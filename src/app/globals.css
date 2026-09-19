@@ -1,26 +1,77 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Self-hosted fonts — no third-party requests at runtime (keeps us clean under UK GDPR). */
+@import "@fontsource/eb-garamond/400.css";
+@import "@fontsource/eb-garamond/500.css";
+@import "@fontsource/eb-garamond/600.css";
+@import "@fontsource-variable/work-sans/index.css";
+
+@theme {
+  /* Grounds */
+  --color-ivory: #faf8f4;
+  --color-ivory-deep: #f7f4ee;
+  --color-charcoal: #2b2a28;
+
+  /* Sage — the primary accent, and the "good / done" status hue */
+  --color-sage: #7c8b72;
+  --color-sage-tint: #eef1ea;
+  --color-sage-deep: #5f6e56;
+  --color-sage-line: #d7decb;
+
+  /* Rose — alerts and destructive actions */
+  --color-rose: #c98b82;
+  --color-rose-tint: #fbedea;
+  --color-rose-deep: #a15d50;
+
+  /* Warm — links inside the portals, and the "pending / waiting" status hue */
+  --color-warm: #8a6f5c;
+  --color-warm-tint: #fbf3e4;
+  --color-gold: #d9c7a3;
+
+  /* Neutrals */
+  --color-ink-soft: #3a3834;
+  --color-ink-muted: #6b6560;
+  --color-ink-faint: #8a8580;
+  --color-ink-pale: #9b958d;
+  --color-line: #e5e0d8;
+  --color-line-soft: #efebe3;
+  --color-line-warm: #f2eee6;
+  --color-field-line: #dad4c9;
+  --color-placeholder: #b0aa9f;
+
+  /* Dark bands — portal sidebars and footers */
+  --color-night: #201f1d;
+  --color-night-deep: #1c1b19;
+  --color-night-line: #35342f;
+  --color-night-line-soft: #33322f;
+  --color-night-chip: #45443f;
+
+  --font-display: "EB Garamond", Georgia, "Times New Roman", serif;
+  --font-sans: "Work Sans Variable", "Work Sans", system-ui, -apple-system, sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  html {
+    background: var(--color-ivory);
   }
-}
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  body {
+    background: var(--color-ivory);
+    color: var(--color-charcoal);
+    font-family: var(--font-sans);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    font-weight: 500;
+  }
+
+  /* Visible focus for keyboard users, invisible for mouse users. */
+  :focus-visible {
+    outline: 2px solid var(--color-sage-deep);
+    outline-offset: 2px;
+  }
 }
