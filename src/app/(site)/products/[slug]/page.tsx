@@ -3,8 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, asc, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
-import { pricingBase, productSizes, products } from "@/db/schema";
-import { CATEGORY_LABEL, formatPrice } from "@/lib/catalogue";
+import { productPrices, productSizes, products } from "@/db/schema";
+import { CATEGORY_LABEL } from "@/lib/catalogue";
+import { ProductPurchase, type SizeOption } from "./product-purchase";
 import { TURNAROUND_NOTE } from "@/lib/studio";
 import { Breadcrumb, Section } from "@/components/site/section";
 import { ImagePlaceholder } from "@/components/site/image-placeholder";
@@ -45,9 +46,14 @@ export default async function ProductDetailPage({
 
   if (!product) notFound();
 
-  const [sizes, basePrice, related] = await Promise.all([
+  const [sizes, prices, related] = await Promise.all([
     db
-      .select({ id: productSizes.id, label: productSizes.label, widthMm: productSizes.widthMm, heightMm: productSizes.heightMm })
+      .select({
+        id: productSizes.id,
+        label: productSizes.label,
+        widthMm: productSizes.widthMm,
+        heightMm: productSizes.heightMm,
+      })
       .from(productSizes)
       .where(
         and(
@@ -56,16 +62,21 @@ export default async function ProductDetailPage({
         ),
       )
       .orderBy(asc(productSizes.sortOrder)),
+    // Public list prices only — a signed-in visitor's own rate is fetched
+    // after render, so this page stays cacheable and auth-free.
     db
-      .select({ unitPricePence: pricingBase.unitPricePence })
-      .from(pricingBase)
+      .select({
+        productSizeId: productPrices.productSizeId,
+        amountMinor: productPrices.amountMinor,
+        currency: productPrices.currency,
+      })
+      .from(productPrices)
       .where(
         and(
-          eq(pricingBase.productId, product.id),
-          eq(pricingBase.isActive, true),
+          eq(productPrices.productId, product.id),
+          eq(productPrices.isActive, true),
         ),
-      )
-      .limit(1),
+      ),
     db
       .select({ slug: products.slug, name: products.name })
       .from(products)
@@ -80,7 +91,22 @@ export default async function ProductDetailPage({
       .limit(3),
   ]);
 
-  const from = basePrice[0]?.unitPricePence;
+  const priceBySize = new Map(
+    prices.map((row) => [
+      row.productSizeId,
+      { amountMinor: row.amountMinor, currency: row.currency },
+    ]),
+  );
+
+  const sizeOptions: SizeOption[] = sizes.map((size) => ({
+    id: size.id,
+    label: size.label,
+    dimensions:
+      size.widthMm && size.heightMm
+        ? `${size.widthMm} × ${size.heightMm}mm`
+        : null,
+    basePrice: priceBySize.get(size.id) ?? null,
+  }));
 
   return (
     <Section>
@@ -119,11 +145,6 @@ export default async function ProductDetailPage({
               {CATEGORY_LABEL[product.category]} stationery
             </span>
             <h1 className="text-[34px] leading-tight">{product.name}</h1>
-            <p className="text-[15px] text-ink-muted">
-              {from
-                ? `From ${formatPrice(from)} per piece · price confirmed at quote`
-                : "Price confirmed at quote"}
-            </p>
           </div>
 
           {(product.description ?? product.summary) && (
@@ -132,46 +153,26 @@ export default async function ProductDetailPage({
             </p>
           )}
 
-          {sizes.length > 0 && (
-            <div className="flex flex-col gap-3">
-              <h2 className="text-[13px] font-semibold text-ink-soft">
-                Available sizes
-              </h2>
-              <ul className="flex flex-wrap gap-2.5">
-                {sizes.map((size) => (
-                  <li
-                    key={size.id}
-                    className="rounded-full border border-line bg-white px-4 py-2 text-[13px] text-ink-soft"
-                  >
-                    {size.label}
-                    {size.widthMm && size.heightMm && (
-                      <span className="text-ink-quiet">
-                        {" "}
-                        ({size.widthMm} × {size.heightMm}mm)
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <ProductPurchase
+            slug={product.slug}
+            sizes={sizeOptions}
+            minimumQuantity={product.minimumQuantity}
+          />
 
           <div className="rounded-md border border-line bg-white p-6">
-            <h2 className="font-display text-lg">Order this piece</h2>
+            <h2 className="font-display text-lg">Before anything is printed</h2>
             <p className="mt-2 text-[14px] leading-relaxed text-ink-muted">
-              Tell us the quantity and the date you need it by, and we&rsquo;ll
-              send a written quote within one working day. Nothing is charged
-              until you&rsquo;ve approved it.
+              A proof comes to you for approval first, whichever way you order.
+              Need something bespoke, or a quantity outside the usual range?{" "}
+              <Link
+                href={`/quote?product=${product.slug}`}
+                className="font-semibold text-accent-text"
+              >
+                Ask us for a quote
+              </Link>
+              .
             </p>
-            <Link
-              href={`/quote?product=${product.slug}`}
-              className="mt-5 inline-flex rounded-[2px] bg-brand px-7 py-3.5 text-sm font-semibold text-on-accent hover:bg-blue-deep"
-            >
-              Request a quote for this
-            </Link>
-            <p className="mt-4 text-[12px] text-ink-quiet">
-              Minimum order {product.minimumQuantity}. {TURNAROUND_NOTE}
-            </p>
+            <p className="mt-4 text-[12px] text-ink-quiet">{TURNAROUND_NOTE}</p>
           </div>
         </div>
       </div>

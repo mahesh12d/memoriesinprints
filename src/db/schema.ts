@@ -96,9 +96,6 @@ export const notificationType = pgEnum("notification_type", [
   "system",
 ]);
 
-export const addonKind = pgEnum("addon_kind", ["finish", "extra"]);
-export const priceMode = pgEnum("price_mode", ["per_unit", "flat"]);
-
 /* -------------------------------------------------------------------------- */
 /* People and auth                                                            */
 /* -------------------------------------------------------------------------- */
@@ -284,7 +281,7 @@ export const enquiries = pgTable(
     eventDate: timestamp("event_date", { withTimezone: true }),
     estimatedQuantity: integer("estimated_quantity"),
     status: enquiryStatus("status").notNull().default("new"),
-    quotedAmountPence: integer("quoted_amount_pence"),
+    quotedAmountMinor: integer("quoted_amount_minor"),
     quotedAt: timestamp("quoted_at", { withTimezone: true }),
     quoteNotes: text("quote_notes"),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -314,7 +311,7 @@ export const orders = pgTable(
     }),
     status: orderStatus("status").notNull().default("awaiting_price"),
     paymentStatus: paymentStatus("payment_status").notNull().default("unpaid"),
-    totalPence: integer("total_pence"),
+    totalMinor: integer("total_minor"),
     currency: text("currency").notNull().default("GBP"),
 
     assignedDesignerId: uuid("assigned_designer_id").references(() => users.id, {
@@ -367,12 +364,17 @@ export const orderItems = pgTable(
     productSizeId: uuid("product_size_id").references(() => productSizes.id, {
       onDelete: "set null",
     }),
-    /** Snapshots, so an order still reads correctly if the catalogue changes. */
+    /**
+     * The same key the cart used. Price is never frozen, so this is what the
+     * repricer resolves against when the order is displayed.
+     */
+    itemKey: text("item_key"),
+    /** Name and size are snapshotted so an order still reads correctly. */
     nameSnapshot: text("name_snapshot").notNull(),
     sizeSnapshot: text("size_snapshot"),
     quantity: integer("quantity").notNull().default(1),
-    unitPricePence: integer("unit_price_pence"),
-    lineTotalPence: integer("line_total_pence"),
+    unitPriceMinor: integer("unit_price_minor"),
+    lineTotalMinor: integer("line_total_minor"),
   },
   (t) => [index("order_items_order_idx").on(t.orderId)],
 );
@@ -462,7 +464,7 @@ export const payments = pgTable(
     provider: paymentProvider("provider").notNull(),
     providerOrderId: text("provider_order_id"),
     providerPaymentId: text("provider_payment_id"),
-    amountPence: integer("amount_pence").notNull(),
+    amountMinor: integer("amount_minor").notNull(),
     currency: text("currency").notNull().default("GBP"),
     status: paymentEventStatus("status").notNull().default("created"),
     rawPayload: jsonb("raw_payload"),
@@ -517,74 +519,175 @@ export const activityEvents = pgTable(
 );
 
 /* -------------------------------------------------------------------------- */
-/* Pricing — four independent layers                                          */
-/* -------------------------------------------------------------------------- */
+/* Pricing — four tables in two layers                                        */
+/* --------------------------------------------------------------------------
+ * Base prices are what the public sees. Customer prices are negotiated rates
+ * that override the base for one account. A customer price always wins; where
+ * neither exists the piece is quoted individually rather than shown as free.
+ *
+ * Every row carries its own currency, so a negotiated price can be agreed in a
+ * different currency from the list price, and each figure is formatted with
+ * the currency it was actually stored in.
+ * -------------------------------------------------------------------------- */
 
-/** Layer 1: the starting unit price for a product at its minimum quantity. */
-export const pricingBase = pgTable(
-  "pricing_base",
+/** Layer 1, portfolio: the list price of a portfolio piece. */
+export const portfolioItemPrices = pgTable(
+  "portfolio_item_prices",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    portfolioItemId: uuid("portfolio_item_id")
+      .notNull()
+      .references(() => portfolioItems.id, { onDelete: "cascade" }),
+    amountMinor: integer("amount_minor").notNull(),
+    currency: text("currency").notNull().default("GBP"),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [uniqueIndex("portfolio_item_prices_item_unique").on(t.portfolioItemId)],
+);
+
+/** Layer 2, portfolio: a negotiated price for one customer on one piece. */
+export const customerItemPrices = pgTable(
+  "customer_item_prices",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    portfolioItemId: uuid("portfolio_item_id")
+      .notNull()
+      .references(() => portfolioItems.id, { onDelete: "cascade" }),
+    amountMinor: integer("amount_minor").notNull(),
+    currency: text("currency").notNull().default("GBP"),
+    isActive: boolean("is_active").notNull().default(true),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("customer_item_prices_unique").on(t.userId, t.portfolioItemId),
+    index("customer_item_prices_user_idx").on(t.userId),
+  ],
+);
+
+/** Layer 1, products: the list price of one size of one product. */
+export const productPrices = pgTable(
+  "product_prices",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     productId: uuid("product_id")
       .notNull()
       .references(() => products.id, { onDelete: "cascade" }),
-    minQuantity: integer("min_quantity").notNull().default(1),
-    unitPricePence: integer("unit_price_pence").notNull(),
+    productSizeId: uuid("product_size_id")
+      .notNull()
+      .references(() => productSizes.id, { onDelete: "cascade" }),
+    amountMinor: integer("amount_minor").notNull(),
+    currency: text("currency").notNull().default("GBP"),
     isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("pricing_base_product_idx").on(t.productId)],
+  (t) => [
+    uniqueIndex("product_prices_unique").on(t.productId, t.productSizeId),
+    index("product_prices_product_idx").on(t.productId),
+  ],
 );
 
-/** Layer 2: volume breaks. A null productId makes the tier apply site-wide. */
-export const pricingVolumeTiers = pgTable(
-  "pricing_volume_tiers",
+/** Layer 2, products: a negotiated price for one customer, product and size. */
+export const customerProductPrices = pgTable(
+  "customer_product_prices",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    productId: uuid("product_id").references(() => products.id, {
-      onDelete: "cascade",
-    }),
-    minQuantity: integer("min_quantity").notNull(),
-    maxQuantity: integer("max_quantity"),
-    unitPricePence: integer("unit_price_pence").notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    productSizeId: uuid("product_size_id")
+      .notNull()
+      .references(() => productSizes.id, { onDelete: "cascade" }),
+    amountMinor: integer("amount_minor").notNull(),
+    currency: text("currency").notNull().default("GBP"),
     isActive: boolean("is_active").notNull().default(true),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
-  (t) => [index("pricing_volume_product_idx").on(t.productId)],
+  (t) => [
+    uniqueIndex("customer_product_prices_unique").on(
+      t.userId,
+      t.productId,
+      t.productSizeId,
+    ),
+    index("customer_product_prices_user_idx").on(t.userId),
+  ],
 );
 
-/** Layer 3: finishes and extras, priced per unit or as a flat fee. */
-export const pricingAddons = pgTable(
-  "pricing_addons",
+/* -------------------------------------------------------------------------- */
+/* Cart                                                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A cart belongs either to an account or to an anonymous browser token. When a
+ * guest signs in, their cart is merged into the account's.
+ */
+export const carts = pgTable(
+  "carts",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    code: text("code").notNull(),
-    name: text("name").notNull(),
-    kind: addonKind("kind").notNull().default("finish"),
-    mode: priceMode("mode").notNull().default("per_unit"),
-    pricePence: integer("price_pence").notNull(),
-    isActive: boolean("is_active").notNull().default(true),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    /** SHA-256 of the guest cookie; null once the cart belongs to an account. */
+    guestTokenHash: text("guest_token_hash"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
-  (t) => [uniqueIndex("pricing_addons_code_unique").on(t.code)],
+  (t) => [
+    uniqueIndex("carts_user_unique").on(t.userId),
+    uniqueIndex("carts_guest_unique").on(t.guestTokenHash),
+  ],
 );
 
-/** Layer 4: turnaround bands and their surcharge. */
-export const pricingTurnaround = pgTable(
-  "pricing_turnaround",
+/**
+ * `itemKey` is the composite `slug::size::templateNumber` for a catalogue
+ * product, or a bare portfolio-item UUID. No price is stored: it is always
+ * re-derived, so a catalogue change reaches carts without a migration.
+ */
+export const cartItems = pgTable(
+  "cart_items",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    code: text("code").notNull(),
-    name: text("name").notNull(),
-    workingDaysMin: integer("working_days_min").notNull(),
-    workingDaysMax: integer("working_days_max").notNull(),
-    /** Whole percent added to the subtotal (0 for standard). */
-    surchargePercent: integer("surcharge_percent").notNull().default(0),
-    surchargeFlatPence: integer("surcharge_flat_pence").notNull().default(0),
-    isActive: boolean("is_active").notNull().default(true),
-    sortOrder: integer("sort_order").notNull().default(0),
+    cartId: uuid("cart_id")
+      .notNull()
+      .references(() => carts.id, { onDelete: "cascade" }),
+    itemKey: text("item_key").notNull(),
+    quantity: integer("quantity").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
-  (t) => [uniqueIndex("pricing_turnaround_code_unique").on(t.code)],
+  (t) => [uniqueIndex("cart_items_unique").on(t.cartId, t.itemKey)],
 );
 
 /* -------------------------------------------------------------------------- */
@@ -605,8 +708,7 @@ export const sessionsRelations = relations(sessions, ({ one }) => ({
 
 export const productsRelations = relations(products, ({ many }) => ({
   sizes: many(productSizes),
-  basePricing: many(pricingBase),
-  volumeTiers: many(pricingVolumeTiers),
+  prices: many(productPrices),
 }));
 
 export const productSizesRelations = relations(productSizes, ({ one }) => ({
@@ -691,6 +793,9 @@ export type Enquiry = typeof enquiries.$inferSelect;
 export type ProofVersion = typeof proofVersions.$inferSelect;
 export type ProofComment = typeof proofComments.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
+export type Cart = typeof carts.$inferSelect;
+export type CartItem = typeof cartItems.$inferSelect;
+export type ProductPrice = typeof productPrices.$inferSelect;
 export type UserRole = (typeof userRole.enumValues)[number];
 export type OrderStatus = (typeof orderStatus.enumValues)[number];
 export type ProofStatus = (typeof proofStatus.enumValues)[number];

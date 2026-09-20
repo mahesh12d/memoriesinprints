@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { enquiries } from "@/db/schema";
 import { requireUser } from "@/lib/auth/guards";
 import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
-import { formatPrice } from "@/lib/catalogue";
+import { formatMoney } from "@/lib/pricing/money";
 import { StatusPill, type PillTone } from "@/components/portal/status-pill";
 import { CancelQuoteButton } from "./cancel-quote-button";
 
@@ -41,7 +41,7 @@ export default async function AccountQuotesPage() {
       reference: enquiries.reference,
       subject: enquiries.subject,
       status: enquiries.status,
-      quotedAmountPence: enquiries.quotedAmountPence,
+      quotedAmountMinor: enquiries.quotedAmountMinor,
       createdAt: enquiries.createdAt,
     })
     .from(enquiries)
@@ -92,9 +92,9 @@ export default async function AccountQuotesPage() {
                     </div>
 
                     <div className="flex items-center gap-5">
-                      {row.quotedAmountPence !== null && (
+                      {row.quotedAmountMinor !== null && (
                         <span className="text-sm font-semibold">
-                          {formatPrice(row.quotedAmountPence)}
+                          {formatMoney(row.quotedAmountMinor, "GBP")}
                         </span>
                       )}
                       <StatusPill tone={STATUS_TONE[row.status] ?? "neutral"}>

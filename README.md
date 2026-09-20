@@ -24,8 +24,14 @@ appears in the customer's Quotes page where they can withdraw it. Terms,
 privacy and cookies pages exist but say plainly that the wording is still to
 come from the studio.
 
-Still to come: cart and checkout, payments (Razorpay and PayPal), the proof
-review tool, the studio work queue, and the admin CRUD screens.
+**Milestone 4 — pricing, cart and checkout.** Four price tables in two layers
+(list prices and per-customer negotiated rates, for both catalogue products and
+portfolio pieces), each row carrying its own currency. A cart that survives
+signing in, checkout, order creation, and both payment providers wired up
+behind one interface. Four admin screens, one per price table.
+
+Still to come: live payment credentials, the proof review tool, the studio work
+queue, and the remaining admin CRUD screens.
 
 ## Stack
 
@@ -108,6 +114,33 @@ variables to send for real.
 | `npm run test:e2e`    | Playwright end-to-end tests                       |
 | `npm test`            | Both                                              |
 
+## How pricing works
+
+Four tables in two layers. `product_prices` and `portfolio_item_prices` hold
+list prices; `customer_product_prices` and `customer_item_prices` hold rates
+negotiated with one account. A customer price always beats the list price, and
+where neither exists the item is shown as quoted individually — never as zero
+or a placeholder.
+
+Every price row stores its own currency, and each figure is formatted with the
+currency it was stored in. The minor-unit divisor comes from `Intl` rather than
+a hardcoded 100, so a currency without decimals formats correctly.
+
+Cart and order lines are identified by one string. A catalogue product is
+`slug::size::templateNumber`; a portfolio piece is its bare UUID. The separator
+decides which path is taken.
+
+Prices are **not** frozen when an order is created. Each line keeps its key, and
+`repriceOrders` re-derives the total whenever orders are displayed, so a
+catalogue correction reaches existing orders without anyone re-keying them. The
+rules, in `src/lib/pricing/reprice-rules.ts`: a paid order is never repriced,
+only orders referencing exactly one item are touched, an item that can't be
+priced is left alone rather than zeroed, and an unchanged figure is not written
+back. A list of any length costs a fixed number of queries.
+
+The `/api/pricing/customer` endpoint takes the user id from the session cookie
+and nowhere else — there is deliberately no user id in the request body.
+
 ## How authentication works
 
 Sessions are rows in the database, not JWTs, so a session can be revoked the
@@ -133,9 +166,12 @@ moment someone asks — which is what makes "sign out my other devices" honest.
       city, founder name and the social links are placeholders.
 - [ ] Write the terms, privacy and cookie notices.
 - [ ] Replace the image placeholders with the studio's photography.
-- [ ] Confirm the four pricing layers; the seeded figures are placeholders.
 - [ ] Point `MAIL_TRANSPORT` at a real provider and verify the sending domain.
-- [ ] Add Razorpay and PayPal credentials.
+- [ ] Add Razorpay and PayPal credentials. Until then checkout records the
+      order and says plainly that payment isn't live; nothing pretends to have
+      been paid.
+- [ ] Confirm which currency the Razorpay account settles in before taking
+      live payments in anything other than that currency.
 - [ ] Decide where proof images are stored (S3, R2 or similar).
 - [ ] Remove the seeded demo accounts.
 
@@ -154,7 +190,10 @@ src/
   db/                schema, client, seed
   lib/
     auth/            passwords, sessions, tokens, guards, server actions
+    cart/            cart contents and guest-cart merging
     enquiries/       quote request handling
+    payments/        provider interface, Razorpay, PayPal, checkout
+    pricing/         keys, money, resolution, repricing
     mail/            transport and templates
   proxy.ts           cookie-level redirects
 drizzle/             generated SQL migrations

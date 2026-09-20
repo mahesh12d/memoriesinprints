@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import { isStaff } from "@/lib/auth/guards";
+import { getCartCount } from "@/lib/cart/cart";
 import { MobileNav } from "./mobile-nav";
 
 const LINKS = [
@@ -13,6 +14,7 @@ const LINKS = [
 
 export async function SiteHeader() {
   const session = await getSession("site");
+  const cartCount = await getCartCount();
 
   const accountHref = session
     ? isStaff(session.user.role)
@@ -54,6 +56,17 @@ export async function SiteHeader() {
             className="text-sm font-semibold text-ink-soft hover:text-blue"
           >
             {accountLabel}
+          </Link>
+          <Link
+            href="/cart"
+            className="flex items-center gap-2 text-sm font-semibold text-ink-soft hover:text-blue"
+          >
+            Cart
+            {cartCount > 0 && (
+              <span className="flex min-w-5 items-center justify-center rounded-full bg-brand px-1.5 py-0.5 text-[11px] font-bold text-on-accent">
+                {cartCount}
+              </span>
+            )}
           </Link>
           <Link
             href="/quote"

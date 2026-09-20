@@ -33,6 +33,7 @@ import {
   revokeSession,
 } from "./session";
 import { isStaff } from "./guards";
+import { mergeGuestCart } from "@/lib/cart/cart";
 import { fail, type FormState } from "./form-state";
 
 async function clientKey(): Promise<string> {
@@ -100,6 +101,7 @@ export async function signupAction(
   await sendMail(verifyEmailMail(email, name, token));
 
   await createSession(created.id, "site");
+  await mergeGuestCart(created.id);
   redirect("/verify-email?sent=1");
 }
 
@@ -163,6 +165,7 @@ export async function loginAction(
     .where(eq(users.id, user.id));
 
   await createSession(user.id, "site");
+  await mergeGuestCart(user.id);
 
   const next = formData.get("next");
   redirect(typeof next === "string" && next.startsWith("/") ? next : homeForRole(user.role));

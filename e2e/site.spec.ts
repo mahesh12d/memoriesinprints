@@ -100,7 +100,7 @@ test.describe("Catalogue", () => {
     expect(await page.getByRole("listitem").count()).toBeLessThan(all);
   });
 
-  test("a product page shows its sizes and routes into the quote form", async ({
+  test("a product page shows a price, a size and a way to buy", async ({
     page,
   }) => {
     await page.goto("/products");
@@ -108,13 +108,8 @@ test.describe("Catalogue", () => {
 
     await expect(page).toHaveURL(/\/products\/[a-z-]+/);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    await expect(page.getByText("Available sizes")).toBeVisible();
-
-    await page.getByRole("link", { name: "Request a quote for this" }).click();
-    await expect(page).toHaveURL(/\/quote\?product=/);
-
-    // The subject is prefilled from the product that was being viewed.
-    await expect(page.getByLabel("What do you need?")).not.toHaveValue("");
+    await expect(page.getByLabel("Size")).toBeVisible();
+    await expect(page.getByLabel("Quantity")).toBeVisible();
   });
 
   test("an unknown product 404s rather than erroring", async ({ page }) => {

@@ -3,16 +3,18 @@ import { hash } from "@node-rs/argon2";
 import { db } from "./index";
 import {
   activityEvents,
+  cartItems,
+  carts,
   enquiries,
   notifications,
   orderItems,
   orders,
   payments,
   portfolioItems,
-  pricingAddons,
-  pricingBase,
-  pricingTurnaround,
-  pricingVolumeTiers,
+  customerItemPrices,
+  customerProductPrices,
+  portfolioItemPrices,
+  productPrices,
   productSizes,
   products,
   proofComments,
@@ -42,10 +44,12 @@ async function reset() {
   await db.delete(enquiries);
   await db.delete(savedItems);
   await db.delete(notifications);
-  await db.delete(pricingBase);
-  await db.delete(pricingVolumeTiers);
-  await db.delete(pricingAddons);
-  await db.delete(pricingTurnaround);
+  await db.delete(cartItems);
+  await db.delete(carts);
+  await db.delete(customerProductPrices);
+  await db.delete(customerItemPrices);
+  await db.delete(productPrices);
+  await db.delete(portfolioItemPrices);
   await db.delete(productSizes);
   await db.delete(products);
   await db.delete(portfolioItems);
@@ -262,7 +266,7 @@ async function main() {
       enquiryId: enquiry.id,
       status: "awaiting_proof",
       paymentStatus: "paid",
-      totalPence: 18500,
+      totalMinor: 18500,
       assignedDesignerId: designer.id,
       paperStock: "300gsm Cover",
       finish: "Foil detailing",
@@ -273,7 +277,7 @@ async function main() {
       userId: customer.id,
       status: "delivered",
       paymentStatus: "paid",
-      totalPence: 9600,
+      totalMinor: 9600,
       assignedDesignerId: designer.id,
       placedAt: new Date(now.getTime() - 40 * 86_400_000),
     },
@@ -284,34 +288,99 @@ async function main() {
     { userId: customer.id, productId: bySlug["memory-box"] },
   ]);
 
-  // Pricing — placeholder figures. Confirm all four layers before launch.
-  await db.insert(pricingBase).values(
-    insertedProducts.map((p) => ({
-      productId: p.id,
-      minQuantity: 25,
-      unitPricePence: 180,
+  /* ---------------------------------------------------------------- */
+  /* Prices — placeholder figures, in two layers                       */
+  /* ---------------------------------------------------------------- */
+
+  const sizeRows = await db
+    .select({
+      id: productSizes.id,
+      productId: productSizes.productId,
+      label: productSizes.label,
+    })
+    .from(productSizes);
+
+  // A list price per (product, size). Deliberately not every size: the ones
+  // left out exercise the "quoted individually" path.
+  const listPrices: Record<string, number> = {
+    "order-of-service": 185,
+    "memorial-thank-you-card": 120,
+    "attendance-card": 95,
+    "wedding-invitation-suite": 340,
+    "save-the-date": 150,
+    "order-of-the-day": 130,
+    "christening-invitation": 140,
+  };
+
+  const slugById = Object.fromEntries(
+    insertedProducts.map((p) => [p.id, p.slug]),
+  );
+
+  const productPriceRows = sizeRows
+    .map((size) => {
+      const slug = slugById[size.productId];
+      const base = listPrices[slug];
+      if (!base) return null;
+
+      // Larger sizes cost a little more; enough variation to see that pricing
+      // really is per size rather than per product.
+      const uplift = /A4|A5|Square|Standard/.test(size.label) ? 40 : 0;
+
+      return {
+        productId: size.productId,
+        productSizeId: size.id,
+        amountMinor: base + uplift,
+        currency: "GBP",
+      };
+    })
+    .filter((row): row is NonNullable<typeof row> => row !== null);
+
+  await db.insert(productPrices).values(productPriceRows);
+
+  // One negotiated rate, so the "Your price" path has something to show.
+  const orderOfServiceSizes = sizeRows.filter(
+    (size) => slugById[size.productId] === "order-of-service",
+  );
+
+  await db.insert(customerProductPrices).values(
+    orderOfServiceSizes.map((size) => ({
+      userId: customer.id,
+      productId: size.productId,
+      productSizeId: size.id,
+      amountMinor: 145,
+      currency: "GBP",
+      note: "Agreed rate for repeat funeral-home work",
     })),
   );
 
-  await db.insert(pricingVolumeTiers).values([
-    { minQuantity: 1, maxQuantity: 49, unitPricePence: 200 },
-    { minQuantity: 50, maxQuantity: 99, unitPricePence: 180 },
-    { minQuantity: 100, maxQuantity: 199, unitPricePence: 160 },
-    { minQuantity: 200, maxQuantity: null, unitPricePence: 140 },
-  ]);
+  const portfolioRows = await db
+    .select({ id: portfolioItems.id, slug: portfolioItems.slug })
+    .from(portfolioItems);
 
-  await db.insert(pricingAddons).values([
-    { code: "foil", name: "Foil detailing", kind: "finish", mode: "per_unit", pricePence: 45 },
-    { code: "letterpress", name: "Letterpress", kind: "finish", mode: "per_unit", pricePence: 80 },
-    { code: "envelope-lining", name: "Envelope lining", kind: "extra", mode: "per_unit", pricePence: 30 },
-    { code: "wax-seal", name: "Wax seal", kind: "extra", mode: "per_unit", pricePence: 55 },
-  ]);
+  // Most portfolio pieces are bespoke and carry no list price at all.
+  const pricedPortfolio = portfolioRows.filter((row) =>
+    ["willow-order-of-service", "autumn-memorial-cards", "memorial-candle-labels"].includes(
+      row.slug,
+    ),
+  );
 
-  await db.insert(pricingTurnaround).values([
-    { code: "standard", name: "Standard", workingDaysMin: 10, workingDaysMax: 14, surchargePercent: 0, sortOrder: 1 },
-    { code: "expedited", name: "Expedited", workingDaysMin: 5, workingDaysMax: 7, surchargePercent: 15, sortOrder: 2 },
-    { code: "rush", name: "Rush", workingDaysMin: 2, workingDaysMax: 3, surchargePercent: 35, sortOrder: 3 },
-  ]);
+  await db.insert(portfolioItemPrices).values(
+    pricedPortfolio.map((row, index) => ({
+      portfolioItemId: row.id,
+      amountMinor: [22000, 9500, 4500][index] ?? 9500,
+      currency: "GBP",
+    })),
+  );
+
+  if (pricedPortfolio[0]) {
+    await db.insert(customerItemPrices).values({
+      userId: customer.id,
+      portfolioItemId: pricedPortfolio[0].id,
+      amountMinor: 19500,
+      currency: "GBP",
+      note: "Negotiated for a repeat commission",
+    });
+  }
 
   console.log("\nSeeded. Demo accounts (password: %s)", DEMO_PASSWORD);
   console.table([
