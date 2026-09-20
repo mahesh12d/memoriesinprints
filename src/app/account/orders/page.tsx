@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { orders } from "@/db/schema";
+import { orders, proofVersions } from "@/db/schema";
 import { requireUser } from "@/lib/auth/guards";
 import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
 import { StatusPill, type PillTone } from "@/components/portal/status-pill";
@@ -56,6 +56,30 @@ export default async function AccountOrdersPage() {
    * figures that actually moved are written back.
    */
   const lines = await loadOrdersWithLines(rows.map((row) => row.id));
+
+  /**
+   * The latest proof per order, so a row can say whether there is anything to
+   * look at. One query for the whole list, not one per row.
+   */
+  const latestProofs = rows.length
+    ? await db
+        .selectDistinctOn([proofVersions.orderId], {
+          orderId: proofVersions.orderId,
+          status: proofVersions.status,
+        })
+        .from(proofVersions)
+        .where(
+          inArray(
+            proofVersions.orderId,
+            rows.map((row) => row.id),
+          ),
+        )
+        .orderBy(proofVersions.orderId, sql`${proofVersions.versionNumber} desc`)
+    : [];
+
+  const proofByOrder = new Map(
+    latestProofs.map((proof) => [proof.orderId, proof.status]),
+  );
 
   const outcomes = await repriceOrders(
     rows.map((row) => ({
@@ -137,6 +161,25 @@ export default async function AccountOrdersPage() {
                         <span className="text-xs text-ink-quiet">
                           Placed {dateFormat.format(row.createdAt)}
                         </span>
+                        {proofByOrder.has(row.id) && (
+                          <Link
+                            href={`/account/orders/${row.id}/proof`}
+                            // Every row's link reads the same, so the
+                            // reference goes in the label rather than the
+                            // visible text, where it would just repeat the
+                            // line above it.
+                            aria-label={
+                              proofByOrder.get(row.id) === "awaiting_customer"
+                                ? `Review your proof for ${row.reference}`
+                                : `See the proof for ${row.reference}`
+                            }
+                            className="mt-0.5 w-fit text-[13px] font-semibold text-accent-text"
+                          >
+                            {proofByOrder.get(row.id) === "awaiting_customer"
+                              ? "Review your proof"
+                              : "See the proof"}
+                          </Link>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-4">

@@ -33,12 +33,15 @@ export function PortalShell({
   nav,
   user,
   logout,
+  bell,
   children,
 }: {
   variant: Variant;
   nav: NavItem[];
   user: { name: string; roleLabel: string };
   logout: ReactNode;
+  /** Optional notification bell, rendered under the nav. */
+  bell?: ReactNode;
   children: ReactNode;
 }) {
   const badge = BADGE[variant];
@@ -63,7 +66,10 @@ export function PortalShell({
             </span>
           </div>
 
-          <PortalNav items={nav} />
+          <div className="flex flex-col gap-0.5">
+            <PortalNav items={nav} />
+            {bell}
+          </div>
         </div>
 
         <div className="flex flex-col gap-3 px-1.5">

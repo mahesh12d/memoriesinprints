@@ -253,6 +253,12 @@ test.describe("Security page", () => {
       .getByRole("button", { name: /Sign out 1 other device/ })
       .click();
 
+    // The click resolves as soon as the action is dispatched, so wait for the
+    // page to show that it finished before checking the other browser.
+    await expect(
+      firstPage.getByRole("button", { name: /Sign out \d+ other/ }),
+    ).toHaveCount(0);
+
     // The second browser is now signed out.
     await secondPage.goto("/account");
     await expect(secondPage).toHaveURL(/login/);

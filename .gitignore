@@ -44,6 +44,9 @@ next-env.d.ts
 .env
 .mail/
 
+# proof artwork written to disk until R2 is configured
+.uploads/
+
 # playwright
 /test-results/
 /playwright-report/

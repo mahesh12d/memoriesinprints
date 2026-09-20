@@ -1,4 +1,6 @@
 import "dotenv/config";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { hash } from "@node-rs/argon2";
 import { db } from "./index";
 import {
@@ -24,6 +26,8 @@ import {
   users,
   verificationTokens,
 } from "./schema";
+import { buildStorageKey, localUploadPath } from "@/lib/storage/keys";
+import { samplePdf, samplePng } from "@/lib/storage/sample-proof";
 
 /**
  * Development seed. It clears everything first, so it can be re-run freely
@@ -32,6 +36,230 @@ import {
  * Never point this at a production database — it deletes the users table.
  */
 const DEMO_PASSWORD = "printsdemo2026";
+
+type SeedOrder = { id: string; reference: string };
+
+/**
+ * Puts a proof in each state the studio queue knows about, so the staff and
+ * customer screens have something real to show. The artwork is generated
+ * rather than committed, and written straight to the local upload directory —
+ * in development there is no R2 bucket to put it in.
+ */
+async function seedProofs({
+  customerId,
+  designerId,
+  proofreaderId,
+  orders: seeded,
+  now,
+}: {
+  customerId: string;
+  designerId: string;
+  proofreaderId: string;
+  orders: {
+    awaitingCustomer: SeedOrder;
+    delivered: SeedOrder;
+    needsProofreading: SeedOrder;
+    returned: SeedOrder;
+  };
+  now: Date;
+}) {
+  async function store(
+    fileName: string,
+    body: Buffer,
+  ): Promise<{ storageKey: string; sizeBytes: number }> {
+    const storageKey = buildStorageKey("proofs", fileName);
+    const target = localUploadPath(storageKey);
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(target, body);
+    return { storageKey, sizeBytes: body.length };
+  }
+
+  const memorial = await store(
+    "order-of-service-v2.pdf",
+    samplePdf("In loving memory", [
+      "Elizabeth Anne Hartley",
+      "14th March 1946 — 2nd February 2026",
+      "St Mary's Church, Tuesday 14th April at 11am",
+    ]),
+  );
+  const thankYou = await store(
+    "thank-you-card-v1.pdf",
+    samplePdf("With grateful thanks", [
+      "The family of Elizabeth Hartley",
+      "thank you for your kindness and sympathy",
+    ]),
+  );
+  const attendance = await store("attendance-card-v1.png", samplePng());
+  const wedding = await store(
+    "invitation-v1.pdf",
+    samplePdf("Save the date", [
+      "Hannah & Joseph",
+      "Saturday 12th September 2026",
+    ]),
+  );
+
+  const [withCustomer] = await db
+    .insert(proofVersions)
+    .values([
+      {
+        orderId: seeded.awaitingCustomer.id,
+        versionNumber: 1,
+        ...memorial,
+        fileName: "order-of-service-v1.pdf",
+        mimeType: "application/pdf",
+        uploadedById: designerId,
+        status: "changes_requested",
+        proofreaderId,
+        proofreadAt: new Date(now.getTime() - 6 * 86_400_000),
+        sentToCustomerAt: new Date(now.getTime() - 6 * 86_400_000),
+        customerDecisionAt: new Date(now.getTime() - 5 * 86_400_000),
+        createdAt: new Date(now.getTime() - 7 * 86_400_000),
+      },
+      {
+        orderId: seeded.awaitingCustomer.id,
+        versionNumber: 2,
+        ...memorial,
+        fileName: "order-of-service-v2.pdf",
+        mimeType: "application/pdf",
+        uploadedById: designerId,
+        status: "awaiting_customer",
+        proofreaderId,
+        proofreadAt: new Date(now.getTime() - 86_400_000),
+        sentToCustomerAt: new Date(now.getTime() - 86_400_000),
+        createdAt: new Date(now.getTime() - 2 * 86_400_000),
+      },
+      {
+        orderId: seeded.needsProofreading.id,
+        versionNumber: 1,
+        ...attendance,
+        fileName: "attendance-card-v1.png",
+        mimeType: "image/png",
+        uploadedById: designerId,
+        status: "awaiting_proofreading",
+        createdAt: new Date(now.getTime() - 5 * 3_600_000),
+      },
+      {
+        orderId: seeded.returned.id,
+        versionNumber: 1,
+        ...wedding,
+        fileName: "invitation-v1.pdf",
+        mimeType: "application/pdf",
+        uploadedById: designerId,
+        status: "returned_to_designer",
+        proofreaderId,
+        proofreadAt: new Date(now.getTime() - 3 * 3_600_000),
+        proofreaderNotes:
+          "The date reads 12th September but the enquiry says the 19th. Worth checking before this goes out.",
+        createdAt: new Date(now.getTime() - 2 * 86_400_000),
+      },
+      {
+        orderId: seeded.delivered.id,
+        versionNumber: 1,
+        ...thankYou,
+        fileName: "thank-you-card-v1.pdf",
+        mimeType: "application/pdf",
+        uploadedById: designerId,
+        status: "approved",
+        proofreaderId,
+        proofreadAt: new Date(now.getTime() - 38 * 86_400_000),
+        sentToCustomerAt: new Date(now.getTime() - 38 * 86_400_000),
+        customerDecisionAt: new Date(now.getTime() - 37 * 86_400_000),
+        createdAt: new Date(now.getTime() - 39 * 86_400_000),
+      },
+    ])
+    .returning({ id: proofVersions.id });
+
+  // What the customer marked on the first version, which is why there is a
+  // second one.
+  await db.insert(proofComments).values([
+    {
+      proofVersionId: withCustomer.id,
+      authorId: customerId,
+      body: "Could her middle name be included here? It should read Elizabeth Anne.",
+      xPct: 38,
+      yPct: 27,
+      pinNumber: 1,
+      createdAt: new Date(now.getTime() - 5 * 86_400_000),
+    },
+    {
+      proofVersionId: withCustomer.id,
+      authorId: customerId,
+      body: "The service is at 11am, not 11.30.",
+      xPct: 55,
+      yPct: 61,
+      pinNumber: 2,
+      createdAt: new Date(now.getTime() - 5 * 86_400_000),
+    },
+  ]);
+
+  /**
+   * A little history on the delivered order, so the dashboard's turnaround
+   * line has more than one week to draw. These are all approved and long past.
+   */
+  const history = [3.5, 2.5, 4, 1.5, 2, 1] // days from sending to approval
+    .map((days, index) => {
+      const weeksAgo = 7 - index;
+      const sent = new Date(now.getTime() - weeksAgo * 7 * 86_400_000);
+
+      return {
+        orderId: seeded.delivered.id,
+        versionNumber: index + 2,
+        ...thankYou,
+        fileName: `archive-v${index + 2}.pdf`,
+        mimeType: "application/pdf",
+        uploadedById: designerId,
+        status: "approved" as const,
+        proofreaderId,
+        proofreadAt: sent,
+        sentToCustomerAt: sent,
+        customerDecisionAt: new Date(sent.getTime() + days * 86_400_000),
+        createdAt: new Date(sent.getTime() - 86_400_000),
+      };
+    });
+
+  await db.insert(proofVersions).values(history);
+
+  await db.insert(notifications).values({
+    userId: customerId,
+    type: "proof_ready",
+    title: `Your proof for ${seeded.awaitingCustomer.reference} is ready`,
+    body: "Have a look and let us know if anything needs changing.",
+    linkUrl: `/account/orders/${seeded.awaitingCustomer.id}/proof`,
+    createdAt: new Date(now.getTime() - 86_400_000),
+  });
+
+  await db.insert(activityEvents).values([
+    {
+      orderId: seeded.awaitingCustomer.id,
+      actorId: proofreaderId,
+      type: "proof_sent",
+      summary: `Version 2 of ${seeded.awaitingCustomer.reference} sent to the customer`,
+      createdAt: new Date(now.getTime() - 86_400_000),
+    },
+    {
+      orderId: seeded.awaitingCustomer.id,
+      actorId: customerId,
+      type: "changes_requested",
+      summary: `Changes requested on ${seeded.awaitingCustomer.reference}`,
+      createdAt: new Date(now.getTime() - 5 * 86_400_000),
+    },
+    {
+      orderId: seeded.returned.id,
+      actorId: proofreaderId,
+      type: "proof_returned",
+      summary: `${seeded.returned.reference} returned to the designer`,
+      createdAt: new Date(now.getTime() - 3 * 3_600_000),
+    },
+    {
+      orderId: seeded.needsProofreading.id,
+      actorId: designerId,
+      type: "proof_uploaded",
+      summary: `A proof for ${seeded.needsProofreading.reference} is waiting to be proofread`,
+      createdAt: new Date(now.getTime() - 5 * 3_600_000),
+    },
+  ]);
+
+}
 
 async function reset() {
   // Children before parents; foreign keys are enforced.
@@ -259,29 +487,58 @@ async function main() {
     })
     .returning({ id: enquiries.id });
 
-  await db.insert(orders).values([
-    {
-      reference: "MP-1039",
-      userId: customer.id,
-      enquiryId: enquiry.id,
-      status: "awaiting_proof",
-      paymentStatus: "paid",
-      totalMinor: 18500,
-      assignedDesignerId: designer.id,
-      paperStock: "300gsm Cover",
-      finish: "Foil detailing",
-      placedAt: now,
-    },
-    {
-      reference: "MP-1036",
-      userId: customer.id,
-      status: "delivered",
-      paymentStatus: "paid",
-      totalMinor: 9600,
-      assignedDesignerId: designer.id,
-      placedAt: new Date(now.getTime() - 40 * 86_400_000),
-    },
-  ]);
+  const [awaitingCustomer, delivered, needsProofreading, returned] = await db
+    .insert(orders)
+    .values([
+      {
+        reference: "MP-1039",
+        userId: customer.id,
+        enquiryId: enquiry.id,
+        status: "awaiting_proof",
+        paymentStatus: "paid",
+        totalMinor: 18500,
+        assignedDesignerId: designer.id,
+        paperStock: "300gsm Cover",
+        finish: "Foil detailing",
+        placedAt: now,
+      },
+      {
+        reference: "MP-1036",
+        userId: customer.id,
+        status: "delivered",
+        paymentStatus: "paid",
+        totalMinor: 9600,
+        assignedDesignerId: designer.id,
+        placedAt: new Date(now.getTime() - 40 * 86_400_000),
+      },
+      {
+        reference: "MP-1041",
+        userId: customer.id,
+        status: "awaiting_proof",
+        paymentStatus: "paid",
+        totalMinor: 14500,
+        assignedDesignerId: designer.id,
+        placedAt: new Date(now.getTime() - 2 * 86_400_000),
+      },
+      {
+        reference: "MP-1042",
+        userId: customer.id,
+        status: "awaiting_proof",
+        paymentStatus: "unpaid",
+        totalMinor: 11000,
+        assignedDesignerId: designer.id,
+        placedAt: new Date(now.getTime() - 4 * 86_400_000),
+      },
+    ])
+    .returning({ id: orders.id, reference: orders.reference });
+
+  await seedProofs({
+    customerId: customer.id,
+    designerId: designer.id,
+    proofreaderId: proofreader.id,
+    orders: { awaitingCustomer, delivered, needsProofreading, returned },
+    now,
+  });
 
   await db.insert(savedItems).values([
     { userId: customer.id, productId: bySlug["memorial-thank-you-card"] },

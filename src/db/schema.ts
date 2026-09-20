@@ -391,9 +391,11 @@ export const proofVersions = pgTable(
       .notNull()
       .references(() => orders.id, { onDelete: "cascade" }),
     versionNumber: integer("version_number").notNull(),
-    fileUrl: text("file_url").notNull(),
+    /** Object key in R2. Never a public URL — reads go through a signed link. */
+    storageKey: text("storage_key").notNull(),
     fileName: text("file_name"),
     mimeType: text("mime_type"),
+    sizeBytes: integer("size_bytes"),
     widthPx: integer("width_px"),
     heightPx: integer("height_px"),
 
