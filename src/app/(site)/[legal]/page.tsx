@@ -70,7 +70,7 @@ export default async function LegalPage({
           {page.intro}
         </p>
 
-        <div className="mt-4 rounded-md border border-warm/30 bg-warm-tint p-6">
+        <div className="mt-4 rounded-md border border-brand/30 bg-brand-tint p-6">
           <h2 className="font-display text-lg">Not yet written</h2>
           <p className="mt-2 text-[14px] leading-relaxed text-ink-soft">
             This wording needs to come from the studio, and the privacy notice
@@ -84,7 +84,7 @@ export default async function LegalPage({
           </p>
         </div>
 
-        <Link href="/" className="mt-4 text-[13px] font-semibold text-warm">
+        <Link href="/" className="mt-4 text-[13px] font-semibold text-accent-text">
           ← Back to the studio
         </Link>
       </div>

@@ -18,13 +18,13 @@ export function AuthCard({
 }) {
   return (
     <main
-      className={`flex min-h-screen flex-col ${dark ? "bg-night-deep" : "bg-ivory"}`}
+      className={`flex min-h-screen flex-col ${dark ? "bg-blue-deep" : "bg-surface"}`}
     >
       <div className="px-16 py-8">
         <Link
           href="/"
           className={`font-display text-lg font-semibold ${
-            dark ? "text-ink-faint" : "text-charcoal"
+            dark ? "text-ink-quiet" : "text-blue"
           }`}
         >
           Memories in Prints
@@ -34,12 +34,12 @@ export function AuthCard({
       <div className="flex flex-1 items-center justify-center px-16 pb-12">
         <div
           className={`flex w-[420px] flex-col gap-[22px] rounded-lg p-11 ${
-            dark ? "bg-ivory" : "border border-line bg-white"
+            dark ? "bg-surface" : "border border-line bg-white"
           }`}
         >
           <div className="flex flex-col items-center gap-1.5 text-center">
             {badge && (
-              <span className="mb-1.5 rounded-full bg-gold px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.06em] text-charcoal">
+              <span className="mb-1.5 rounded-full bg-brand px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.06em] text-blue">
                 {badge}
               </span>
             )}
@@ -54,7 +54,7 @@ export function AuthCard({
       {footer && (
         <div
           className={`px-16 pb-10 text-center text-[13px] ${
-            dark ? "text-ink-faint" : "text-ink-muted"
+            dark ? "text-ink-quiet" : "text-ink-muted"
           }`}
         >
           {footer}

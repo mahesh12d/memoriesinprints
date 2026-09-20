@@ -27,7 +27,7 @@ export async function SiteHeader() {
     : "Login / Signup";
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-ivory/95 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-line bg-surface/95 backdrop-blur">
       <div className="mx-auto flex h-[72px] max-w-[1200px] items-center justify-between gap-6 px-6 sm:px-10">
         <Link
           href="/"
@@ -41,7 +41,7 @@ export async function SiteHeader() {
             <Link
               key={link.href}
               href={link.href}
-              className="text-sm font-medium text-ink-soft hover:text-charcoal"
+              className="text-sm font-medium text-ink-soft hover:text-blue"
             >
               {link.label}
             </Link>
@@ -51,13 +51,13 @@ export async function SiteHeader() {
         <div className="hidden items-center gap-3 lg:flex">
           <Link
             href={accountHref}
-            className="text-sm font-semibold text-ink-soft hover:text-charcoal"
+            className="text-sm font-semibold text-ink-soft hover:text-blue"
           >
             {accountLabel}
           </Link>
           <Link
             href="/quote"
-            className="rounded-[2px] bg-charcoal px-5 py-3 text-[13px] font-semibold text-ivory hover:bg-night"
+            className="rounded-[2px] bg-brand px-5 py-3 text-[13px] font-semibold text-on-accent hover:bg-blue-deep"
           >
             Request a Quote
           </Link>

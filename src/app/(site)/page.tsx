@@ -37,7 +37,7 @@ export default async function HomePage() {
 
         <div className="mx-auto max-w-[1200px] px-6 py-16 sm:px-10">
           <div className="flex max-w-[62ch] flex-col gap-5">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-warm">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent-text">
               Independent print studio · Funeral Service Association member
             </span>
             <h1 className="text-[40px] leading-[1.15] sm:text-[52px]">
@@ -51,13 +51,13 @@ export default async function HomePage() {
             <div className="mt-2 flex flex-wrap gap-3">
               <Link
                 href="/quote"
-                className="rounded-[2px] bg-charcoal px-7 py-3.5 text-sm font-semibold text-ivory hover:bg-night"
+                className="rounded-[2px] bg-brand px-7 py-3.5 text-sm font-semibold text-on-accent hover:bg-blue-deep"
               >
                 Request a quote
               </Link>
               <Link
                 href="/portfolio"
-                className="rounded-[2px] border border-field-line px-7 py-3.5 text-sm font-semibold text-ink-soft hover:bg-line-warm"
+                className="rounded-[2px] border border-field-line px-7 py-3.5 text-sm font-semibold text-ink-soft hover:bg-surface-grey"
               >
                 View our work
               </Link>
@@ -89,7 +89,7 @@ export default async function HomePage() {
       </Section>
 
       {/* QUICK LINKS */}
-      <Section tone="warm" className="!py-0">
+      <Section tone="grey" className="!py-0">
         <div className="flex flex-col gap-6 py-14">
           <h2 className="text-[22px]">Jump to what you need</h2>
           <ul className="flex flex-wrap gap-3">
@@ -97,7 +97,7 @@ export default async function HomePage() {
               <li key={link.label}>
                 <Link
                   href={link.href}
-                  className="inline-flex rounded-full border border-line bg-white px-5 py-2.5 text-[13px] font-medium text-ink-soft hover:border-warm hover:text-charcoal"
+                  className="inline-flex rounded-full border border-line bg-white px-5 py-2.5 text-[13px] font-medium text-ink-soft hover:border-brand hover:text-blue"
                 >
                   {link.label}
                 </Link>
@@ -123,7 +123,7 @@ export default async function HomePage() {
                   caption={`[Photograph — ${item.title.toLowerCase()}]`}
                   className="aspect-[4/3] w-full rounded-md"
                 />
-                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-warm">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-text">
                   {CATEGORY_LABEL[item.category]}
                 </span>
                 <span className="font-display text-lg group-hover:underline">
@@ -150,7 +150,7 @@ export default async function HomePage() {
                 caption={step.caption}
                 className="aspect-[4/3] w-full rounded-md"
               />
-              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-warm">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-text">
                 {step.label}
               </span>
               <p className="text-[15px] leading-relaxed text-ink-muted">
@@ -162,7 +162,7 @@ export default async function HomePage() {
       </Section>
 
       {/* VALUES */}
-      <Section tone="night">
+      <Section tone="blue">
         <SectionHeading
           tone="light"
           title="Where craft meets care"
@@ -172,11 +172,11 @@ export default async function HomePage() {
         <ul className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
           {STUDIO_VALUES.map((value) => (
             <li key={value.n} className="flex flex-col gap-3">
-              <span className="font-display text-[28px] text-gold">
+              <span className="font-display text-[28px] text-brand">
                 {value.n}
               </span>
-              <h3 className="text-lg text-ivory">{value.title}</h3>
-              <p className="text-[14px] leading-relaxed text-ivory/65">
+              <h3 className="text-lg text-white">{value.title}</h3>
+              <p className="text-[14px] leading-relaxed text-white/65">
                 {value.body}
               </p>
             </li>
@@ -185,12 +185,12 @@ export default async function HomePage() {
       </Section>
 
       {/* TRUSTED BY */}
-      <Section tone="warm">
+      <Section tone="grey">
         <div className="flex flex-col items-center gap-8 text-center">
-          <span className="rounded-full bg-sage-tint px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-sage-deep">
+          <span className="rounded-full bg-good-tint px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-good-deep">
             FSA Member — Funeral Service Association
           </span>
-          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-quiet">
             As trusted by
           </span>
           <ul className="flex flex-wrap items-center justify-center gap-x-12 gap-y-4">
@@ -217,7 +217,7 @@ export default async function HomePage() {
               <blockquote className="font-display text-[19px] leading-[1.5]">
                 “{quote.text}”
               </blockquote>
-              <cite className="text-[13px] not-italic text-ink-faint">
+              <cite className="text-[13px] not-italic text-ink-quiet">
                 — {quote.attribution}
               </cite>
             </li>
@@ -239,7 +239,7 @@ export default async function HomePage() {
             </p>
             <Link
               href="/quote"
-              className="mt-2 w-fit rounded-[2px] bg-charcoal px-7 py-3.5 text-sm font-semibold text-ivory hover:bg-night"
+              className="mt-2 w-fit rounded-[2px] bg-brand px-7 py-3.5 text-sm font-semibold text-on-accent hover:bg-blue-deep"
             >
               Get a quote, wherever you are
             </Link>

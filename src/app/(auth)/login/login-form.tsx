@@ -36,10 +36,10 @@ export function LoginForm({ next }: { next?: string }) {
       <SubmitButton pendingLabel="Signing in…">Sign in</SubmitButton>
 
       <div className="flex justify-between text-[13px]">
-        <Link href="/forgot-password" className="font-semibold text-warm">
+        <Link href="/forgot-password" className="font-semibold text-accent-text">
           Forgotten your password?
         </Link>
-        <Link href="/signup" className="font-semibold text-warm">
+        <Link href="/signup" className="font-semibold text-accent-text">
           Create an account
         </Link>
       </div>

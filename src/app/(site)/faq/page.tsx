@@ -30,7 +30,7 @@ export default function FaqPage() {
                 {faq.q}
                 <span
                   aria-hidden="true"
-                  className="shrink-0 text-ink-faint transition-transform group-open:rotate-45"
+                  className="shrink-0 text-ink-quiet transition-transform group-open:rotate-45"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
                     <line x1="12" y1="5" x2="12" y2="19" />

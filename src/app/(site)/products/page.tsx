@@ -109,8 +109,8 @@ export default async function ProductsPage({
                 aria-current={!active ? "true" : undefined}
                 className={`inline-flex rounded-full px-5 py-2.5 text-[13px] font-semibold ${
                   !active
-                    ? "bg-charcoal text-ivory"
-                    : "border border-line bg-white text-ink-soft hover:border-warm"
+                    ? "bg-blue text-white"
+                    : "border border-line bg-white text-ink-soft hover:border-brand"
                 }`}
               >
                 Everything
@@ -123,8 +123,8 @@ export default async function ProductsPage({
                   aria-current={active === value ? "true" : undefined}
                   className={`inline-flex rounded-full px-5 py-2.5 text-[13px] font-semibold ${
                     active === value
-                      ? "bg-charcoal text-ivory"
-                      : "border border-line bg-white text-ink-soft hover:border-warm"
+                      ? "bg-blue text-white"
+                      : "border border-line bg-white text-ink-soft hover:border-brand"
                   }`}
                 >
                   {CATEGORY_LABEL[value]}
@@ -145,7 +145,7 @@ export default async function ProductsPage({
                 className="aspect-[4/3] w-full"
               />
               <div className="flex flex-1 flex-col gap-3 p-6">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-warm">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-text">
                   {CATEGORY_LABEL[product.category]}
                 </span>
                 <h2 className="font-display text-lg">{product.name}</h2>
@@ -154,13 +154,13 @@ export default async function ProductsPage({
                     {product.summary}
                   </p>
                 )}
-                <p className="text-[12px] text-ink-faint">
+                <p className="text-[12px] text-ink-quiet">
                   {(sizesByProduct.get(product.id) ?? []).join(" · ") ||
                     "Sizes confirmed at quote"}
                 </p>
                 <Link
                   href={`/products/${product.slug}`}
-                  className="mt-auto pt-2 text-[13px] font-semibold text-warm"
+                  className="mt-auto pt-2 text-[13px] font-semibold text-accent-text"
                 >
                   View details →
                 </Link>

@@ -33,7 +33,7 @@ export default async function VerifyEmailPage({
         {verified ? (
           <Link
             href={session ? "/account" : "/login"}
-            className="rounded-[2px] bg-charcoal px-6 py-[14px] text-center text-sm font-semibold text-ivory"
+            className="rounded-[2px] bg-brand px-6 py-[14px] text-center text-sm font-semibold text-on-accent"
           >
             {session ? "Go to my account" : "Sign in"}
           </Link>
@@ -42,7 +42,7 @@ export default async function VerifyEmailPage({
         ) : (
           <Link
             href="/login"
-            className="rounded-[2px] bg-charcoal px-6 py-[14px] text-center text-sm font-semibold text-ivory"
+            className="rounded-[2px] bg-brand px-6 py-[14px] text-center text-sm font-semibold text-on-accent"
           >
             Sign in to send a new link
           </Link>
@@ -59,7 +59,7 @@ export default async function VerifyEmailPage({
       >
         <Link
           href="/account"
-          className="rounded-[2px] bg-charcoal px-6 py-[14px] text-center text-sm font-semibold text-ivory"
+          className="rounded-[2px] bg-brand px-6 py-[14px] text-center text-sm font-semibold text-on-accent"
         >
           Go to my account
         </Link>
@@ -82,7 +82,7 @@ export default async function VerifyEmailPage({
       ) : (
         <Link
           href="/login"
-          className="rounded-[2px] bg-charcoal px-6 py-[14px] text-center text-sm font-semibold text-ivory"
+          className="rounded-[2px] bg-brand px-6 py-[14px] text-center text-sm font-semibold text-on-accent"
         >
           Sign in
         </Link>

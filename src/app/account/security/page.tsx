@@ -72,7 +72,7 @@ export default async function SecurityPage() {
                 <form action={revokeOtherSessionsAction}>
                   <button
                     type="submit"
-                    className="rounded-[2px] border border-field-line px-4 py-2.5 text-[13px] font-semibold text-rose-deep hover:bg-rose-tint"
+                    className="rounded-[2px] border border-field-line px-4 py-2.5 text-[13px] font-semibold text-alert hover:bg-alert-tint"
                   >
                     Sign out {otherCount} other{" "}
                     {otherCount === 1 ? "device" : "devices"}
@@ -91,12 +91,12 @@ export default async function SecurityPage() {
                     <span className="flex items-center gap-2.5 text-sm font-semibold">
                       {describeDevice(item.userAgent)}
                       {item.isCurrent && (
-                        <span className="rounded-full bg-sage-tint px-2.5 py-1 text-[11px] font-bold text-sage-deep">
+                        <span className="rounded-full bg-good-tint px-2.5 py-1 text-[11px] font-bold text-good-deep">
                           This device
                         </span>
                       )}
                     </span>
-                    <span className="text-xs text-ink-faint">
+                    <span className="text-xs text-ink-quiet">
                       {item.ipAddress ?? "Unknown location"} · last active{" "}
                       {formatter.format(item.lastSeenAt)}
                     </span>
@@ -107,7 +107,7 @@ export default async function SecurityPage() {
                       <input type="hidden" name="sessionId" value={item.id} />
                       <button
                         type="submit"
-                        className="text-[13px] font-semibold text-rose-deep hover:underline"
+                        className="text-[13px] font-semibold text-alert hover:underline"
                       >
                         Revoke
                       </button>

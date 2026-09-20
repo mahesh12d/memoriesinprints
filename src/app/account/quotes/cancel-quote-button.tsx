@@ -11,7 +11,7 @@ export function CancelQuoteButton({ enquiryId }: { enquiryId: string }) {
       <button
         type="button"
         onClick={() => setConfirming(true)}
-        className="text-[13px] font-semibold text-ink-faint hover:text-rose-deep"
+        className="text-[13px] font-semibold text-ink-quiet hover:text-alert"
       >
         Cancel
       </button>
@@ -24,14 +24,14 @@ export function CancelQuoteButton({ enquiryId }: { enquiryId: string }) {
       <span className="text-[12px] text-ink-muted">Cancel this request?</span>
       <button
         type="submit"
-        className="text-[13px] font-semibold text-rose-deep hover:underline"
+        className="text-[13px] font-semibold text-alert hover:underline"
       >
         Yes, cancel
       </button>
       <button
         type="button"
         onClick={() => setConfirming(false)}
-        className="text-[13px] font-semibold text-ink-faint hover:text-charcoal"
+        className="text-[13px] font-semibold text-ink-quiet hover:text-blue"
       >
         Keep
       </button>

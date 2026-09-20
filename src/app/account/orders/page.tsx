@@ -63,7 +63,7 @@ export default async function AccountOrdersPage() {
             </p>
             <Link
               href="/products"
-              className="mt-6 inline-flex rounded-[2px] bg-charcoal px-6 py-3 text-[13px] font-semibold text-ivory"
+              className="mt-6 inline-flex rounded-[2px] bg-brand px-6 py-3 text-[13px] font-semibold text-on-accent"
             >
               Browse products
             </Link>
@@ -72,13 +72,13 @@ export default async function AccountOrdersPage() {
           <div className="flex flex-col gap-6">
             <div className="flex gap-[18px]">
               <div className="flex flex-col gap-1.5 rounded-md border border-line bg-white p-5">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-faint">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-quiet">
                   Orders
                 </span>
                 <span className="font-display text-[27px]">{rows.length}</span>
               </div>
               <div className="flex flex-col gap-1.5 rounded-md border border-line bg-white p-5">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-faint">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-quiet">
                   Total spend
                 </span>
                 <span className="font-display text-[27px]">
@@ -98,7 +98,7 @@ export default async function AccountOrdersPage() {
                       <span className="text-sm font-semibold">
                         {row.reference}
                       </span>
-                      <span className="text-xs text-ink-faint">
+                      <span className="text-xs text-ink-quiet">
                         Placed {dateFormat.format(row.createdAt)}
                       </span>
                     </div>

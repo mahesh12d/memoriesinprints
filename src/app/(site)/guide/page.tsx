@@ -21,7 +21,7 @@ export default function GuidePage() {
         <Breadcrumb trail={[{ href: "/", label: "Home" }, { label: "Process" }]} />
 
         <div className="flex max-w-[62ch] flex-col gap-4">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-warm">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent-text">
             How it works
           </span>
           <h1 className="text-[40px] leading-tight">
@@ -72,7 +72,7 @@ export default function GuidePage() {
                 caption={step.caption}
                 className="aspect-[4/3] w-full rounded-md"
               />
-              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-warm">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-text">
                 {step.label}
               </span>
               <p className="text-[14px] leading-relaxed text-ink-muted">
@@ -83,7 +83,7 @@ export default function GuidePage() {
         </ol>
       </Section>
 
-      <Section tone="warm">
+      <Section tone="grey">
         <SectionHeading
           eyebrow="From the studio"
           title="Guides &amp; resources"
@@ -101,7 +101,7 @@ export default function GuidePage() {
                 className="aspect-[16/9] w-full"
               />
               <div className="flex flex-1 flex-col gap-3 p-7">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-warm">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-text">
                   {article.tag}
                 </span>
                 <h3 className="font-display text-xl leading-snug">
@@ -110,7 +110,7 @@ export default function GuidePage() {
                 <p className="text-[14px] leading-relaxed text-ink-muted">
                   {article.excerpt}
                 </p>
-                <span className="mt-auto pt-3 text-[12px] text-ink-faint">
+                <span className="mt-auto pt-3 text-[12px] text-ink-quiet">
                   {article.date}
                 </span>
               </div>
@@ -118,7 +118,7 @@ export default function GuidePage() {
           ))}
         </ul>
 
-        <p className="mt-8 text-[13px] text-ink-faint">
+        <p className="mt-8 text-[13px] text-ink-quiet">
           Articles are outlined and ready for the studio to write — the pages
           themselves come with the content milestone.
         </p>

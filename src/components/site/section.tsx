@@ -4,19 +4,19 @@ import type { ReactNode } from "react";
 export function Section({
   children,
   className = "",
-  tone = "ivory",
+  tone = "surface",
   id,
 }: {
   children: ReactNode;
   className?: string;
-  tone?: "ivory" | "white" | "night" | "warm";
+  tone?: "surface" | "white" | "blue" | "grey";
   id?: string;
 }) {
   const tones = {
-    ivory: "bg-ivory",
+    surface: "bg-surface",
     white: "bg-white",
-    night: "bg-night text-ivory",
-    warm: "bg-ivory-deep",
+    blue: "bg-blue text-white",
+    grey: "bg-surface-grey",
   };
 
   return (
@@ -41,8 +41,8 @@ export function SectionHeading({
   action?: { href: string; label: string };
   tone?: "dark" | "light";
 }) {
-  const introColour = tone === "light" ? "text-ivory/65" : "text-ink-muted";
-  const eyebrowColour = tone === "light" ? "text-gold" : "text-warm";
+  const introColour = tone === "light" ? "text-white/65" : "text-ink-muted";
+  const eyebrowColour = tone === "light" ? "text-brand" : "text-accent-text";
 
   return (
     <div className="mb-12 flex flex-wrap items-end justify-between gap-6">
@@ -66,7 +66,7 @@ export function SectionHeading({
         <Link
           href={action.href}
           className={`text-[13px] font-semibold ${
-            tone === "light" ? "text-gold" : "text-warm"
+            tone === "light" ? "text-brand" : "text-accent-text"
           }`}
         >
           {action.label}
@@ -83,11 +83,11 @@ export function Breadcrumb({
 }) {
   return (
     <nav aria-label="Breadcrumb" className="mb-8">
-      <ol className="flex flex-wrap items-center gap-2 text-[13px] text-ink-faint">
+      <ol className="flex flex-wrap items-center gap-2 text-[13px] text-ink-quiet">
         {trail.map((crumb, index) => (
           <li key={crumb.label} className="flex items-center gap-2">
             {crumb.href ? (
-              <Link href={crumb.href} className="hover:text-charcoal">
+              <Link href={crumb.href} className="hover:text-blue">
                 {crumb.label}
               </Link>
             ) : (
@@ -113,23 +113,23 @@ export function CtaBand({
   secondary?: { href: string; label: string };
 }) {
   return (
-    <Section tone="night">
+    <Section tone="blue">
       <div className="flex flex-col items-center gap-5 text-center">
         <h2 className="max-w-[24ch] text-[32px] leading-tight">{title}</h2>
-        <p className="max-w-[56ch] text-[15px] leading-relaxed text-ivory/65">
+        <p className="max-w-[56ch] text-[15px] leading-relaxed text-white/65">
           {body}
         </p>
         <div className="mt-2 flex flex-wrap justify-center gap-3">
           <Link
             href={primary.href}
-            className="rounded-[2px] bg-ivory px-7 py-3.5 text-sm font-semibold text-charcoal hover:bg-white"
+            className="rounded-[2px] bg-surface px-7 py-3.5 text-sm font-semibold text-blue hover:bg-white"
           >
             {primary.label}
           </Link>
           {secondary && (
             <Link
               href={secondary.href}
-              className="rounded-[2px] border border-white/25 px-7 py-3.5 text-sm font-semibold text-ivory hover:border-white/50"
+              className="rounded-[2px] border border-white/25 px-7 py-3.5 text-sm font-semibold text-white hover:border-white/50"
             >
               {secondary.label}
             </Link>

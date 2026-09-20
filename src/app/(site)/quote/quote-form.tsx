@@ -37,8 +37,8 @@ export function QuoteForm({
               key={value}
               className={`cursor-pointer rounded-full border px-5 py-2.5 text-[13px] font-semibold transition-colors ${
                 category === value
-                  ? "border-charcoal bg-charcoal text-ivory"
-                  : "border-line bg-white text-ink-soft hover:border-warm"
+                  ? "border-blue bg-blue text-white"
+                  : "border-line bg-white text-ink-soft hover:border-brand"
               }`}
             >
               <input
@@ -54,7 +54,7 @@ export function QuoteForm({
           ))}
         </div>
         {state.errors?.category && (
-          <p className="text-xs font-medium text-rose-deep">
+          <p className="text-xs font-medium text-alert">
             {state.errors.category}
           </p>
         )}
@@ -121,13 +121,13 @@ export function QuoteForm({
           required
           aria-invalid={state.errors?.message ? true : undefined}
           placeholder="Tell us about the service or occasion, any wording or photographs you'd like included, and the date you're working towards."
-          className={`w-full rounded-[3px] border bg-white px-[15px] py-[13px] font-sans text-sm text-charcoal placeholder:text-placeholder ${
-            state.errors?.message ? "border-rose-deep" : "border-field-line"
+          className={`w-full rounded-[3px] border bg-white px-[15px] py-[13px] font-sans text-sm text-blue placeholder:text-placeholder ${
+            state.errors?.message ? "border-alert" : "border-field-line"
           }`}
         />
       </Field>
 
-      <p className="text-[12px] leading-relaxed text-ink-faint">
+      <p className="text-[12px] leading-relaxed text-ink-quiet">
         We use your details only to answer this enquiry. Uploading reference
         files arrives with the next release — for now, mention them and
         we&rsquo;ll ask by email.

@@ -57,7 +57,7 @@ export function ProfileForm({ profile }: { profile: Profile }) {
           id="email"
           value={profile.email}
           disabled
-          className="w-full rounded-[3px] border border-line bg-line-warm px-[15px] py-[13px] text-sm text-ink-muted"
+          className="w-full rounded-[3px] border border-line bg-surface-grey px-[15px] py-[13px] text-sm text-ink-muted"
         />
       </Field>
 

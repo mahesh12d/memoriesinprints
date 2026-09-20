@@ -6,45 +6,65 @@
 @import "@fontsource/eb-garamond/600.css";
 @import "@fontsource-variable/work-sans/index.css";
 
+/* ==========================================================================
+   Brand palette
+   --------------------------------------------------------------------------
+   Green   #2DBC9A   primary accent, button and badge fills
+   Blue    #465862   primary ink, dark bands
+   Grey    #F8F8F8   alternating sections and the footer
+   Muted   #A8AAAB   quiet text
+
+   THE VARIANT BLOCK BELOW is the only difference between the two versions
+   you're comparing. Everything else is identical.
+   ========================================================================== */
+
 @theme {
-  /* Grounds */
-  --color-ivory: #faf8f4;
-  --color-ivory-deep: #f7f4ee;
-  --color-charcoal: #2b2a28;
+  /* --- VARIANT: accessible ------------------------------------------------
+     Green and muted grey are kept as the brand colours for fills, but small
+     text and links use a darker shade of the same hue so they stay readable.
+     Contrast: link 4.59:1, muted text 4.57:1, button label 5.17:1.
+  */
+  --color-accent-text: #20846c;
+  --color-muted-text: #6f7273;
+  --color-on-accent: #0f3d32;
+  /* --- end VARIANT ------------------------------------------------------ */
 
-  /* Sage — the primary accent, and the "good / done" status hue */
-  --color-sage: #7c8b72;
-  --color-sage-tint: #eef1ea;
-  --color-sage-deep: #5f6e56;
-  --color-sage-line: #d7decb;
+  /* Brand */
+  --color-brand: #2dbc9a;
+  --color-brand-deep: #20846c;
+  --color-brand-tint: #eaf8f4;
+  --color-brand-line: #bce7dc;
 
-  /* Rose — alerts and destructive actions */
-  --color-rose: #c98b82;
-  --color-rose-tint: #fbedea;
-  --color-rose-deep: #a15d50;
+  --color-blue: #465862;
+  --color-blue-deep: #35444c;
+  --color-blue-tint: #eceef0;
 
-  /* Warm — links inside the portals, and the "pending / waiting" status hue */
-  --color-warm: #8a6f5c;
-  --color-warm-tint: #fbf3e4;
-  --color-gold: #d9c7a3;
+  /* Surfaces */
+  --color-surface: #ffffff;
+  --color-surface-grey: #f8f8f8;
 
-  /* Neutrals */
-  --color-ink-soft: #3a3834;
-  --color-ink-muted: #6b6560;
-  --color-ink-faint: #8a8580;
-  --color-ink-pale: #9b958d;
-  --color-line: #e5e0d8;
-  --color-line-soft: #efebe3;
-  --color-line-warm: #f2eee6;
-  --color-field-line: #dad4c9;
-  --color-placeholder: #b0aa9f;
+  /* Ink */
+  --color-ink: #465862;
+  --color-ink-soft: #3d4e57;
+  --color-ink-muted: #5d6e77;
+  --color-ink-quiet: var(--color-muted-text);
+  --color-ink-pale: #a8aaab;
 
-  /* Dark bands — portal sidebars and footers */
-  --color-night: #201f1d;
-  --color-night-deep: #1c1b19;
-  --color-night-line: #35342f;
-  --color-night-line-soft: #33322f;
-  --color-night-chip: #45443f;
+  /* Lines and fields */
+  --color-line: #e4e6e7;
+  --color-line-soft: #eeeff0;
+  --color-field-line: #d6d9da;
+  --color-placeholder: #a8aaab;
+
+  /* Status — the brand palette has no danger colour, so this is the one
+     hue added. Kept muted so it never shouts on a bereavement page. */
+  --color-good: #2dbc9a;
+  --color-good-tint: #eaf8f4;
+  --color-good-deep: #1b6e59;
+  --color-alert: #b4554a;
+  --color-alert-tint: #fbeeec;
+  --color-pending-tint: #fdf4e6;
+  --color-pending-deep: #8a6b3d;
 
   --font-display: "EB Garamond", Georgia, "Times New Roman", serif;
   --font-sans: "Work Sans Variable", "Work Sans", system-ui, -apple-system, sans-serif;
@@ -52,12 +72,12 @@
 
 @layer base {
   html {
-    background: var(--color-ivory);
+    background: var(--color-surface);
   }
 
   body {
-    background: var(--color-ivory);
-    color: var(--color-charcoal);
+    background: var(--color-surface);
+    color: var(--color-ink);
     font-family: var(--font-sans);
   }
 
@@ -67,11 +87,12 @@
   h4 {
     font-family: var(--font-display);
     font-weight: 500;
+    color: var(--color-blue);
   }
 
   /* Visible focus for keyboard users, invisible for mouse users. */
   :focus-visible {
-    outline: 2px solid var(--color-sage-deep);
+    outline: 2px solid var(--color-brand-deep);
     outline-offset: 2px;
   }
 }

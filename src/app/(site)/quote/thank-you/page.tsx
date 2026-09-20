@@ -20,7 +20,7 @@ export default async function QuoteThankYouPage({
   return (
     <Section>
       <div className="mx-auto flex max-w-[60ch] flex-col items-center gap-6 py-10 text-center">
-        <span className="flex size-14 items-center justify-center rounded-full bg-sage-tint text-sage-deep">
+        <span className="flex size-14 items-center justify-center rounded-full bg-good-tint text-good-deep">
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <polyline points="20 6 9 17 4 12" />
           </svg>
@@ -31,7 +31,7 @@ export default async function QuoteThankYouPage({
         {ref && (
           <p className="text-[15px] text-ink-muted">
             Your reference is{" "}
-            <strong className="font-semibold text-charcoal">{ref}</strong>. A
+            <strong className="font-semibold text-blue">{ref}</strong>. A
             confirmation is on its way to your inbox.
           </p>
         )}
@@ -46,21 +46,21 @@ export default async function QuoteThankYouPage({
           {session ? (
             <Link
               href="/account/quotes"
-              className="rounded-[2px] bg-charcoal px-7 py-3.5 text-sm font-semibold text-ivory hover:bg-night"
+              className="rounded-[2px] bg-brand px-7 py-3.5 text-sm font-semibold text-on-accent hover:bg-blue-deep"
             >
               See it in my account
             </Link>
           ) : (
             <Link
               href="/signup"
-              className="rounded-[2px] bg-charcoal px-7 py-3.5 text-sm font-semibold text-ivory hover:bg-night"
+              className="rounded-[2px] bg-brand px-7 py-3.5 text-sm font-semibold text-on-accent hover:bg-blue-deep"
             >
               Create an account to track it
             </Link>
           )}
           <Link
             href="/portfolio"
-            className="rounded-[2px] border border-field-line px-7 py-3.5 text-sm font-semibold text-ink-soft hover:bg-line-warm"
+            className="rounded-[2px] border border-field-line px-7 py-3.5 text-sm font-semibold text-ink-soft hover:bg-surface-grey"
           >
             Browse our work
           </Link>

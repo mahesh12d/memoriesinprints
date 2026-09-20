@@ -38,7 +38,7 @@ export default function AboutPage() {
       <Section tone="white">
         <div className="grid items-center gap-12 lg:grid-cols-2">
           <div className="flex flex-col gap-5">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-warm">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent-text">
               Our story
             </span>
             <h2 className="text-[32px] leading-tight">Why we started</h2>
@@ -66,7 +66,7 @@ export default function AboutPage() {
             className="order-last h-[340px] w-full rounded-md lg:order-first"
           />
           <div className="flex flex-col gap-5">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-warm">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent-text">
               Meet the studio
             </span>
             <h2 className="text-[32px] leading-tight">
@@ -84,7 +84,7 @@ export default function AboutPage() {
         </div>
       </Section>
 
-      <Section tone="night">
+      <Section tone="blue">
         <SectionHeading
           tone="light"
           eyebrow="What we stand by"
@@ -93,11 +93,11 @@ export default function AboutPage() {
         <ul className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
           {STUDIO_VALUES.map((value) => (
             <li key={value.n} className="flex flex-col gap-3">
-              <span className="font-display text-[28px] text-gold">
+              <span className="font-display text-[28px] text-brand">
                 {value.n}
               </span>
-              <h3 className="text-lg text-ivory">{value.title}</h3>
-              <p className="text-[14px] leading-relaxed text-ivory/65">
+              <h3 className="text-lg text-white">{value.title}</h3>
+              <p className="text-[14px] leading-relaxed text-white/65">
                 {value.body}
               </p>
             </li>
@@ -105,9 +105,9 @@ export default function AboutPage() {
         </ul>
       </Section>
 
-      <Section tone="warm">
+      <Section tone="grey">
         <div className="mx-auto flex max-w-[64ch] flex-col items-center gap-5 text-center">
-          <span className="rounded-full bg-sage-tint px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-sage-deep">
+          <span className="rounded-full bg-good-tint px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-good-deep">
             FSA Member — Funeral Service Association
           </span>
           <p className="text-[15px] leading-relaxed text-ink-muted">

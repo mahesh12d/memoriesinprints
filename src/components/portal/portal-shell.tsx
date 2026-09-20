@@ -7,15 +7,15 @@ export type { NavItem };
 type Variant = "customer" | "staff" | "admin";
 
 const BADGE: Record<Variant, { label: string; className: string }> = {
-  customer: { label: "My account", className: "bg-warm text-ivory" },
-  staff: { label: "Studio staff", className: "bg-sage text-ivory" },
-  admin: { label: "Admin", className: "bg-gold text-charcoal" },
+  customer: { label: "My account", className: "bg-brand text-white" },
+  staff: { label: "Studio staff", className: "bg-brand text-white" },
+  admin: { label: "Admin", className: "bg-brand text-blue" },
 };
 
 const SIDEBAR_BG: Record<Variant, string> = {
-  customer: "bg-night",
-  staff: "bg-night",
-  admin: "bg-night-deep",
+  customer: "bg-blue",
+  staff: "bg-blue",
+  admin: "bg-blue-deep",
 };
 
 function initials(name: string): string {
@@ -44,7 +44,7 @@ export function PortalShell({
   const badge = BADGE[variant];
 
   return (
-    <div className="flex min-h-screen bg-ivory">
+    <div className="flex min-h-screen bg-surface">
       <aside
         className={`flex w-[230px] shrink-0 flex-col justify-between px-[18px] py-7 ${SIDEBAR_BG[variant]}`}
       >
@@ -52,7 +52,7 @@ export function PortalShell({
           <div className="flex flex-col gap-2 px-1.5">
             <Link
               href="/"
-              className="font-display text-[17px] font-semibold text-ivory"
+              className="font-display text-[17px] font-semibold text-white"
             >
               Memories in Prints
             </Link>
@@ -67,15 +67,15 @@ export function PortalShell({
         </div>
 
         <div className="flex flex-col gap-3 px-1.5">
-          <div className="flex items-center gap-2.5 border-t border-night-line pt-4">
-            <span className="flex size-[30px] shrink-0 items-center justify-center rounded-full bg-night-chip text-[11px] font-bold text-ivory">
+          <div className="flex items-center gap-2.5 border-t border-blue-deep pt-4">
+            <span className="flex size-[30px] shrink-0 items-center justify-center rounded-full bg-blue-deep text-[11px] font-bold text-white">
               {initials(user.name)}
             </span>
             <span className="flex min-w-0 flex-col">
-              <span className="truncate text-[13px] font-semibold text-ivory">
+              <span className="truncate text-[13px] font-semibold text-white">
                 {user.name}
               </span>
-              <span className="text-[11px] text-ink-faint">
+              <span className="text-[11px] text-ink-quiet">
                 {user.roleLabel}
               </span>
             </span>
@@ -113,7 +113,7 @@ export function LogoutButton({ action }: { action: () => Promise<void> }) {
     <form action={action}>
       <button
         type="submit"
-        className="text-[13px] font-semibold text-ink-pale hover:text-ivory"
+        className="text-[13px] font-semibold text-ink-pale hover:text-white"
       >
         Log out
       </button>

@@ -13,14 +13,14 @@ export default async function AccountDashboardPage() {
       <PortalBody>
         <div className="flex flex-col gap-6">
           {!verified && (
-            <div className="flex items-center justify-between gap-6 rounded-md border border-warm/30 bg-warm-tint px-5 py-4">
+            <div className="flex items-center justify-between gap-6 rounded-md border border-brand/30 bg-brand-tint px-5 py-4">
               <p className="text-sm text-ink-soft">
                 Please confirm your email address so we can send you proofs and
                 order updates.
               </p>
               <Link
                 href="/verify-email"
-                className="shrink-0 text-[13px] font-semibold text-warm"
+                className="shrink-0 text-[13px] font-semibold text-accent-text"
               >
                 Confirm now →
               </Link>
@@ -37,7 +37,7 @@ export default async function AccountDashboardPage() {
             <div className="mt-6 flex gap-3">
               <Link
                 href="/account/profile"
-                className="rounded-[2px] bg-charcoal px-5 py-3 text-[13px] font-semibold text-ivory"
+                className="rounded-[2px] bg-brand px-5 py-3 text-[13px] font-semibold text-on-accent"
               >
                 Edit profile
               </Link>

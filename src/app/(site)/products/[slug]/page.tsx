@@ -115,7 +115,7 @@ export default async function ProductDetailPage({
 
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-3">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-warm">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-text">
               {CATEGORY_LABEL[product.category]} stationery
             </span>
             <h1 className="text-[34px] leading-tight">{product.name}</h1>
@@ -145,7 +145,7 @@ export default async function ProductDetailPage({
                   >
                     {size.label}
                     {size.widthMm && size.heightMm && (
-                      <span className="text-ink-faint">
+                      <span className="text-ink-quiet">
                         {" "}
                         ({size.widthMm} × {size.heightMm}mm)
                       </span>
@@ -165,11 +165,11 @@ export default async function ProductDetailPage({
             </p>
             <Link
               href={`/quote?product=${product.slug}`}
-              className="mt-5 inline-flex rounded-[2px] bg-charcoal px-7 py-3.5 text-sm font-semibold text-ivory hover:bg-night"
+              className="mt-5 inline-flex rounded-[2px] bg-brand px-7 py-3.5 text-sm font-semibold text-on-accent hover:bg-blue-deep"
             >
               Request a quote for this
             </Link>
-            <p className="mt-4 text-[12px] text-ink-faint">
+            <p className="mt-4 text-[12px] text-ink-quiet">
               Minimum order {product.minimumQuantity}. {TURNAROUND_NOTE}
             </p>
           </div>

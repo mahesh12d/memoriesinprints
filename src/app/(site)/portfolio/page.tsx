@@ -76,8 +76,8 @@ export default async function PortfolioPage({
                   aria-current={filter.isActive ? "true" : undefined}
                   className={`inline-flex rounded-full px-5 py-2.5 text-[13px] font-semibold transition-colors ${
                     filter.isActive
-                      ? "bg-charcoal text-ivory"
-                      : "border border-line bg-white text-ink-soft hover:border-warm"
+                      ? "bg-blue text-white"
+                      : "border border-line bg-white text-ink-soft hover:border-brand"
                   }`}
                 >
                   {filter.label}
@@ -90,7 +90,7 @@ export default async function PortfolioPage({
         {items.length === 0 ? (
           <p className="rounded-md border border-line bg-white p-10 text-center text-[15px] text-ink-muted">
             Nothing here yet in this category. Try another, or{" "}
-            <Link href="/quote" className="font-semibold text-warm">
+            <Link href="/quote" className="font-semibold text-accent-text">
               tell us what you have in mind
             </Link>
             .
@@ -103,7 +103,7 @@ export default async function PortfolioPage({
                   caption={`[Photograph — ${item.title.toLowerCase()}]`}
                   className="aspect-[4/3] w-full rounded-md"
                 />
-                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-warm">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-text">
                   {CATEGORY_LABEL[item.category]}
                 </span>
                 <h2 className="font-display text-lg">{item.title}</h2>

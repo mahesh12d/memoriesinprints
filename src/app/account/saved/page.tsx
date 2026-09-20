@@ -36,7 +36,7 @@ export default async function AccountSavedPage() {
             </p>
             <Link
               href="/products"
-              className="mt-6 inline-flex rounded-[2px] bg-charcoal px-6 py-3 text-[13px] font-semibold text-ivory"
+              className="mt-6 inline-flex rounded-[2px] bg-brand px-6 py-3 text-[13px] font-semibold text-on-accent"
             >
               Browse products
             </Link>
@@ -53,7 +53,7 @@ export default async function AccountSavedPage() {
                   className="aspect-[4/3] w-full"
                 />
                 <div className="flex flex-col gap-1.5 p-5">
-                  <span className="text-[10px] font-bold uppercase tracking-[0.05em] text-warm">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.05em] text-accent-text">
                     {CATEGORY_LABEL[row.category]}
                   </span>
                   <Link

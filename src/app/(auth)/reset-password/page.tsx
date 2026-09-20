@@ -22,7 +22,7 @@ export default async function ResetPasswordPage({
       >
         <Link
           href="/forgot-password"
-          className="rounded-[2px] bg-charcoal px-6 py-[14px] text-center text-sm font-semibold text-ivory"
+          className="rounded-[2px] bg-brand px-6 py-[14px] text-center text-sm font-semibold text-on-accent"
         >
           Request a new link
         </Link>

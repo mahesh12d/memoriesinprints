@@ -62,7 +62,7 @@ export default async function AccountQuotesPage() {
             </p>
             <Link
               href="/quote"
-              className="mt-6 inline-flex rounded-[2px] bg-charcoal px-6 py-3 text-[13px] font-semibold text-ivory"
+              className="mt-6 inline-flex rounded-[2px] bg-brand px-6 py-3 text-[13px] font-semibold text-on-accent"
             >
               Request a quote
             </Link>
@@ -85,7 +85,7 @@ export default async function AccountQuotesPage() {
                       <span className="text-sm font-semibold">
                         {row.subject}
                       </span>
-                      <span className="text-xs text-ink-faint">
+                      <span className="text-xs text-ink-quiet">
                         {row.reference} · sent{" "}
                         {dateFormat.format(row.createdAt)}
                       </span>

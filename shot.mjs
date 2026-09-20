@@ -1,0 +1,10 @@
+import { chromium } from '@playwright/test';
+const label = process.argv[2];
+const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+const res = await page.goto('http://127.0.0.1:3100/', { waitUntil: 'networkidle' });
+if (res.status() !== 200) throw new Error('page returned ' + res.status());
+await page.screenshot({ path: `/tmp/${label}-top.png` });
+await page.screenshot({ path: `/tmp/${label}-full.png`, fullPage: true });
+await browser.close();
+console.log('captured', label, 'status', res.status());

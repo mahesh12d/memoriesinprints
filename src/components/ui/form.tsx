@@ -35,8 +35,8 @@ export function Field({
           name={name}
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
-          className={`w-full rounded-[3px] border bg-white px-[15px] py-[13px] text-sm text-charcoal placeholder:text-placeholder ${
-            error ? "border-rose-deep" : "border-field-line"
+          className={`w-full rounded-[3px] border bg-white px-[15px] py-[13px] text-sm text-blue placeholder:text-placeholder ${
+            error ? "border-alert" : "border-field-line"
           }`}
           {...props}
         />
@@ -49,7 +49,7 @@ export function Field({
       )}
 
       {error && (
-        <p id={`${name}-error`} className="text-xs font-medium text-rose-deep">
+        <p id={`${name}-error`} className="text-xs font-medium text-alert">
           {error}
         </p>
       )}
@@ -74,8 +74,8 @@ export function SubmitButton({
     "rounded-[2px] px-6 py-[14px] text-sm font-semibold transition-colors disabled:opacity-60";
   const styles =
     variant === "primary"
-      ? "bg-charcoal text-ivory hover:bg-night"
-      : "border border-field-line bg-transparent text-ink-muted hover:bg-line-warm";
+      ? "bg-brand text-on-accent hover:bg-brand-deep hover:text-white"
+      : "border border-field-line bg-transparent text-ink-muted hover:bg-surface-grey";
 
   return (
     <button
@@ -101,8 +101,8 @@ export function FormMessage({
       role="status"
       className={`rounded-[4px] px-[14px] py-3 text-[13px] leading-relaxed ${
         state.ok
-          ? "bg-sage-tint text-sage-deep"
-          : "bg-rose-tint text-rose-deep"
+          ? "bg-good-tint text-good-deep"
+          : "bg-alert-tint text-alert"
       }`}
     >
       {state.message}

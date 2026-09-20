@@ -14,7 +14,7 @@ export function ImagePlaceholder({
 }) {
   const toneClasses =
     tone === "dark"
-      ? "bg-night-line text-ivory/50"
+      ? "bg-blue-deep text-white/50"
       : "bg-line-soft text-ink-pale";
 
   return (

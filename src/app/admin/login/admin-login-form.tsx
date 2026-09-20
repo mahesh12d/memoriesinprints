@@ -30,7 +30,7 @@ export function AdminLoginForm() {
         error={state.errors?.password}
       />
 
-      <SubmitButton pendingLabel="Signing in…" className="bg-night-deep">
+      <SubmitButton pendingLabel="Signing in…" className="bg-blue-deep">
         Sign in
       </SubmitButton>
     </form>

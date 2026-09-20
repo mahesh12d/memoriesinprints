@@ -45,7 +45,7 @@ function SocialLink({
       aria-label={label}
       rel="noreferrer noopener"
       target="_blank"
-      className="flex size-9 items-center justify-center rounded-full border border-white/20 text-ivory/80 transition-colors hover:border-white/40 hover:text-ivory"
+      className="flex size-9 items-center justify-center rounded-full border border-field-line text-ink-muted transition-colors hover:border-brand hover:text-brand-deep"
     >
       {children}
     </a>
@@ -54,17 +54,17 @@ function SocialLink({
 
 export function SiteFooter() {
   return (
-    <footer className="mt-auto bg-night text-ivory">
+    <footer className="mt-auto border-t border-line bg-surface-grey">
       <div className="mx-auto grid max-w-[1200px] gap-12 px-6 py-16 sm:px-10 lg:grid-cols-[1.4fr_repeat(3,1fr)]">
         <div className="flex flex-col gap-4">
-          <span className="font-display text-lg font-semibold">
+          <span className="font-display text-lg font-semibold text-blue">
             Memories in Prints
           </span>
-          <p className="max-w-[38ch] text-[13px] leading-relaxed text-ivory/60">
+          <p className="max-w-[38ch] text-[13px] leading-relaxed text-ink-quiet">
             Bespoke funeral stationery, memorial keepsakes and wedding
             stationery, printed with care in {STUDIO.city}, UK.
           </p>
-          <p className="text-[13px] leading-relaxed text-ivory/60">
+          <p className="text-[13px] leading-relaxed text-ink-quiet">
             Proud member of the Funeral Service Association (FSA)
           </p>
 
@@ -93,7 +93,7 @@ export function SiteFooter() {
 
         {COLUMNS.map((column) => (
           <div key={column.title} className="flex flex-col gap-4">
-            <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-ivory/45">
+            <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-blue">
               {column.title}
             </span>
             <ul className="flex flex-col gap-2.5">
@@ -101,7 +101,7 @@ export function SiteFooter() {
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="text-[13px] text-ivory/75 hover:text-ivory"
+                    className="text-[13px] text-ink-quiet hover:text-blue"
                   >
                     {link.label}
                   </Link>
@@ -112,8 +112,8 @@ export function SiteFooter() {
         ))}
       </div>
 
-      <div className="border-t border-night-line">
-        <div className="mx-auto flex max-w-[1200px] flex-col gap-2 px-6 py-6 text-[12px] text-ivory/50 sm:flex-row sm:items-center sm:justify-between sm:px-10">
+      <div className="border-t border-line">
+        <div className="mx-auto flex max-w-[1200px] flex-col gap-2 px-6 py-6 text-[12px] text-ink-quiet sm:flex-row sm:items-center sm:justify-between sm:px-10">
           <span>
             © {new Date().getFullYear()} Memories in Prints. All rights
             reserved.

@@ -25,7 +25,7 @@ export function MobileNav({
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-controls="mobile-nav"
-        className="flex size-11 items-center justify-center rounded text-charcoal"
+        className="flex size-11 items-center justify-center rounded text-blue"
       >
         <span className="sr-only">{open ? "Close menu" : "Open menu"}</span>
         <svg
@@ -56,7 +56,7 @@ export function MobileNav({
       {open && (
         <div
           id="mobile-nav"
-          className="absolute inset-x-0 top-[72px] border-b border-line bg-ivory px-6 pb-6 shadow-sm"
+          className="absolute inset-x-0 top-[72px] border-b border-line bg-surface px-6 pb-6 shadow-sm"
         >
           <nav className="flex flex-col">
             {links.map((link) => (
@@ -81,7 +81,7 @@ export function MobileNav({
           <Link
             href="/quote"
             onClick={close}
-            className="mt-5 block rounded-[2px] bg-charcoal px-5 py-3.5 text-center text-sm font-semibold text-ivory"
+            className="mt-5 block rounded-[2px] bg-brand px-5 py-3.5 text-center text-sm font-semibold text-on-accent"
           >
             Request a Quote
           </Link>

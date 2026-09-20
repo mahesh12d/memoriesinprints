@@ -39,7 +39,7 @@ export default async function AdminDashboardPage() {
                 key={tile.label}
                 className="flex flex-col gap-1.5 rounded-md border border-line bg-white p-5"
               >
-                <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-faint">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-quiet">
                   {tile.label}
                 </span>
                 <span className="font-display text-[27px]">{tile.value}</span>

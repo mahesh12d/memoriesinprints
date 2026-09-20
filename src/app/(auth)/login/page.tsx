@@ -20,7 +20,7 @@ export default async function LoginPage({
       {params.reset && (
         <p
           role="status"
-          className="rounded-[4px] bg-sage-tint px-[14px] py-3 text-[13px] leading-relaxed text-sage-deep"
+          className="rounded-[4px] bg-good-tint px-[14px] py-3 text-[13px] leading-relaxed text-good-deep"
         >
           Your password has been changed. Please sign in with your new password.
         </p>

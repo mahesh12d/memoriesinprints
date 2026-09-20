@@ -83,7 +83,7 @@ export default async function QuotePage({
             <ol className="mt-4 flex flex-col gap-4">
               {NEXT_STEPS.map((step, index) => (
                 <li key={step} className="flex gap-3">
-                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-warm-tint text-[11px] font-bold text-warm">
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-brand-tint text-[11px] font-bold text-accent-text">
                     {index + 1}
                   </span>
                   <span className="text-[14px] leading-relaxed text-ink-muted">
@@ -101,7 +101,7 @@ export default async function QuotePage({
               <br />
               {STUDIO.email}
             </p>
-            <p className="mt-3 text-[13px] text-ink-faint">
+            <p className="mt-3 text-[13px] text-ink-quiet">
               {STUDIO.openingHours}
             </p>
           </div>
