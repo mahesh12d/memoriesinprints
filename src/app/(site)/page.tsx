@@ -1,7 +1,4 @@
 import Link from "next/link";
-import { asc, eq } from "drizzle-orm";
-import { db } from "@/db";
-import { portfolioItems } from "@/db/schema";
 import {
   CASE_STUDY_STEPS,
   FAQS,
@@ -12,19 +9,9 @@ import {
 } from "@/content/home";
 import { CtaBand, Section, SectionHeading } from "@/components/site/section";
 import { ImagePlaceholder } from "@/components/site/image-placeholder";
-import { CATEGORY_LABEL } from "@/lib/catalogue";
+import { ImageAutoSlider } from "@/components/ui/image-auto-slider";
 
 export default async function HomePage() {
-  const work = await db
-    .select({
-      slug: portfolioItems.slug,
-      title: portfolioItems.title,
-      category: portfolioItems.category,
-    })
-    .from(portfolioItems)
-    .where(eq(portfolioItems.isPublished, true))
-    .orderBy(asc(portfolioItems.sortOrder))
-    .limit(6);
 
   return (
     <>
@@ -115,24 +102,7 @@ export default async function HomePage() {
           action={{ href: "/portfolio", label: "View full portfolio →" }}
         />
 
-        <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {work.map((item) => (
-            <li key={item.slug}>
-              <Link href="/portfolio" className="group flex flex-col gap-3">
-                <ImagePlaceholder
-                  caption={`[Photograph — ${item.title.toLowerCase()}]`}
-                  className="aspect-[4/3] w-full rounded-md"
-                />
-                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-text">
-                  {CATEGORY_LABEL[item.category]}
-                </span>
-                <span className="font-display text-lg group-hover:underline">
-                  {item.title}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <ImageAutoSlider />
       </Section>
 
       {/* CASE STUDY */}

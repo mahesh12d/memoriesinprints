@@ -1,0 +1,1723 @@
+From 6e872ae37454ccebc8c5366c389716922ff215ed Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 20 Sep 2026 06:22:29 +0000
+Subject: [PATCH 1/2] Apply the brand palette across the site
+
+Replaces the placeholder ivory/sage palette with the studio's own colours:
+green #2DBC9A, blue #465862, grey #F8F8F8, muted #A8AAAB. Every colour still
+lives in one @theme block, so this is a token swap rather than a rewrite.
+
+The footer moves from a dark band to #F8F8F8 as the palette specifies, which
+changes it from light-on-dark to dark-on-light throughout.
+
+Two supplied pairings fall below the 4.5:1 contrast floor for body text:
+muted grey on the grey footer is 2.20:1, and white on the green is 2.39:1.
+The VARIANT block at the top of globals.css holds the three values that
+differ between using the hexes literally and using darker shades of the same
+hues for small text. Currently set to the accessible variant pending a
+decision; switching is a three-line edit.
+
+Green becomes the primary action colour, blue the ink and the dark bands.
+The palette has no danger colour, so one muted red is added for form errors.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01L1bxKChEbqvtmDsqed6PxW
+---
+ shot.mjs                                      | 10 ++
+ src/app/(auth)/forgot-password/page.tsx       |  2 +-
+ src/app/(auth)/login/login-form.tsx           |  4 +-
+ src/app/(auth)/login/page.tsx                 |  2 +-
+ src/app/(auth)/reset-password/page.tsx        |  2 +-
+ src/app/(auth)/signup/page.tsx                |  2 +-
+ src/app/(auth)/verify-email/page.tsx          |  8 +-
+ src/app/(site)/[legal]/page.tsx               |  4 +-
+ src/app/(site)/about/page.tsx                 | 16 ++--
+ src/app/(site)/faq/page.tsx                   |  2 +-
+ src/app/(site)/guide/page.tsx                 | 12 +--
+ src/app/(site)/page.tsx                       | 32 +++----
+ src/app/(site)/portfolio/page.tsx             |  8 +-
+ src/app/(site)/products/[slug]/page.tsx       |  8 +-
+ src/app/(site)/products/page.tsx              | 14 +--
+ src/app/(site)/quote/page.tsx                 |  4 +-
+ src/app/(site)/quote/quote-form.tsx           | 12 +--
+ src/app/(site)/quote/thank-you/page.tsx       | 10 +-
+ src/app/account/orders/page.tsx               |  8 +-
+ src/app/account/page.tsx                      |  6 +-
+ src/app/account/profile/profile-form.tsx      |  2 +-
+ .../account/quotes/cancel-quote-button.tsx    |  6 +-
+ src/app/account/quotes/page.tsx               |  4 +-
+ src/app/account/saved/page.tsx                |  4 +-
+ src/app/account/security/page.tsx             |  8 +-
+ src/app/admin/(portal)/page.tsx               |  2 +-
+ src/app/admin/login/admin-login-form.tsx      |  2 +-
+ src/app/globals.css                           | 95 +++++++++++--------
+ src/components/auth/auth-card.tsx             | 10 +-
+ src/components/portal/portal-nav.tsx          |  4 +-
+ src/components/portal/portal-shell.tsx        | 26 ++---
+ src/components/portal/status-pill.tsx         |  8 +-
+ src/components/site/image-placeholder.tsx     |  2 +-
+ src/components/site/mobile-nav.tsx            |  6 +-
+ src/components/site/section.tsx               | 28 +++---
+ src/components/site/site-footer.tsx           | 18 ++--
+ src/components/site/site-header.tsx           |  8 +-
+ src/components/ui/form.tsx                    | 14 +--
+ 38 files changed, 222 insertions(+), 191 deletions(-)
+ create mode 100644 shot.mjs
+
+diff --git a/shot.mjs b/shot.mjs
+new file mode 100644
+index 0000000..9580d8c
+--- /dev/null
++++ b/shot.mjs
+@@ -0,0 +1,10 @@
++import { chromium } from '@playwright/test';
++const label = process.argv[2];
++const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
++const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
++const res = await page.goto('http://127.0.0.1:3100/', { waitUntil: 'networkidle' });
++if (res.status() !== 200) throw new Error('page returned ' + res.status());
++await page.screenshot({ path: `/tmp/${label}-top.png` });
++await page.screenshot({ path: `/tmp/${label}-full.png`, fullPage: true });
++await browser.close();
++console.log('captured', label, 'status', res.status());
+diff --git a/src/app/(auth)/forgot-password/page.tsx b/src/app/(auth)/forgot-password/page.tsx
+index 14c6da1..b143d6c 100644
+--- a/src/app/(auth)/forgot-password/page.tsx
++++ b/src/app/(auth)/forgot-password/page.tsx
+@@ -13,7 +13,7 @@ export default function ForgotPasswordPage() {
+       title="Reset your password"
+       intro="We'll email you a link to choose a new one."
+       footer={
+-        <Link href="/login" className="font-semibold text-warm">
++        <Link href="/login" className="font-semibold text-accent-text">
+           Back to sign in
+         </Link>
+       }
+diff --git a/src/app/(auth)/login/login-form.tsx b/src/app/(auth)/login/login-form.tsx
+index 7a660fc..a57da07 100644
+--- a/src/app/(auth)/login/login-form.tsx
++++ b/src/app/(auth)/login/login-form.tsx
+@@ -36,10 +36,10 @@ export function LoginForm({ next }: { next?: string }) {
+       <SubmitButton pendingLabel="Signing in…">Sign in</SubmitButton>
+ 
+       <div className="flex justify-between text-[13px]">
+-        <Link href="/forgot-password" className="font-semibold text-warm">
++        <Link href="/forgot-password" className="font-semibold text-accent-text">
+           Forgotten your password?
+         </Link>
+-        <Link href="/signup" className="font-semibold text-warm">
++        <Link href="/signup" className="font-semibold text-accent-text">
+           Create an account
+         </Link>
+       </div>
+diff --git a/src/app/(auth)/login/page.tsx b/src/app/(auth)/login/page.tsx
+index 83f097b..46b76a9 100644
+--- a/src/app/(auth)/login/page.tsx
++++ b/src/app/(auth)/login/page.tsx
+@@ -20,7 +20,7 @@ export default async function LoginPage({
+       {params.reset && (
+         <p
+           role="status"
+-          className="rounded-[4px] bg-sage-tint px-[14px] py-3 text-[13px] leading-relaxed text-sage-deep"
++          className="rounded-[4px] bg-good-tint px-[14px] py-3 text-[13px] leading-relaxed text-good-deep"
+         >
+           Your password has been changed. Please sign in with your new password.
+         </p>
+diff --git a/src/app/(auth)/reset-password/page.tsx b/src/app/(auth)/reset-password/page.tsx
+index e29ebc6..fce2e76 100644
+--- a/src/app/(auth)/reset-password/page.tsx
++++ b/src/app/(auth)/reset-password/page.tsx
+@@ -22,7 +22,7 @@ export default async function ResetPasswordPage({
+       >
+         <Link
+           href="/forgot-password"
+-          className="rounded-[2px] bg-charcoal px-6 py-[14px] text-center text-sm font-semibold text-ivory"
++          className="rounded-[2px] bg-brand px-6 py-[14px] text-center text-sm font-semibold text-on-accent"
+         >
+           Request a new link
+         </Link>
+diff --git a/src/app/(auth)/signup/page.tsx b/src/app/(auth)/signup/page.tsx
+index 852ba65..827acd6 100644
+--- a/src/app/(auth)/signup/page.tsx
++++ b/src/app/(auth)/signup/page.tsx
+@@ -15,7 +15,7 @@ export default function SignupPage() {
+       footer={
+         <>
+           Already have an account?{" "}
+-          <Link href="/login" className="font-semibold text-warm">
++          <Link href="/login" className="font-semibold text-accent-text">
+             Sign in
+           </Link>
+         </>
+diff --git a/src/app/(auth)/verify-email/page.tsx b/src/app/(auth)/verify-email/page.tsx
+index a2ffd79..c7ef4d5 100644
+--- a/src/app/(auth)/verify-email/page.tsx
++++ b/src/app/(auth)/verify-email/page.tsx
+@@ -33,7 +33,7 @@ export default async function VerifyEmailPage({
+         {verified ? (
+           <Link
+             href={session ? "/account" : "/login"}
+-            className="rounded-[2px] bg-charcoal px-6 py-[14px] text-center text-sm font-semibold text-ivory"
++            className="rounded-[2px] bg-brand px-6 py-[14px] text-center text-sm font-semibold text-on-accent"
+           >
+             {session ? "Go to my account" : "Sign in"}
+           </Link>
+@@ -42,7 +42,7 @@ export default async function VerifyEmailPage({
+         ) : (
+           <Link
+             href="/login"
+-            className="rounded-[2px] bg-charcoal px-6 py-[14px] text-center text-sm font-semibold text-ivory"
++            className="rounded-[2px] bg-brand px-6 py-[14px] text-center text-sm font-semibold text-on-accent"
+           >
+             Sign in to send a new link
+           </Link>
+@@ -59,7 +59,7 @@ export default async function VerifyEmailPage({
+       >
+         <Link
+           href="/account"
+-          className="rounded-[2px] bg-charcoal px-6 py-[14px] text-center text-sm font-semibold text-ivory"
++          className="rounded-[2px] bg-brand px-6 py-[14px] text-center text-sm font-semibold text-on-accent"
+         >
+           Go to my account
+         </Link>
+@@ -82,7 +82,7 @@ export default async function VerifyEmailPage({
+       ) : (
+         <Link
+           href="/login"
+-          className="rounded-[2px] bg-charcoal px-6 py-[14px] text-center text-sm font-semibold text-ivory"
++          className="rounded-[2px] bg-brand px-6 py-[14px] text-center text-sm font-semibold text-on-accent"
+         >
+           Sign in
+         </Link>
+diff --git a/src/app/(site)/[legal]/page.tsx b/src/app/(site)/[legal]/page.tsx
+index beb0e33..4329901 100644
+--- a/src/app/(site)/[legal]/page.tsx
++++ b/src/app/(site)/[legal]/page.tsx
+@@ -70,7 +70,7 @@ export default async function LegalPage({
+           {page.intro}
+         </p>
+ 
+-        <div className="mt-4 rounded-md border border-warm/30 bg-warm-tint p-6">
++        <div className="mt-4 rounded-md border border-brand/30 bg-brand-tint p-6">
+           <h2 className="font-display text-lg">Not yet written</h2>
+           <p className="mt-2 text-[14px] leading-relaxed text-ink-soft">
+             This wording needs to come from the studio, and the privacy notice
+@@ -84,7 +84,7 @@ export default async function LegalPage({
+           </p>
+         </div>
+ 
+-        <Link href="/" className="mt-4 text-[13px] font-semibold text-warm">
++        <Link href="/" className="mt-4 text-[13px] font-semibold text-accent-text">
+           ← Back to the studio
+         </Link>
+       </div>
+diff --git a/src/app/(site)/about/page.tsx b/src/app/(site)/about/page.tsx
+index 8d6beb7..dc5ee8e 100644
+--- a/src/app/(site)/about/page.tsx
++++ b/src/app/(site)/about/page.tsx
+@@ -38,7 +38,7 @@ export default function AboutPage() {
+       <Section tone="white">
+         <div className="grid items-center gap-12 lg:grid-cols-2">
+           <div className="flex flex-col gap-5">
+-            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-warm">
++            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent-text">
+               Our story
+             </span>
+             <h2 className="text-[32px] leading-tight">Why we started</h2>
+@@ -66,7 +66,7 @@ export default function AboutPage() {
+             className="order-last h-[340px] w-full rounded-md lg:order-first"
+           />
+           <div className="flex flex-col gap-5">
+-            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-warm">
++            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent-text">
+               Meet the studio
+             </span>
+             <h2 className="text-[32px] leading-tight">
+@@ -84,7 +84,7 @@ export default function AboutPage() {
+         </div>
+       </Section>
+ 
+-      <Section tone="night">
++      <Section tone="blue">
+         <SectionHeading
+           tone="light"
+           eyebrow="What we stand by"
+@@ -93,11 +93,11 @@ export default function AboutPage() {
+         <ul className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
+           {STUDIO_VALUES.map((value) => (
+             <li key={value.n} className="flex flex-col gap-3">
+-              <span className="font-display text-[28px] text-gold">
++              <span className="font-display text-[28px] text-brand">
+                 {value.n}
+               </span>
+-              <h3 className="text-lg text-ivory">{value.title}</h3>
+-              <p className="text-[14px] leading-relaxed text-ivory/65">
++              <h3 className="text-lg text-white">{value.title}</h3>
++              <p className="text-[14px] leading-relaxed text-white/65">
+                 {value.body}
+               </p>
+             </li>
+@@ -105,9 +105,9 @@ export default function AboutPage() {
+         </ul>
+       </Section>
+ 
+-      <Section tone="warm">
++      <Section tone="grey">
+         <div className="mx-auto flex max-w-[64ch] flex-col items-center gap-5 text-center">
+-          <span className="rounded-full bg-sage-tint px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-sage-deep">
++          <span className="rounded-full bg-good-tint px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-good-deep">
+             FSA Member — Funeral Service Association
+           </span>
+           <p className="text-[15px] leading-relaxed text-ink-muted">
+diff --git a/src/app/(site)/faq/page.tsx b/src/app/(site)/faq/page.tsx
+index 81d6288..536cfb5 100644
+--- a/src/app/(site)/faq/page.tsx
++++ b/src/app/(site)/faq/page.tsx
+@@ -30,7 +30,7 @@ export default function FaqPage() {
+                 {faq.q}
+                 <span
+                   aria-hidden="true"
+-                  className="shrink-0 text-ink-faint transition-transform group-open:rotate-45"
++                  className="shrink-0 text-ink-quiet transition-transform group-open:rotate-45"
+                 >
+                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+                     <line x1="12" y1="5" x2="12" y2="19" />
+diff --git a/src/app/(site)/guide/page.tsx b/src/app/(site)/guide/page.tsx
+index 497e538..26b99c5 100644
+--- a/src/app/(site)/guide/page.tsx
++++ b/src/app/(site)/guide/page.tsx
+@@ -21,7 +21,7 @@ export default function GuidePage() {
+         <Breadcrumb trail={[{ href: "/", label: "Home" }, { label: "Process" }]} />
+ 
+         <div className="flex max-w-[62ch] flex-col gap-4">
+-          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-warm">
++          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent-text">
+             How it works
+           </span>
+           <h1 className="text-[40px] leading-tight">
+@@ -72,7 +72,7 @@ export default function GuidePage() {
+                 caption={step.caption}
+                 className="aspect-[4/3] w-full rounded-md"
+               />
+-              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-warm">
++              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-text">
+                 {step.label}
+               </span>
+               <p className="text-[14px] leading-relaxed text-ink-muted">
+@@ -83,7 +83,7 @@ export default function GuidePage() {
+         </ol>
+       </Section>
+ 
+-      <Section tone="warm">
++      <Section tone="grey">
+         <SectionHeading
+           eyebrow="From the studio"
+           title="Guides &amp; resources"
+@@ -101,7 +101,7 @@ export default function GuidePage() {
+                 className="aspect-[16/9] w-full"
+               />
+               <div className="flex flex-1 flex-col gap-3 p-7">
+-                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-warm">
++                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-text">
+                   {article.tag}
+                 </span>
+                 <h3 className="font-display text-xl leading-snug">
+@@ -110,7 +110,7 @@ export default function GuidePage() {
+                 <p className="text-[14px] leading-relaxed text-ink-muted">
+                   {article.excerpt}
+                 </p>
+-                <span className="mt-auto pt-3 text-[12px] text-ink-faint">
++                <span className="mt-auto pt-3 text-[12px] text-ink-quiet">
+                   {article.date}
+                 </span>
+               </div>
+@@ -118,7 +118,7 @@ export default function GuidePage() {
+           ))}
+         </ul>
+ 
+-        <p className="mt-8 text-[13px] text-ink-faint">
++        <p className="mt-8 text-[13px] text-ink-quiet">
+           Articles are outlined and ready for the studio to write — the pages
+           themselves come with the content milestone.
+         </p>
+diff --git a/src/app/(site)/page.tsx b/src/app/(site)/page.tsx
+index 67d5903..0e5bded 100644
+--- a/src/app/(site)/page.tsx
++++ b/src/app/(site)/page.tsx
+@@ -37,7 +37,7 @@ export default async function HomePage() {
+ 
+         <div className="mx-auto max-w-[1200px] px-6 py-16 sm:px-10">
+           <div className="flex max-w-[62ch] flex-col gap-5">
+-            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-warm">
++            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent-text">
+               Independent print studio · Funeral Service Association member
+             </span>
+             <h1 className="text-[40px] leading-[1.15] sm:text-[52px]">
+@@ -51,13 +51,13 @@ export default async function HomePage() {
+             <div className="mt-2 flex flex-wrap gap-3">
+               <Link
+                 href="/quote"
+-                className="rounded-[2px] bg-charcoal px-7 py-3.5 text-sm font-semibold text-ivory hover:bg-night"
++                className="rounded-[2px] bg-brand px-7 py-3.5 text-sm font-semibold text-on-accent hover:bg-blue-deep"
+               >
+                 Request a quote
+               </Link>
+               <Link
+                 href="/portfolio"
+-                className="rounded-[2px] border border-field-line px-7 py-3.5 text-sm font-semibold text-ink-soft hover:bg-line-warm"
++                className="rounded-[2px] border border-field-line px-7 py-3.5 text-sm font-semibold text-ink-soft hover:bg-surface-grey"
+               >
+                 View our work
+               </Link>
+@@ -89,7 +89,7 @@ export default async function HomePage() {
+       </Section>
+ 
+       {/* QUICK LINKS */}
+-      <Section tone="warm" className="!py-0">
++      <Section tone="grey" className="!py-0">
+         <div className="flex flex-col gap-6 py-14">
+           <h2 className="text-[22px]">Jump to what you need</h2>
+           <ul className="flex flex-wrap gap-3">
+@@ -97,7 +97,7 @@ export default async function HomePage() {
+               <li key={link.label}>
+                 <Link
+                   href={link.href}
+-                  className="inline-flex rounded-full border border-line bg-white px-5 py-2.5 text-[13px] font-medium text-ink-soft hover:border-warm hover:text-charcoal"
++                  className="inline-flex rounded-full border border-line bg-white px-5 py-2.5 text-[13px] font-medium text-ink-soft hover:border-brand hover:text-blue"
+                 >
+                   {link.label}
+                 </Link>
+@@ -123,7 +123,7 @@ export default async function HomePage() {
+                   caption={`[Photograph — ${item.title.toLowerCase()}]`}
+                   className="aspect-[4/3] w-full rounded-md"
+                 />
+-                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-warm">
++                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-text">
+                   {CATEGORY_LABEL[item.category]}
+                 </span>
+                 <span className="font-display text-lg group-hover:underline">
+@@ -150,7 +150,7 @@ export default async function HomePage() {
+                 caption={step.caption}
+                 className="aspect-[4/3] w-full rounded-md"
+               />
+-              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-warm">
++              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-text">
+                 {step.label}
+               </span>
+               <p className="text-[15px] leading-relaxed text-ink-muted">
+@@ -162,7 +162,7 @@ export default async function HomePage() {
+       </Section>
+ 
+       {/* VALUES */}
+-      <Section tone="night">
++      <Section tone="blue">
+         <SectionHeading
+           tone="light"
+           title="Where craft meets care"
+@@ -172,11 +172,11 @@ export default async function HomePage() {
+         <ul className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
+           {STUDIO_VALUES.map((value) => (
+             <li key={value.n} className="flex flex-col gap-3">
+-              <span className="font-display text-[28px] text-gold">
++              <span className="font-display text-[28px] text-brand">
+                 {value.n}
+               </span>
+-              <h3 className="text-lg text-ivory">{value.title}</h3>
+-              <p className="text-[14px] leading-relaxed text-ivory/65">
++              <h3 className="text-lg text-white">{value.title}</h3>
++              <p className="text-[14px] leading-relaxed text-white/65">
+                 {value.body}
+               </p>
+             </li>
+@@ -185,12 +185,12 @@ export default async function HomePage() {
+       </Section>
+ 
+       {/* TRUSTED BY */}
+-      <Section tone="warm">
++      <Section tone="grey">
+         <div className="flex flex-col items-center gap-8 text-center">
+-          <span className="rounded-full bg-sage-tint px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-sage-deep">
++          <span className="rounded-full bg-good-tint px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-good-deep">
+             FSA Member — Funeral Service Association
+           </span>
+-          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-faint">
++          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-quiet">
+             As trusted by
+           </span>
+           <ul className="flex flex-wrap items-center justify-center gap-x-12 gap-y-4">
+@@ -217,7 +217,7 @@ export default async function HomePage() {
+               <blockquote className="font-display text-[19px] leading-[1.5]">
+                 “{quote.text}”
+               </blockquote>
+-              <cite className="text-[13px] not-italic text-ink-faint">
++              <cite className="text-[13px] not-italic text-ink-quiet">
+                 — {quote.attribution}
+               </cite>
+             </li>
+@@ -239,7 +239,7 @@ export default async function HomePage() {
+             </p>
+             <Link
+               href="/quote"
+-              className="mt-2 w-fit rounded-[2px] bg-charcoal px-7 py-3.5 text-sm font-semibold text-ivory hover:bg-night"
++              className="mt-2 w-fit rounded-[2px] bg-brand px-7 py-3.5 text-sm font-semibold text-on-accent hover:bg-blue-deep"
+             >
+               Get a quote, wherever you are
+             </Link>
+diff --git a/src/app/(site)/portfolio/page.tsx b/src/app/(site)/portfolio/page.tsx
+index 689dd49..be1f88d 100644
+--- a/src/app/(site)/portfolio/page.tsx
++++ b/src/app/(site)/portfolio/page.tsx
+@@ -76,8 +76,8 @@ export default async function PortfolioPage({
+                   aria-current={filter.isActive ? "true" : undefined}
+                   className={`inline-flex rounded-full px-5 py-2.5 text-[13px] font-semibold transition-colors ${
+                     filter.isActive
+-                      ? "bg-charcoal text-ivory"
+-                      : "border border-line bg-white text-ink-soft hover:border-warm"
++                      ? "bg-blue text-white"
++                      : "border border-line bg-white text-ink-soft hover:border-brand"
+                   }`}
+                 >
+                   {filter.label}
+@@ -90,7 +90,7 @@ export default async function PortfolioPage({
+         {items.length === 0 ? (
+           <p className="rounded-md border border-line bg-white p-10 text-center text-[15px] text-ink-muted">
+             Nothing here yet in this category. Try another, or{" "}
+-            <Link href="/quote" className="font-semibold text-warm">
++            <Link href="/quote" className="font-semibold text-accent-text">
+               tell us what you have in mind
+             </Link>
+             .
+@@ -103,7 +103,7 @@ export default async function PortfolioPage({
+                   caption={`[Photograph — ${item.title.toLowerCase()}]`}
+                   className="aspect-[4/3] w-full rounded-md"
+                 />
+-                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-warm">
++                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-text">
+                   {CATEGORY_LABEL[item.category]}
+                 </span>
+                 <h2 className="font-display text-lg">{item.title}</h2>
+diff --git a/src/app/(site)/products/[slug]/page.tsx b/src/app/(site)/products/[slug]/page.tsx
+index 8ea10ce..33af086 100644
+--- a/src/app/(site)/products/[slug]/page.tsx
++++ b/src/app/(site)/products/[slug]/page.tsx
+@@ -115,7 +115,7 @@ export default async function ProductDetailPage({
+ 
+         <div className="flex flex-col gap-6">
+           <div className="flex flex-col gap-3">
+-            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-warm">
++            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-text">
+               {CATEGORY_LABEL[product.category]} stationery
+             </span>
+             <h1 className="text-[34px] leading-tight">{product.name}</h1>
+@@ -145,7 +145,7 @@ export default async function ProductDetailPage({
+                   >
+                     {size.label}
+                     {size.widthMm && size.heightMm && (
+-                      <span className="text-ink-faint">
++                      <span className="text-ink-quiet">
+                         {" "}
+                         ({size.widthMm} × {size.heightMm}mm)
+                       </span>
+@@ -165,11 +165,11 @@ export default async function ProductDetailPage({
+             </p>
+             <Link
+               href={`/quote?product=${product.slug}`}
+-              className="mt-5 inline-flex rounded-[2px] bg-charcoal px-7 py-3.5 text-sm font-semibold text-ivory hover:bg-night"
++              className="mt-5 inline-flex rounded-[2px] bg-brand px-7 py-3.5 text-sm font-semibold text-on-accent hover:bg-blue-deep"
+             >
+               Request a quote for this
+             </Link>
+-            <p className="mt-4 text-[12px] text-ink-faint">
++            <p className="mt-4 text-[12px] text-ink-quiet">
+               Minimum order {product.minimumQuantity}. {TURNAROUND_NOTE}
+             </p>
+           </div>
+diff --git a/src/app/(site)/products/page.tsx b/src/app/(site)/products/page.tsx
+index ed94529..ff67f09 100644
+--- a/src/app/(site)/products/page.tsx
++++ b/src/app/(site)/products/page.tsx
+@@ -109,8 +109,8 @@ export default async function ProductsPage({
+                 aria-current={!active ? "true" : undefined}
+                 className={`inline-flex rounded-full px-5 py-2.5 text-[13px] font-semibold ${
+                   !active
+-                    ? "bg-charcoal text-ivory"
+-                    : "border border-line bg-white text-ink-soft hover:border-warm"
++                    ? "bg-blue text-white"
++                    : "border border-line bg-white text-ink-soft hover:border-brand"
+                 }`}
+               >
+                 Everything
+@@ -123,8 +123,8 @@ export default async function ProductsPage({
+                   aria-current={active === value ? "true" : undefined}
+                   className={`inline-flex rounded-full px-5 py-2.5 text-[13px] font-semibold ${
+                     active === value
+-                      ? "bg-charcoal text-ivory"
+-                      : "border border-line bg-white text-ink-soft hover:border-warm"
++                      ? "bg-blue text-white"
++                      : "border border-line bg-white text-ink-soft hover:border-brand"
+                   }`}
+                 >
+                   {CATEGORY_LABEL[value]}
+@@ -145,7 +145,7 @@ export default async function ProductsPage({
+                 className="aspect-[4/3] w-full"
+               />
+               <div className="flex flex-1 flex-col gap-3 p-6">
+-                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-warm">
++                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-text">
+                   {CATEGORY_LABEL[product.category]}
+                 </span>
+                 <h2 className="font-display text-lg">{product.name}</h2>
+@@ -154,13 +154,13 @@ export default async function ProductsPage({
+                     {product.summary}
+                   </p>
+                 )}
+-                <p className="text-[12px] text-ink-faint">
++                <p className="text-[12px] text-ink-quiet">
+                   {(sizesByProduct.get(product.id) ?? []).join(" · ") ||
+                     "Sizes confirmed at quote"}
+                 </p>
+                 <Link
+                   href={`/products/${product.slug}`}
+-                  className="mt-auto pt-2 text-[13px] font-semibold text-warm"
++                  className="mt-auto pt-2 text-[13px] font-semibold text-accent-text"
+                 >
+                   View details →
+                 </Link>
+diff --git a/src/app/(site)/quote/page.tsx b/src/app/(site)/quote/page.tsx
+index 67a70a5..20c0647 100644
+--- a/src/app/(site)/quote/page.tsx
++++ b/src/app/(site)/quote/page.tsx
+@@ -83,7 +83,7 @@ export default async function QuotePage({
+             <ol className="mt-4 flex flex-col gap-4">
+               {NEXT_STEPS.map((step, index) => (
+                 <li key={step} className="flex gap-3">
+-                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-warm-tint text-[11px] font-bold text-warm">
++                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-brand-tint text-[11px] font-bold text-accent-text">
+                     {index + 1}
+                   </span>
+                   <span className="text-[14px] leading-relaxed text-ink-muted">
+@@ -101,7 +101,7 @@ export default async function QuotePage({
+               <br />
+               {STUDIO.email}
+             </p>
+-            <p className="mt-3 text-[13px] text-ink-faint">
++            <p className="mt-3 text-[13px] text-ink-quiet">
+               {STUDIO.openingHours}
+             </p>
+           </div>
+diff --git a/src/app/(site)/quote/quote-form.tsx b/src/app/(site)/quote/quote-form.tsx
+index 9155cc0..19d3938 100644
+--- a/src/app/(site)/quote/quote-form.tsx
++++ b/src/app/(site)/quote/quote-form.tsx
+@@ -37,8 +37,8 @@ export function QuoteForm({
+               key={value}
+               className={`cursor-pointer rounded-full border px-5 py-2.5 text-[13px] font-semibold transition-colors ${
+                 category === value
+-                  ? "border-charcoal bg-charcoal text-ivory"
+-                  : "border-line bg-white text-ink-soft hover:border-warm"
++                  ? "border-blue bg-blue text-white"
++                  : "border-line bg-white text-ink-soft hover:border-brand"
+               }`}
+             >
+               <input
+@@ -54,7 +54,7 @@ export function QuoteForm({
+           ))}
+         </div>
+         {state.errors?.category && (
+-          <p className="text-xs font-medium text-rose-deep">
++          <p className="text-xs font-medium text-alert">
+             {state.errors.category}
+           </p>
+         )}
+@@ -121,13 +121,13 @@ export function QuoteForm({
+           required
+           aria-invalid={state.errors?.message ? true : undefined}
+           placeholder="Tell us about the service or occasion, any wording or photographs you'd like included, and the date you're working towards."
+-          className={`w-full rounded-[3px] border bg-white px-[15px] py-[13px] font-sans text-sm text-charcoal placeholder:text-placeholder ${
+-            state.errors?.message ? "border-rose-deep" : "border-field-line"
++          className={`w-full rounded-[3px] border bg-white px-[15px] py-[13px] font-sans text-sm text-blue placeholder:text-placeholder ${
++            state.errors?.message ? "border-alert" : "border-field-line"
+           }`}
+         />
+       </Field>
+ 
+-      <p className="text-[12px] leading-relaxed text-ink-faint">
++      <p className="text-[12px] leading-relaxed text-ink-quiet">
+         We use your details only to answer this enquiry. Uploading reference
+         files arrives with the next release — for now, mention them and
+         we&rsquo;ll ask by email.
+diff --git a/src/app/(site)/quote/thank-you/page.tsx b/src/app/(site)/quote/thank-you/page.tsx
+index 23279af..765004f 100644
+--- a/src/app/(site)/quote/thank-you/page.tsx
++++ b/src/app/(site)/quote/thank-you/page.tsx
+@@ -20,7 +20,7 @@ export default async function QuoteThankYouPage({
+   return (
+     <Section>
+       <div className="mx-auto flex max-w-[60ch] flex-col items-center gap-6 py-10 text-center">
+-        <span className="flex size-14 items-center justify-center rounded-full bg-sage-tint text-sage-deep">
++        <span className="flex size-14 items-center justify-center rounded-full bg-good-tint text-good-deep">
+           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+             <polyline points="20 6 9 17 4 12" />
+           </svg>
+@@ -31,7 +31,7 @@ export default async function QuoteThankYouPage({
+         {ref && (
+           <p className="text-[15px] text-ink-muted">
+             Your reference is{" "}
+-            <strong className="font-semibold text-charcoal">{ref}</strong>. A
++            <strong className="font-semibold text-blue">{ref}</strong>. A
+             confirmation is on its way to your inbox.
+           </p>
+         )}
+@@ -46,21 +46,21 @@ export default async function QuoteThankYouPage({
+           {session ? (
+             <Link
+               href="/account/quotes"
+-              className="rounded-[2px] bg-charcoal px-7 py-3.5 text-sm font-semibold text-ivory hover:bg-night"
++              className="rounded-[2px] bg-brand px-7 py-3.5 text-sm font-semibold text-on-accent hover:bg-blue-deep"
+             >
+               See it in my account
+             </Link>
+           ) : (
+             <Link
+               href="/signup"
+-              className="rounded-[2px] bg-charcoal px-7 py-3.5 text-sm font-semibold text-ivory hover:bg-night"
++              className="rounded-[2px] bg-brand px-7 py-3.5 text-sm font-semibold text-on-accent hover:bg-blue-deep"
+             >
+               Create an account to track it
+             </Link>
+           )}
+           <Link
+             href="/portfolio"
+-            className="rounded-[2px] border border-field-line px-7 py-3.5 text-sm font-semibold text-ink-soft hover:bg-line-warm"
++            className="rounded-[2px] border border-field-line px-7 py-3.5 text-sm font-semibold text-ink-soft hover:bg-surface-grey"
+           >
+             Browse our work
+           </Link>
+diff --git a/src/app/account/orders/page.tsx b/src/app/account/orders/page.tsx
+index 4dcece8..4072e95 100644
+--- a/src/app/account/orders/page.tsx
++++ b/src/app/account/orders/page.tsx
+@@ -63,7 +63,7 @@ export default async function AccountOrdersPage() {
+             </p>
+             <Link
+               href="/products"
+-              className="mt-6 inline-flex rounded-[2px] bg-charcoal px-6 py-3 text-[13px] font-semibold text-ivory"
++              className="mt-6 inline-flex rounded-[2px] bg-brand px-6 py-3 text-[13px] font-semibold text-on-accent"
+             >
+               Browse products
+             </Link>
+@@ -72,13 +72,13 @@ export default async function AccountOrdersPage() {
+           <div className="flex flex-col gap-6">
+             <div className="flex gap-[18px]">
+               <div className="flex flex-col gap-1.5 rounded-md border border-line bg-white p-5">
+-                <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-faint">
++                <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-quiet">
+                   Orders
+                 </span>
+                 <span className="font-display text-[27px]">{rows.length}</span>
+               </div>
+               <div className="flex flex-col gap-1.5 rounded-md border border-line bg-white p-5">
+-                <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-faint">
++                <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-quiet">
+                   Total spend
+                 </span>
+                 <span className="font-display text-[27px]">
+@@ -98,7 +98,7 @@ export default async function AccountOrdersPage() {
+                       <span className="text-sm font-semibold">
+                         {row.reference}
+                       </span>
+-                      <span className="text-xs text-ink-faint">
++                      <span className="text-xs text-ink-quiet">
+                         Placed {dateFormat.format(row.createdAt)}
+                       </span>
+                     </div>
+diff --git a/src/app/account/page.tsx b/src/app/account/page.tsx
+index 8edd40f..35ff6fe 100644
+--- a/src/app/account/page.tsx
++++ b/src/app/account/page.tsx
+@@ -13,14 +13,14 @@ export default async function AccountDashboardPage() {
+       <PortalBody>
+         <div className="flex flex-col gap-6">
+           {!verified && (
+-            <div className="flex items-center justify-between gap-6 rounded-md border border-warm/30 bg-warm-tint px-5 py-4">
++            <div className="flex items-center justify-between gap-6 rounded-md border border-brand/30 bg-brand-tint px-5 py-4">
+               <p className="text-sm text-ink-soft">
+                 Please confirm your email address so we can send you proofs and
+                 order updates.
+               </p>
+               <Link
+                 href="/verify-email"
+-                className="shrink-0 text-[13px] font-semibold text-warm"
++                className="shrink-0 text-[13px] font-semibold text-accent-text"
+               >
+                 Confirm now →
+               </Link>
+@@ -37,7 +37,7 @@ export default async function AccountDashboardPage() {
+             <div className="mt-6 flex gap-3">
+               <Link
+                 href="/account/profile"
+-                className="rounded-[2px] bg-charcoal px-5 py-3 text-[13px] font-semibold text-ivory"
++                className="rounded-[2px] bg-brand px-5 py-3 text-[13px] font-semibold text-on-accent"
+               >
+                 Edit profile
+               </Link>
+diff --git a/src/app/account/profile/profile-form.tsx b/src/app/account/profile/profile-form.tsx
+index a44dec5..af69ea0 100644
+--- a/src/app/account/profile/profile-form.tsx
++++ b/src/app/account/profile/profile-form.tsx
+@@ -57,7 +57,7 @@ export function ProfileForm({ profile }: { profile: Profile }) {
+           id="email"
+           value={profile.email}
+           disabled
+-          className="w-full rounded-[3px] border border-line bg-line-warm px-[15px] py-[13px] text-sm text-ink-muted"
++          className="w-full rounded-[3px] border border-line bg-surface-grey px-[15px] py-[13px] text-sm text-ink-muted"
+         />
+       </Field>
+ 
+diff --git a/src/app/account/quotes/cancel-quote-button.tsx b/src/app/account/quotes/cancel-quote-button.tsx
+index edc69b7..d3928c4 100644
+--- a/src/app/account/quotes/cancel-quote-button.tsx
++++ b/src/app/account/quotes/cancel-quote-button.tsx
+@@ -11,7 +11,7 @@ export function CancelQuoteButton({ enquiryId }: { enquiryId: string }) {
+       <button
+         type="button"
+         onClick={() => setConfirming(true)}
+-        className="text-[13px] font-semibold text-ink-faint hover:text-rose-deep"
++        className="text-[13px] font-semibold text-ink-quiet hover:text-alert"
+       >
+         Cancel
+       </button>
+@@ -24,14 +24,14 @@ export function CancelQuoteButton({ enquiryId }: { enquiryId: string }) {
+       <span className="text-[12px] text-ink-muted">Cancel this request?</span>
+       <button
+         type="submit"
+-        className="text-[13px] font-semibold text-rose-deep hover:underline"
++        className="text-[13px] font-semibold text-alert hover:underline"
+       >
+         Yes, cancel
+       </button>
+       <button
+         type="button"
+         onClick={() => setConfirming(false)}
+-        className="text-[13px] font-semibold text-ink-faint hover:text-charcoal"
++        className="text-[13px] font-semibold text-ink-quiet hover:text-blue"
+       >
+         Keep
+       </button>
+diff --git a/src/app/account/quotes/page.tsx b/src/app/account/quotes/page.tsx
+index 4a09ba3..c43d200 100644
+--- a/src/app/account/quotes/page.tsx
++++ b/src/app/account/quotes/page.tsx
+@@ -62,7 +62,7 @@ export default async function AccountQuotesPage() {
+             </p>
+             <Link
+               href="/quote"
+-              className="mt-6 inline-flex rounded-[2px] bg-charcoal px-6 py-3 text-[13px] font-semibold text-ivory"
++              className="mt-6 inline-flex rounded-[2px] bg-brand px-6 py-3 text-[13px] font-semibold text-on-accent"
+             >
+               Request a quote
+             </Link>
+@@ -85,7 +85,7 @@ export default async function AccountQuotesPage() {
+                       <span className="text-sm font-semibold">
+                         {row.subject}
+                       </span>
+-                      <span className="text-xs text-ink-faint">
++                      <span className="text-xs text-ink-quiet">
+                         {row.reference} · sent{" "}
+                         {dateFormat.format(row.createdAt)}
+                       </span>
+diff --git a/src/app/account/saved/page.tsx b/src/app/account/saved/page.tsx
+index 525f615..4d2c7e5 100644
+--- a/src/app/account/saved/page.tsx
++++ b/src/app/account/saved/page.tsx
+@@ -36,7 +36,7 @@ export default async function AccountSavedPage() {
+             </p>
+             <Link
+               href="/products"
+-              className="mt-6 inline-flex rounded-[2px] bg-charcoal px-6 py-3 text-[13px] font-semibold text-ivory"
++              className="mt-6 inline-flex rounded-[2px] bg-brand px-6 py-3 text-[13px] font-semibold text-on-accent"
+             >
+               Browse products
+             </Link>
+@@ -53,7 +53,7 @@ export default async function AccountSavedPage() {
+                   className="aspect-[4/3] w-full"
+                 />
+                 <div className="flex flex-col gap-1.5 p-5">
+-                  <span className="text-[10px] font-bold uppercase tracking-[0.05em] text-warm">
++                  <span className="text-[10px] font-bold uppercase tracking-[0.05em] text-accent-text">
+                     {CATEGORY_LABEL[row.category]}
+                   </span>
+                   <Link
+diff --git a/src/app/account/security/page.tsx b/src/app/account/security/page.tsx
+index 0284dde..9b01859 100644
+--- a/src/app/account/security/page.tsx
++++ b/src/app/account/security/page.tsx
+@@ -72,7 +72,7 @@ export default async function SecurityPage() {
+                 <form action={revokeOtherSessionsAction}>
+                   <button
+                     type="submit"
+-                    className="rounded-[2px] border border-field-line px-4 py-2.5 text-[13px] font-semibold text-rose-deep hover:bg-rose-tint"
++                    className="rounded-[2px] border border-field-line px-4 py-2.5 text-[13px] font-semibold text-alert hover:bg-alert-tint"
+                   >
+                     Sign out {otherCount} other{" "}
+                     {otherCount === 1 ? "device" : "devices"}
+@@ -91,12 +91,12 @@ export default async function SecurityPage() {
+                     <span className="flex items-center gap-2.5 text-sm font-semibold">
+                       {describeDevice(item.userAgent)}
+                       {item.isCurrent && (
+-                        <span className="rounded-full bg-sage-tint px-2.5 py-1 text-[11px] font-bold text-sage-deep">
++                        <span className="rounded-full bg-good-tint px-2.5 py-1 text-[11px] font-bold text-good-deep">
+                           This device
+                         </span>
+                       )}
+                     </span>
+-                    <span className="text-xs text-ink-faint">
++                    <span className="text-xs text-ink-quiet">
+                       {item.ipAddress ?? "Unknown location"} · last active{" "}
+                       {formatter.format(item.lastSeenAt)}
+                     </span>
+@@ -107,7 +107,7 @@ export default async function SecurityPage() {
+                       <input type="hidden" name="sessionId" value={item.id} />
+                       <button
+                         type="submit"
+-                        className="text-[13px] font-semibold text-rose-deep hover:underline"
++                        className="text-[13px] font-semibold text-alert hover:underline"
+                       >
+                         Revoke
+                       </button>
+diff --git a/src/app/admin/(portal)/page.tsx b/src/app/admin/(portal)/page.tsx
+index 5a71ae9..f28b5f1 100644
+--- a/src/app/admin/(portal)/page.tsx
++++ b/src/app/admin/(portal)/page.tsx
+@@ -39,7 +39,7 @@ export default async function AdminDashboardPage() {
+                 key={tile.label}
+                 className="flex flex-col gap-1.5 rounded-md border border-line bg-white p-5"
+               >
+-                <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-faint">
++                <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-quiet">
+                   {tile.label}
+                 </span>
+                 <span className="font-display text-[27px]">{tile.value}</span>
+diff --git a/src/app/admin/login/admin-login-form.tsx b/src/app/admin/login/admin-login-form.tsx
+index 920cffb..cda9c67 100644
+--- a/src/app/admin/login/admin-login-form.tsx
++++ b/src/app/admin/login/admin-login-form.tsx
+@@ -30,7 +30,7 @@ export function AdminLoginForm() {
+         error={state.errors?.password}
+       />
+ 
+-      <SubmitButton pendingLabel="Signing in…" className="bg-night-deep">
++      <SubmitButton pendingLabel="Signing in…" className="bg-blue-deep">
+         Sign in
+       </SubmitButton>
+     </form>
+diff --git a/src/app/globals.css b/src/app/globals.css
+index 8748767..c08f3f2 100644
+--- a/src/app/globals.css
++++ b/src/app/globals.css
+@@ -6,45 +6,65 @@
+ @import "@fontsource/eb-garamond/600.css";
+ @import "@fontsource-variable/work-sans/index.css";
+ 
++/* ==========================================================================
++   Brand palette
++   --------------------------------------------------------------------------
++   Green   #2DBC9A   primary accent, button and badge fills
++   Blue    #465862   primary ink, dark bands
++   Grey    #F8F8F8   alternating sections and the footer
++   Muted   #A8AAAB   quiet text
++
++   THE VARIANT BLOCK BELOW is the only difference between the two versions
++   you're comparing. Everything else is identical.
++   ========================================================================== */
++
+ @theme {
+-  /* Grounds */
+-  --color-ivory: #faf8f4;
+-  --color-ivory-deep: #f7f4ee;
+-  --color-charcoal: #2b2a28;
++  /* --- VARIANT: accessible ------------------------------------------------
++     Green and muted grey are kept as the brand colours for fills, but small
++     text and links use a darker shade of the same hue so they stay readable.
++     Contrast: link 4.59:1, muted text 4.57:1, button label 5.17:1.
++  */
++  --color-accent-text: #20846c;
++  --color-muted-text: #6f7273;
++  --color-on-accent: #0f3d32;
++  /* --- end VARIANT ------------------------------------------------------ */
++
++  /* Brand */
++  --color-brand: #2dbc9a;
++  --color-brand-deep: #20846c;
++  --color-brand-tint: #eaf8f4;
++  --color-brand-line: #bce7dc;
+ 
+-  /* Sage — the primary accent, and the "good / done" status hue */
+-  --color-sage: #7c8b72;
+-  --color-sage-tint: #eef1ea;
+-  --color-sage-deep: #5f6e56;
+-  --color-sage-line: #d7decb;
++  --color-blue: #465862;
++  --color-blue-deep: #35444c;
++  --color-blue-tint: #eceef0;
+ 
+-  /* Rose — alerts and destructive actions */
+-  --color-rose: #c98b82;
+-  --color-rose-tint: #fbedea;
+-  --color-rose-deep: #a15d50;
++  /* Surfaces */
++  --color-surface: #ffffff;
++  --color-surface-grey: #f8f8f8;
+ 
+-  /* Warm — links inside the portals, and the "pending / waiting" status hue */
+-  --color-warm: #8a6f5c;
+-  --color-warm-tint: #fbf3e4;
+-  --color-gold: #d9c7a3;
++  /* Ink */
++  --color-ink: #465862;
++  --color-ink-soft: #3d4e57;
++  --color-ink-muted: #5d6e77;
++  --color-ink-quiet: var(--color-muted-text);
++  --color-ink-pale: #a8aaab;
+ 
+-  /* Neutrals */
+-  --color-ink-soft: #3a3834;
+-  --color-ink-muted: #6b6560;
+-  --color-ink-faint: #8a8580;
+-  --color-ink-pale: #9b958d;
+-  --color-line: #e5e0d8;
+-  --color-line-soft: #efebe3;
+-  --color-line-warm: #f2eee6;
+-  --color-field-line: #dad4c9;
+-  --color-placeholder: #b0aa9f;
++  /* Lines and fields */
++  --color-line: #e4e6e7;
++  --color-line-soft: #eeeff0;
++  --color-field-line: #d6d9da;
++  --color-placeholder: #a8aaab;
+ 
+-  /* Dark bands — portal sidebars and footers */
+-  --color-night: #201f1d;
+-  --color-night-deep: #1c1b19;
+-  --color-night-line: #35342f;
+-  --color-night-line-soft: #33322f;
+-  --color-night-chip: #45443f;
++  /* Status — the brand palette has no danger colour, so this is the one
++     hue added. Kept muted so it never shouts on a bereavement page. */
++  --color-good: #2dbc9a;
++  --color-good-tint: #eaf8f4;
++  --color-good-deep: #1b6e59;
++  --color-alert: #b4554a;
++  --color-alert-tint: #fbeeec;
++  --color-pending-tint: #fdf4e6;
++  --color-pending-deep: #8a6b3d;
+ 
+   --font-display: "EB Garamond", Georgia, "Times New Roman", serif;
+   --font-sans: "Work Sans Variable", "Work Sans", system-ui, -apple-system, sans-serif;
+@@ -52,12 +72,12 @@
+ 
+ @layer base {
+   html {
+-    background: var(--color-ivory);
++    background: var(--color-surface);
+   }
+ 
+   body {
+-    background: var(--color-ivory);
+-    color: var(--color-charcoal);
++    background: var(--color-surface);
++    color: var(--color-ink);
+     font-family: var(--font-sans);
+   }
+ 
+@@ -67,11 +87,12 @@
+   h4 {
+     font-family: var(--font-display);
+     font-weight: 500;
++    color: var(--color-blue);
+   }
+ 
+   /* Visible focus for keyboard users, invisible for mouse users. */
+   :focus-visible {
+-    outline: 2px solid var(--color-sage-deep);
++    outline: 2px solid var(--color-brand-deep);
+     outline-offset: 2px;
+   }
+ }
+diff --git a/src/components/auth/auth-card.tsx b/src/components/auth/auth-card.tsx
+index e06782a..331150e 100644
+--- a/src/components/auth/auth-card.tsx
++++ b/src/components/auth/auth-card.tsx
+@@ -18,13 +18,13 @@ export function AuthCard({
+ }) {
+   return (
+     <main
+-      className={`flex min-h-screen flex-col ${dark ? "bg-night-deep" : "bg-ivory"}`}
++      className={`flex min-h-screen flex-col ${dark ? "bg-blue-deep" : "bg-surface"}`}
+     >
+       <div className="px-16 py-8">
+         <Link
+           href="/"
+           className={`font-display text-lg font-semibold ${
+-            dark ? "text-ink-faint" : "text-charcoal"
++            dark ? "text-ink-quiet" : "text-blue"
+           }`}
+         >
+           Memories in Prints
+@@ -34,12 +34,12 @@ export function AuthCard({
+       <div className="flex flex-1 items-center justify-center px-16 pb-12">
+         <div
+           className={`flex w-[420px] flex-col gap-[22px] rounded-lg p-11 ${
+-            dark ? "bg-ivory" : "border border-line bg-white"
++            dark ? "bg-surface" : "border border-line bg-white"
+           }`}
+         >
+           <div className="flex flex-col items-center gap-1.5 text-center">
+             {badge && (
+-              <span className="mb-1.5 rounded-full bg-gold px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.06em] text-charcoal">
++              <span className="mb-1.5 rounded-full bg-brand px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.06em] text-blue">
+                 {badge}
+               </span>
+             )}
+@@ -54,7 +54,7 @@ export function AuthCard({
+       {footer && (
+         <div
+           className={`px-16 pb-10 text-center text-[13px] ${
+-            dark ? "text-ink-faint" : "text-ink-muted"
++            dark ? "text-ink-quiet" : "text-ink-muted"
+           }`}
+         >
+           {footer}
+diff --git a/src/components/portal/portal-nav.tsx b/src/components/portal/portal-nav.tsx
+index 1882c21..1a1f7f2 100644
+--- a/src/components/portal/portal-nav.tsx
++++ b/src/components/portal/portal-nav.tsx
+@@ -26,8 +26,8 @@ export function PortalNav({ items }: { items: NavItem[] }) {
+             aria-current={active ? "page" : undefined}
+             className={`flex items-center gap-3 rounded px-3.5 py-2.5 text-sm font-medium transition-colors ${
+               active
+-                ? "bg-white/10 text-ivory"
+-                : "text-white/70 hover:bg-white/5 hover:text-ivory"
++                ? "bg-white/10 text-white"
++                : "text-white/70 hover:bg-white/5 hover:text-white"
+             }`}
+           >
+             {item.icon}
+diff --git a/src/components/portal/portal-shell.tsx b/src/components/portal/portal-shell.tsx
+index 36aeb23..9e0e0b1 100644
+--- a/src/components/portal/portal-shell.tsx
++++ b/src/components/portal/portal-shell.tsx
+@@ -7,15 +7,15 @@ export type { NavItem };
+ type Variant = "customer" | "staff" | "admin";
+ 
+ const BADGE: Record<Variant, { label: string; className: string }> = {
+-  customer: { label: "My account", className: "bg-warm text-ivory" },
+-  staff: { label: "Studio staff", className: "bg-sage text-ivory" },
+-  admin: { label: "Admin", className: "bg-gold text-charcoal" },
++  customer: { label: "My account", className: "bg-brand text-white" },
++  staff: { label: "Studio staff", className: "bg-brand text-white" },
++  admin: { label: "Admin", className: "bg-brand text-blue" },
+ };
+ 
+ const SIDEBAR_BG: Record<Variant, string> = {
+-  customer: "bg-night",
+-  staff: "bg-night",
+-  admin: "bg-night-deep",
++  customer: "bg-blue",
++  staff: "bg-blue",
++  admin: "bg-blue-deep",
+ };
+ 
+ function initials(name: string): string {
+@@ -44,7 +44,7 @@ export function PortalShell({
+   const badge = BADGE[variant];
+ 
+   return (
+-    <div className="flex min-h-screen bg-ivory">
++    <div className="flex min-h-screen bg-surface">
+       <aside
+         className={`flex w-[230px] shrink-0 flex-col justify-between px-[18px] py-7 ${SIDEBAR_BG[variant]}`}
+       >
+@@ -52,7 +52,7 @@ export function PortalShell({
+           <div className="flex flex-col gap-2 px-1.5">
+             <Link
+               href="/"
+-              className="font-display text-[17px] font-semibold text-ivory"
++              className="font-display text-[17px] font-semibold text-white"
+             >
+               Memories in Prints
+             </Link>
+@@ -67,15 +67,15 @@ export function PortalShell({
+         </div>
+ 
+         <div className="flex flex-col gap-3 px-1.5">
+-          <div className="flex items-center gap-2.5 border-t border-night-line pt-4">
+-            <span className="flex size-[30px] shrink-0 items-center justify-center rounded-full bg-night-chip text-[11px] font-bold text-ivory">
++          <div className="flex items-center gap-2.5 border-t border-blue-deep pt-4">
++            <span className="flex size-[30px] shrink-0 items-center justify-center rounded-full bg-blue-deep text-[11px] font-bold text-white">
+               {initials(user.name)}
+             </span>
+             <span className="flex min-w-0 flex-col">
+-              <span className="truncate text-[13px] font-semibold text-ivory">
++              <span className="truncate text-[13px] font-semibold text-white">
+                 {user.name}
+               </span>
+-              <span className="text-[11px] text-ink-faint">
++              <span className="text-[11px] text-ink-quiet">
+                 {user.roleLabel}
+               </span>
+             </span>
+@@ -113,7 +113,7 @@ export function LogoutButton({ action }: { action: () => Promise<void> }) {
+     <form action={action}>
+       <button
+         type="submit"
+-        className="text-[13px] font-semibold text-ink-pale hover:text-ivory"
++        className="text-[13px] font-semibold text-ink-pale hover:text-white"
+       >
+         Log out
+       </button>
+diff --git a/src/components/portal/status-pill.tsx b/src/components/portal/status-pill.tsx
+index 2a599d2..57bf423 100644
+--- a/src/components/portal/status-pill.tsx
++++ b/src/components/portal/status-pill.tsx
+@@ -3,10 +3,10 @@ import type { ReactNode } from "react";
+ export type PillTone = "good" | "pending" | "alert" | "neutral";
+ 
+ const TONES: Record<PillTone, string> = {
+-  good: "bg-sage-tint text-sage-deep",
+-  pending: "bg-warm-tint text-warm",
+-  alert: "bg-rose-tint text-rose-deep",
+-  neutral: "bg-line-warm text-ink-muted",
++  good: "bg-good-tint text-good-deep",
++  pending: "bg-brand-tint text-accent-text",
++  alert: "bg-alert-tint text-alert",
++  neutral: "bg-surface-grey text-ink-muted",
+ };
+ 
+ export function StatusPill({
+diff --git a/src/components/site/image-placeholder.tsx b/src/components/site/image-placeholder.tsx
+index bd4ac54..ace4808 100644
+--- a/src/components/site/image-placeholder.tsx
++++ b/src/components/site/image-placeholder.tsx
+@@ -14,7 +14,7 @@ export function ImagePlaceholder({
+ }) {
+   const toneClasses =
+     tone === "dark"
+-      ? "bg-night-line text-ivory/50"
++      ? "bg-blue-deep text-white/50"
+       : "bg-line-soft text-ink-pale";
+ 
+   return (
+diff --git a/src/components/site/mobile-nav.tsx b/src/components/site/mobile-nav.tsx
+index 88b3213..d29a0ba 100644
+--- a/src/components/site/mobile-nav.tsx
++++ b/src/components/site/mobile-nav.tsx
+@@ -25,7 +25,7 @@ export function MobileNav({
+         onClick={() => setOpen((value) => !value)}
+         aria-expanded={open}
+         aria-controls="mobile-nav"
+-        className="flex size-11 items-center justify-center rounded text-charcoal"
++        className="flex size-11 items-center justify-center rounded text-blue"
+       >
+         <span className="sr-only">{open ? "Close menu" : "Open menu"}</span>
+         <svg
+@@ -56,7 +56,7 @@ export function MobileNav({
+       {open && (
+         <div
+           id="mobile-nav"
+-          className="absolute inset-x-0 top-[72px] border-b border-line bg-ivory px-6 pb-6 shadow-sm"
++          className="absolute inset-x-0 top-[72px] border-b border-line bg-surface px-6 pb-6 shadow-sm"
+         >
+           <nav className="flex flex-col">
+             {links.map((link) => (
+@@ -81,7 +81,7 @@ export function MobileNav({
+           <Link
+             href="/quote"
+             onClick={close}
+-            className="mt-5 block rounded-[2px] bg-charcoal px-5 py-3.5 text-center text-sm font-semibold text-ivory"
++            className="mt-5 block rounded-[2px] bg-brand px-5 py-3.5 text-center text-sm font-semibold text-on-accent"
+           >
+             Request a Quote
+           </Link>
+diff --git a/src/components/site/section.tsx b/src/components/site/section.tsx
+index 4f84a51..d0851a9 100644
+--- a/src/components/site/section.tsx
++++ b/src/components/site/section.tsx
+@@ -4,19 +4,19 @@ import type { ReactNode } from "react";
+ export function Section({
+   children,
+   className = "",
+-  tone = "ivory",
++  tone = "surface",
+   id,
+ }: {
+   children: ReactNode;
+   className?: string;
+-  tone?: "ivory" | "white" | "night" | "warm";
++  tone?: "surface" | "white" | "blue" | "grey";
+   id?: string;
+ }) {
+   const tones = {
+-    ivory: "bg-ivory",
++    surface: "bg-surface",
+     white: "bg-white",
+-    night: "bg-night text-ivory",
+-    warm: "bg-ivory-deep",
++    blue: "bg-blue text-white",
++    grey: "bg-surface-grey",
+   };
+ 
+   return (
+@@ -41,8 +41,8 @@ export function SectionHeading({
+   action?: { href: string; label: string };
+   tone?: "dark" | "light";
+ }) {
+-  const introColour = tone === "light" ? "text-ivory/65" : "text-ink-muted";
+-  const eyebrowColour = tone === "light" ? "text-gold" : "text-warm";
++  const introColour = tone === "light" ? "text-white/65" : "text-ink-muted";
++  const eyebrowColour = tone === "light" ? "text-brand" : "text-accent-text";
+ 
+   return (
+     <div className="mb-12 flex flex-wrap items-end justify-between gap-6">
+@@ -66,7 +66,7 @@ export function SectionHeading({
+         <Link
+           href={action.href}
+           className={`text-[13px] font-semibold ${
+-            tone === "light" ? "text-gold" : "text-warm"
++            tone === "light" ? "text-brand" : "text-accent-text"
+           }`}
+         >
+           {action.label}
+@@ -83,11 +83,11 @@ export function Breadcrumb({
+ }) {
+   return (
+     <nav aria-label="Breadcrumb" className="mb-8">
+-      <ol className="flex flex-wrap items-center gap-2 text-[13px] text-ink-faint">
++      <ol className="flex flex-wrap items-center gap-2 text-[13px] text-ink-quiet">
+         {trail.map((crumb, index) => (
+           <li key={crumb.label} className="flex items-center gap-2">
+             {crumb.href ? (
+-              <Link href={crumb.href} className="hover:text-charcoal">
++              <Link href={crumb.href} className="hover:text-blue">
+                 {crumb.label}
+               </Link>
+             ) : (
+@@ -113,23 +113,23 @@ export function CtaBand({
+   secondary?: { href: string; label: string };
+ }) {
+   return (
+-    <Section tone="night">
++    <Section tone="blue">
+       <div className="flex flex-col items-center gap-5 text-center">
+         <h2 className="max-w-[24ch] text-[32px] leading-tight">{title}</h2>
+-        <p className="max-w-[56ch] text-[15px] leading-relaxed text-ivory/65">
++        <p className="max-w-[56ch] text-[15px] leading-relaxed text-white/65">
+           {body}
+         </p>
+         <div className="mt-2 flex flex-wrap justify-center gap-3">
+           <Link
+             href={primary.href}
+-            className="rounded-[2px] bg-ivory px-7 py-3.5 text-sm font-semibold text-charcoal hover:bg-white"
++            className="rounded-[2px] bg-surface px-7 py-3.5 text-sm font-semibold text-blue hover:bg-white"
+           >
+             {primary.label}
+           </Link>
+           {secondary && (
+             <Link
+               href={secondary.href}
+-              className="rounded-[2px] border border-white/25 px-7 py-3.5 text-sm font-semibold text-ivory hover:border-white/50"
++              className="rounded-[2px] border border-white/25 px-7 py-3.5 text-sm font-semibold text-white hover:border-white/50"
+             >
+               {secondary.label}
+             </Link>
+diff --git a/src/components/site/site-footer.tsx b/src/components/site/site-footer.tsx
+index af4b16c..2dd235b 100644
+--- a/src/components/site/site-footer.tsx
++++ b/src/components/site/site-footer.tsx
+@@ -45,7 +45,7 @@ function SocialLink({
+       aria-label={label}
+       rel="noreferrer noopener"
+       target="_blank"
+-      className="flex size-9 items-center justify-center rounded-full border border-white/20 text-ivory/80 transition-colors hover:border-white/40 hover:text-ivory"
++      className="flex size-9 items-center justify-center rounded-full border border-field-line text-ink-muted transition-colors hover:border-brand hover:text-brand-deep"
+     >
+       {children}
+     </a>
+@@ -54,17 +54,17 @@ function SocialLink({
+ 
+ export function SiteFooter() {
+   return (
+-    <footer className="mt-auto bg-night text-ivory">
++    <footer className="mt-auto border-t border-line bg-surface-grey">
+       <div className="mx-auto grid max-w-[1200px] gap-12 px-6 py-16 sm:px-10 lg:grid-cols-[1.4fr_repeat(3,1fr)]">
+         <div className="flex flex-col gap-4">
+-          <span className="font-display text-lg font-semibold">
++          <span className="font-display text-lg font-semibold text-blue">
+             Memories in Prints
+           </span>
+-          <p className="max-w-[38ch] text-[13px] leading-relaxed text-ivory/60">
++          <p className="max-w-[38ch] text-[13px] leading-relaxed text-ink-quiet">
+             Bespoke funeral stationery, memorial keepsakes and wedding
+             stationery, printed with care in {STUDIO.city}, UK.
+           </p>
+-          <p className="text-[13px] leading-relaxed text-ivory/60">
++          <p className="text-[13px] leading-relaxed text-ink-quiet">
+             Proud member of the Funeral Service Association (FSA)
+           </p>
+ 
+@@ -93,7 +93,7 @@ export function SiteFooter() {
+ 
+         {COLUMNS.map((column) => (
+           <div key={column.title} className="flex flex-col gap-4">
+-            <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-ivory/45">
++            <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-blue">
+               {column.title}
+             </span>
+             <ul className="flex flex-col gap-2.5">
+@@ -101,7 +101,7 @@ export function SiteFooter() {
+                 <li key={link.href}>
+                   <Link
+                     href={link.href}
+-                    className="text-[13px] text-ivory/75 hover:text-ivory"
++                    className="text-[13px] text-ink-quiet hover:text-blue"
+                   >
+                     {link.label}
+                   </Link>
+@@ -112,8 +112,8 @@ export function SiteFooter() {
+         ))}
+       </div>
+ 
+-      <div className="border-t border-night-line">
+-        <div className="mx-auto flex max-w-[1200px] flex-col gap-2 px-6 py-6 text-[12px] text-ivory/50 sm:flex-row sm:items-center sm:justify-between sm:px-10">
++      <div className="border-t border-line">
++        <div className="mx-auto flex max-w-[1200px] flex-col gap-2 px-6 py-6 text-[12px] text-ink-quiet sm:flex-row sm:items-center sm:justify-between sm:px-10">
+           <span>
+             © {new Date().getFullYear()} Memories in Prints. All rights
+             reserved.
+diff --git a/src/components/site/site-header.tsx b/src/components/site/site-header.tsx
+index ed0b377..88d354f 100644
+--- a/src/components/site/site-header.tsx
++++ b/src/components/site/site-header.tsx
+@@ -27,7 +27,7 @@ export async function SiteHeader() {
+     : "Login / Signup";
+ 
+   return (
+-    <header className="sticky top-0 z-40 border-b border-line bg-ivory/95 backdrop-blur">
++    <header className="sticky top-0 z-40 border-b border-line bg-surface/95 backdrop-blur">
+       <div className="mx-auto flex h-[72px] max-w-[1200px] items-center justify-between gap-6 px-6 sm:px-10">
+         <Link
+           href="/"
+@@ -41,7 +41,7 @@ export async function SiteHeader() {
+             <Link
+               key={link.href}
+               href={link.href}
+-              className="text-sm font-medium text-ink-soft hover:text-charcoal"
++              className="text-sm font-medium text-ink-soft hover:text-blue"
+             >
+               {link.label}
+             </Link>
+@@ -51,13 +51,13 @@ export async function SiteHeader() {
+         <div className="hidden items-center gap-3 lg:flex">
+           <Link
+             href={accountHref}
+-            className="text-sm font-semibold text-ink-soft hover:text-charcoal"
++            className="text-sm font-semibold text-ink-soft hover:text-blue"
+           >
+             {accountLabel}
+           </Link>
+           <Link
+             href="/quote"
+-            className="rounded-[2px] bg-charcoal px-5 py-3 text-[13px] font-semibold text-ivory hover:bg-night"
++            className="rounded-[2px] bg-brand px-5 py-3 text-[13px] font-semibold text-on-accent hover:bg-blue-deep"
+           >
+             Request a Quote
+           </Link>
+diff --git a/src/components/ui/form.tsx b/src/components/ui/form.tsx
+index 17d70d2..26b0fb5 100644
+--- a/src/components/ui/form.tsx
++++ b/src/components/ui/form.tsx
+@@ -35,8 +35,8 @@ export function Field({
+           name={name}
+           aria-invalid={error ? true : undefined}
+           aria-describedby={describedBy}
+-          className={`w-full rounded-[3px] border bg-white px-[15px] py-[13px] text-sm text-charcoal placeholder:text-placeholder ${
+-            error ? "border-rose-deep" : "border-field-line"
++          className={`w-full rounded-[3px] border bg-white px-[15px] py-[13px] text-sm text-blue placeholder:text-placeholder ${
++            error ? "border-alert" : "border-field-line"
+           }`}
+           {...props}
+         />
+@@ -49,7 +49,7 @@ export function Field({
+       )}
+ 
+       {error && (
+-        <p id={`${name}-error`} className="text-xs font-medium text-rose-deep">
++        <p id={`${name}-error`} className="text-xs font-medium text-alert">
+           {error}
+         </p>
+       )}
+@@ -74,8 +74,8 @@ export function SubmitButton({
+     "rounded-[2px] px-6 py-[14px] text-sm font-semibold transition-colors disabled:opacity-60";
+   const styles =
+     variant === "primary"
+-      ? "bg-charcoal text-ivory hover:bg-night"
+-      : "border border-field-line bg-transparent text-ink-muted hover:bg-line-warm";
++      ? "bg-brand text-on-accent hover:bg-brand-deep hover:text-white"
++      : "border border-field-line bg-transparent text-ink-muted hover:bg-surface-grey";
+ 
+   return (
+     <button
+@@ -101,8 +101,8 @@ export function FormMessage({
+       role="status"
+       className={`rounded-[4px] px-[14px] py-3 text-[13px] leading-relaxed ${
+         state.ok
+-          ? "bg-sage-tint text-sage-deep"
+-          : "bg-rose-tint text-rose-deep"
++          ? "bg-good-tint text-good-deep"
++          : "bg-alert-tint text-alert"
+       }`}
+     >
+       {state.message}
+-- 
+2.43.0
+
+
+From 6fe145b3da701d1da725f07c955b1cc39eabc13c Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 20 Sep 2026 06:31:43 +0000
+Subject: [PATCH 2/2] Finish the palette rollout and fix what the swap exposed
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Sweeping all 21 pages after the token swap turned up four things the
+mechanical rename could not have caught:
+
+- "Pending" states inherited the green tint, so an enquiry waiting on the
+  studio looked like a confirmed one. Pending now wears amber, and the
+  "confirm your email" and "not yet written" notices go with it — those are
+  warnings, not confirmations.
+- The green is too dark to read on the blue band (3.10:1), so eyebrow text
+  and the large numerals there use a lighter tint of it instead.
+- The sidebar's secondary text was a dark grey chosen when that panel was
+  near-black; on the new blue it measured 1.53:1. It now uses a light grey
+  that clears 4.5:1 there.
+- The alert red sat at 4.27:1 on its own tint, just under the floor, and is
+  now slightly darker.
+
+All 29 tests still pass.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01L1bxKChEbqvtmDsqed6PxW
+---
+ README.md                              | 15 +++++++++++++++
+ src/app/(site)/[legal]/page.tsx        |  2 +-
+ src/app/(site)/about/page.tsx          |  2 +-
+ src/app/(site)/page.tsx                |  2 +-
+ src/app/account/page.tsx               |  4 ++--
+ src/app/globals.css                    |  6 +++++-
+ src/components/auth/auth-card.tsx      |  4 ++--
+ src/components/portal/portal-shell.tsx |  4 ++--
+ src/components/portal/status-pill.tsx  |  2 +-
+ src/components/site/section.tsx        |  4 ++--
+ 10 files changed, 32 insertions(+), 13 deletions(-)
+
+diff --git a/README.md b/README.md
+index 40877d4..06bc261 100644
+--- a/README.md
++++ b/README.md
+@@ -42,6 +42,21 @@ review tool, the studio work queue, and the admin CRUD screens.
+ Fonts (EB Garamond, Work Sans) are self-hosted through Fontsource rather than
+ loaded from Google Fonts, so no visitor data leaves the site to a third party.
+ 
++## Colour
++
++The brand palette — green `#2DBC9A`, blue `#465862`, grey `#F8F8F8`, muted
++`#A8AAAB` — lives in the `@theme` block at the top of `src/app/globals.css`.
++Components reference tokens, never raw hexes, so the whole site restyles from
++that one file.
++
++Two of the supplied pairings fall below the 4.5:1 contrast floor for body text:
++the muted grey on the grey footer (2.20:1) and white on the green (2.39:1). The
++`VARIANT` block at the top of that file holds the three values that differ
++between using the hexes literally and using darker shades of the same hues for
++small text. It currently uses the accessible variant. A handful of derived
++tokens exist for the same reason — `brand-on-dark` and `on-blue-muted` are the
++versions that survive the blue band and sidebar.
++
+ ## Getting started
+ 
+ You'll need Node 20+ and a PostgreSQL 14+ database.
+diff --git a/src/app/(site)/[legal]/page.tsx b/src/app/(site)/[legal]/page.tsx
+index 4329901..874a15d 100644
+--- a/src/app/(site)/[legal]/page.tsx
++++ b/src/app/(site)/[legal]/page.tsx
+@@ -70,7 +70,7 @@ export default async function LegalPage({
+           {page.intro}
+         </p>
+ 
+-        <div className="mt-4 rounded-md border border-brand/30 bg-brand-tint p-6">
++        <div className="mt-4 rounded-md border border-pending-deep/25 bg-pending-tint p-6">
+           <h2 className="font-display text-lg">Not yet written</h2>
+           <p className="mt-2 text-[14px] leading-relaxed text-ink-soft">
+             This wording needs to come from the studio, and the privacy notice
+diff --git a/src/app/(site)/about/page.tsx b/src/app/(site)/about/page.tsx
+index dc5ee8e..98d7269 100644
+--- a/src/app/(site)/about/page.tsx
++++ b/src/app/(site)/about/page.tsx
+@@ -93,7 +93,7 @@ export default function AboutPage() {
+         <ul className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
+           {STUDIO_VALUES.map((value) => (
+             <li key={value.n} className="flex flex-col gap-3">
+-              <span className="font-display text-[28px] text-brand">
++              <span className="font-display text-[28px] text-brand-on-dark">
+                 {value.n}
+               </span>
+               <h3 className="text-lg text-white">{value.title}</h3>
+diff --git a/src/app/(site)/page.tsx b/src/app/(site)/page.tsx
+index 0e5bded..0d610ec 100644
+--- a/src/app/(site)/page.tsx
++++ b/src/app/(site)/page.tsx
+@@ -172,7 +172,7 @@ export default async function HomePage() {
+         <ul className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
+           {STUDIO_VALUES.map((value) => (
+             <li key={value.n} className="flex flex-col gap-3">
+-              <span className="font-display text-[28px] text-brand">
++              <span className="font-display text-[28px] text-brand-on-dark">
+                 {value.n}
+               </span>
+               <h3 className="text-lg text-white">{value.title}</h3>
+diff --git a/src/app/account/page.tsx b/src/app/account/page.tsx
+index 35ff6fe..774fbb2 100644
+--- a/src/app/account/page.tsx
++++ b/src/app/account/page.tsx
+@@ -13,14 +13,14 @@ export default async function AccountDashboardPage() {
+       <PortalBody>
+         <div className="flex flex-col gap-6">
+           {!verified && (
+-            <div className="flex items-center justify-between gap-6 rounded-md border border-brand/30 bg-brand-tint px-5 py-4">
++            <div className="flex items-center justify-between gap-6 rounded-md border border-pending-deep/25 bg-pending-tint px-5 py-4">
+               <p className="text-sm text-ink-soft">
+                 Please confirm your email address so we can send you proofs and
+                 order updates.
+               </p>
+               <Link
+                 href="/verify-email"
+-                className="shrink-0 text-[13px] font-semibold text-accent-text"
++                className="shrink-0 text-[13px] font-semibold text-pending-deep"
+               >
+                 Confirm now →
+               </Link>
+diff --git a/src/app/globals.css b/src/app/globals.css
+index c08f3f2..54e95bb 100644
+--- a/src/app/globals.css
++++ b/src/app/globals.css
+@@ -34,6 +34,8 @@
+   --color-brand-deep: #20846c;
+   --color-brand-tint: #eaf8f4;
+   --color-brand-line: #bce7dc;
++  /* Green is too dark to read on the blue band; this one clears 4.5:1 there. */
++  --color-brand-on-dark: #70ddc3;
+ 
+   --color-blue: #465862;
+   --color-blue-deep: #35444c;
+@@ -49,6 +51,8 @@
+   --color-ink-muted: #5d6e77;
+   --color-ink-quiet: var(--color-muted-text);
+   --color-ink-pale: #a8aaab;
++  /* On the blue sidebar, where dark greys vanish (4.51:1 there). */
++  --color-on-blue-muted: #c3cbd0;
+ 
+   /* Lines and fields */
+   --color-line: #e4e6e7;
+@@ -61,7 +65,7 @@
+   --color-good: #2dbc9a;
+   --color-good-tint: #eaf8f4;
+   --color-good-deep: #1b6e59;
+-  --color-alert: #b4554a;
++  --color-alert: #ad5247;
+   --color-alert-tint: #fbeeec;
+   --color-pending-tint: #fdf4e6;
+   --color-pending-deep: #8a6b3d;
+diff --git a/src/components/auth/auth-card.tsx b/src/components/auth/auth-card.tsx
+index 331150e..f6dbb6a 100644
+--- a/src/components/auth/auth-card.tsx
++++ b/src/components/auth/auth-card.tsx
+@@ -24,7 +24,7 @@ export function AuthCard({
+         <Link
+           href="/"
+           className={`font-display text-lg font-semibold ${
+-            dark ? "text-ink-quiet" : "text-blue"
++            dark ? "text-on-blue-muted" : "text-blue"
+           }`}
+         >
+           Memories in Prints
+@@ -54,7 +54,7 @@ export function AuthCard({
+       {footer && (
+         <div
+           className={`px-16 pb-10 text-center text-[13px] ${
+-            dark ? "text-ink-quiet" : "text-ink-muted"
++            dark ? "text-on-blue-muted" : "text-ink-muted"
+           }`}
+         >
+           {footer}
+diff --git a/src/components/portal/portal-shell.tsx b/src/components/portal/portal-shell.tsx
+index 9e0e0b1..d1ee8db 100644
+--- a/src/components/portal/portal-shell.tsx
++++ b/src/components/portal/portal-shell.tsx
+@@ -75,7 +75,7 @@ export function PortalShell({
+               <span className="truncate text-[13px] font-semibold text-white">
+                 {user.name}
+               </span>
+-              <span className="text-[11px] text-ink-quiet">
++              <span className="text-[11px] text-on-blue-muted">
+                 {user.roleLabel}
+               </span>
+             </span>
+@@ -113,7 +113,7 @@ export function LogoutButton({ action }: { action: () => Promise<void> }) {
+     <form action={action}>
+       <button
+         type="submit"
+-        className="text-[13px] font-semibold text-ink-pale hover:text-white"
++        className="text-[13px] font-semibold text-on-blue-muted hover:text-white"
+       >
+         Log out
+       </button>
+diff --git a/src/components/portal/status-pill.tsx b/src/components/portal/status-pill.tsx
+index 57bf423..75bc47c 100644
+--- a/src/components/portal/status-pill.tsx
++++ b/src/components/portal/status-pill.tsx
+@@ -4,7 +4,7 @@ export type PillTone = "good" | "pending" | "alert" | "neutral";
+ 
+ const TONES: Record<PillTone, string> = {
+   good: "bg-good-tint text-good-deep",
+-  pending: "bg-brand-tint text-accent-text",
++  pending: "bg-pending-tint text-pending-deep",
+   alert: "bg-alert-tint text-alert",
+   neutral: "bg-surface-grey text-ink-muted",
+ };
+diff --git a/src/components/site/section.tsx b/src/components/site/section.tsx
+index d0851a9..7da78a7 100644
+--- a/src/components/site/section.tsx
++++ b/src/components/site/section.tsx
+@@ -42,7 +42,7 @@ export function SectionHeading({
+   tone?: "dark" | "light";
+ }) {
+   const introColour = tone === "light" ? "text-white/65" : "text-ink-muted";
+-  const eyebrowColour = tone === "light" ? "text-brand" : "text-accent-text";
++  const eyebrowColour = tone === "light" ? "text-brand-on-dark" : "text-accent-text";
+ 
+   return (
+     <div className="mb-12 flex flex-wrap items-end justify-between gap-6">
+@@ -66,7 +66,7 @@ export function SectionHeading({
+         <Link
+           href={action.href}
+           className={`text-[13px] font-semibold ${
+-            tone === "light" ? "text-brand" : "text-accent-text"
++            tone === "light" ? "text-brand-on-dark" : "text-accent-text"
+           }`}
+         >
+           {action.label}
+-- 
+2.43.0
+

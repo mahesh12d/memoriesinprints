@@ -72,6 +72,22 @@
 
   --font-display: "EB Garamond", Georgia, "Times New Roman", serif;
   --font-sans: "Work Sans Variable", "Work Sans", system-ui, -apple-system, sans-serif;
+
+  /* ---------- shadcn/ui semantic tokens (mapped to brand palette) ---------- */
+  --color-background: #ffffff;
+  --color-foreground: #465862;
+  --color-primary: #2dbc9a;
+  --color-primary-foreground: #0f3d32;
+  --color-secondary: #f8f8f8;
+  --color-secondary-foreground: #465862;
+  --color-muted: #f8f8f8;
+  --color-muted-foreground: #5d6e77;
+  --color-accent: #eaf8f4;
+  --color-accent-foreground: #465862;
+  --color-destructive: #ad5247;
+  --color-destructive-foreground: #ffffff;
+  --color-ring: #2dbc9a;
+  --color-input: #d6d9da;
 }
 
 @layer base {

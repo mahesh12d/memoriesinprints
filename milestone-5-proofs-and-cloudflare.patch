@@ -1,0 +1,5056 @@
+From d4fd2042ecd5f1bbe86749dab6b62aed6b5d2ab5 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 20 Sep 2026 11:27:12 +0000
+Subject: [PATCH] Store proofs in Cloudflare R2 and build the proofing journey
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Proof artwork now lives in an R2 bucket. The bucket is private: nothing is
+served from a public URL, every read goes through a signed link that expires,
+and the object key is random so one proof can't be guessed from another. Until
+the credentials are added, files are written to .uploads/ instead, which a
+production build refuses unless ALLOW_LOCAL_UPLOADS is set deliberately — that
+flag is how the end-to-end suite walks the journey against a real build.
+
+Around that:
+
+- The studio queue groups work by who it is waiting on, and the dashboard
+  counts what is outstanding alongside a turnaround line and designer workload.
+- A designer uploads; every upload is a new version and nothing is overwritten.
+  Only a proofreader or an admin can send one on or return it with notes.
+- The customer sees the artwork itself — a PDF is rendered in the browser
+  rather than converted on the server — and clicks it to pin a comment where
+  the problem is. Requesting changes needs at least one mark, so the studio
+  always knows where to look.
+- The staff order page keeps showing the customer's marks after a new version
+  is uploaded, since that is exactly when the designer needs them.
+- A notification bell in the account sidebar, and a customer dashboard that
+  leads with the proof waiting on them rather than a placeholder.
+
+pdf.js 6 calls Map.prototype.getOrInsertComputed, which only reached browsers
+during 2025, so it is polyfilled when missing — a good share of the people
+approving a funeral proof are on older devices.
+
+Two things the tests turned up on the way: the unit glob only ever matched one
+directory deep, so 37 of the 41 unit tests were never running; and the e2e
+suite left the database in a state that failed its own second run, so it now
+reseeds before every run.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01L1bxKChEbqvtmDsqed6PxW
+---
+ .gitignore                                    |   3 +
+ drizzle/0000_initial_schema.sql               |   3 +-
+ drizzle/meta/0000_snapshot.json               |  12 +-
+ drizzle/meta/_journal.json                    |   2 +-
+ e2e/auth.spec.ts                              |   6 +
+ e2e/global-setup.ts                           |  15 +
+ e2e/proofs.spec.ts                            | 161 +++++
+ package-lock.json                             | 677 ++++++++++++++++++
+ package.json                                  |   5 +-
+ playwright.config.ts                          |   4 +
+ src/app/account/layout.tsx                    |  11 +
+ .../account/orders/[orderId]/proof/page.tsx   | 132 ++++
+ src/app/account/orders/page.tsx               |  47 +-
+ src/app/account/page.tsx                      | 117 ++-
+ src/app/api/uploads/[...key]/route.ts         |  67 ++
+ src/app/staff/orders/[orderId]/page.tsx       | 325 +++++++++
+ .../staff/orders/[orderId]/proof-actions.tsx  | 143 ++++
+ src/app/staff/page.tsx                        | 217 +++++-
+ src/app/staff/queue/page.tsx                  | 101 +++
+ src/components/portal/icons.tsx               |   7 +
+ src/components/portal/notification-bell.tsx   | 161 +++++
+ src/components/portal/portal-shell.tsx        |   8 +-
+ src/components/proofs/proof-canvas.tsx        | 194 +++++
+ src/components/proofs/proof-reviewer.tsx      | 244 +++++++
+ .../proofs/turnaround-sparkline.tsx           | 134 ++++
+ src/db/schema.ts                              |   4 +-
+ src/db/seed.ts                                | 303 +++++++-
+ src/lib/notifications/actions.ts              |  29 +
+ src/lib/notifications/queries.ts              |  49 ++
+ src/lib/notifications/types.ts                |  14 +
+ src/lib/proofs/actions.ts                     | 454 ++++++++++++
+ src/lib/proofs/map-upsert-polyfill.ts         |  50 ++
+ src/lib/proofs/pins.ts                        |  45 ++
+ src/lib/proofs/proofs.test.ts                 | 191 +++++
+ src/lib/proofs/queue.ts                       | 104 +++
+ src/lib/proofs/staff-queries.ts               |  69 ++
+ src/lib/storage/keys.ts                       |  35 +
+ src/lib/storage/sample-proof.ts               | 124 ++++
+ src/lib/storage/storage.ts                    | 148 ++++
+ src/lib/storage/uploads.ts                    |  58 ++
+ 40 files changed, 4415 insertions(+), 58 deletions(-)
+ create mode 100644 e2e/global-setup.ts
+ create mode 100644 e2e/proofs.spec.ts
+ create mode 100644 src/app/account/orders/[orderId]/proof/page.tsx
+ create mode 100644 src/app/api/uploads/[...key]/route.ts
+ create mode 100644 src/app/staff/orders/[orderId]/page.tsx
+ create mode 100644 src/app/staff/orders/[orderId]/proof-actions.tsx
+ create mode 100644 src/app/staff/queue/page.tsx
+ create mode 100644 src/components/portal/notification-bell.tsx
+ create mode 100644 src/components/proofs/proof-canvas.tsx
+ create mode 100644 src/components/proofs/proof-reviewer.tsx
+ create mode 100644 src/components/proofs/turnaround-sparkline.tsx
+ create mode 100644 src/lib/notifications/actions.ts
+ create mode 100644 src/lib/notifications/queries.ts
+ create mode 100644 src/lib/notifications/types.ts
+ create mode 100644 src/lib/proofs/actions.ts
+ create mode 100644 src/lib/proofs/map-upsert-polyfill.ts
+ create mode 100644 src/lib/proofs/pins.ts
+ create mode 100644 src/lib/proofs/proofs.test.ts
+ create mode 100644 src/lib/proofs/queue.ts
+ create mode 100644 src/lib/proofs/staff-queries.ts
+ create mode 100644 src/lib/storage/keys.ts
+ create mode 100644 src/lib/storage/sample-proof.ts
+ create mode 100644 src/lib/storage/storage.ts
+ create mode 100644 src/lib/storage/uploads.ts
+
+diff --git a/.gitignore b/.gitignore
+index 7f80c79..f090f34 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -44,6 +44,9 @@ next-env.d.ts
+ .env
+ .mail/
+ 
++# proof artwork written to disk until R2 is configured
++.uploads/
++
+ # playwright
+ /test-results/
+ /playwright-report/
+diff --git a/drizzle/0000_initial_schema.sql b/drizzle/0000_initial_schema.sql
+index 219464b..ed38010 100644
+--- a/drizzle/0000_initial_schema.sql
++++ b/drizzle/0000_initial_schema.sql
+@@ -221,9 +221,10 @@ CREATE TABLE "proof_versions" (
+ 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+ 	"order_id" uuid NOT NULL,
+ 	"version_number" integer NOT NULL,
+-	"file_url" text NOT NULL,
++	"storage_key" text NOT NULL,
+ 	"file_name" text,
+ 	"mime_type" text,
++	"size_bytes" integer,
+ 	"width_px" integer,
+ 	"height_px" integer,
+ 	"uploaded_by_id" uuid,
+diff --git a/drizzle/meta/0000_snapshot.json b/drizzle/meta/0000_snapshot.json
+index 500792d..e05bd3e 100644
+--- a/drizzle/meta/0000_snapshot.json
++++ b/drizzle/meta/0000_snapshot.json
+@@ -1,5 +1,5 @@
+ {
+-  "id": "3296e0e0-279d-451b-852b-70e52f446324",
++  "id": "b214c4d7-92d8-480c-a51f-f17359bba66c",
+   "prevId": "00000000-0000-0000-0000-000000000000",
+   "version": "7",
+   "dialect": "postgresql",
+@@ -2021,8 +2021,8 @@
+           "primaryKey": false,
+           "notNull": true
+         },
+-        "file_url": {
+-          "name": "file_url",
++        "storage_key": {
++          "name": "storage_key",
+           "type": "text",
+           "primaryKey": false,
+           "notNull": true
+@@ -2039,6 +2039,12 @@
+           "primaryKey": false,
+           "notNull": false
+         },
++        "size_bytes": {
++          "name": "size_bytes",
++          "type": "integer",
++          "primaryKey": false,
++          "notNull": false
++        },
+         "width_px": {
+           "name": "width_px",
+           "type": "integer",
+diff --git a/drizzle/meta/_journal.json b/drizzle/meta/_journal.json
+index 958a518..630e6c0 100644
+--- a/drizzle/meta/_journal.json
++++ b/drizzle/meta/_journal.json
+@@ -5,7 +5,7 @@
+     {
+       "idx": 0,
+       "version": "7",
+-      "when": 1789889945977,
++      "when": 1789891778689,
+       "tag": "0000_initial_schema",
+       "breakpoints": true
+     }
+diff --git a/e2e/auth.spec.ts b/e2e/auth.spec.ts
+index 6763d15..d14adfa 100644
+--- a/e2e/auth.spec.ts
++++ b/e2e/auth.spec.ts
+@@ -253,6 +253,12 @@ test.describe("Security page", () => {
+       .getByRole("button", { name: /Sign out 1 other device/ })
+       .click();
+ 
++    // The click resolves as soon as the action is dispatched, so wait for the
++    // page to show that it finished before checking the other browser.
++    await expect(
++      firstPage.getByRole("button", { name: /Sign out \d+ other/ }),
++    ).toHaveCount(0);
++
+     // The second browser is now signed out.
+     await secondPage.goto("/account");
+     await expect(secondPage).toHaveURL(/login/);
+diff --git a/e2e/global-setup.ts b/e2e/global-setup.ts
+new file mode 100644
+index 0000000..db9483f
+--- /dev/null
++++ b/e2e/global-setup.ts
+@@ -0,0 +1,15 @@
++import { execFileSync } from "node:child_process";
++
++/**
++ * Reseeds before every run.
++ *
++ * The suite buys things, uploads proofs and approves them, so a second run
++ * against the leftovers of the first would fail on state it didn't create.
++ * Starting from the same database every time is what makes the run mean
++ * anything.
++ */
++export default function globalSetup(): void {
++  execFileSync("npm", ["run", "db:seed"], {
++    stdio: process.env.CI ? "inherit" : "ignore",
++  });
++}
+diff --git a/e2e/proofs.spec.ts b/e2e/proofs.spec.ts
+new file mode 100644
+index 0000000..ce5ccb0
+--- /dev/null
++++ b/e2e/proofs.spec.ts
+@@ -0,0 +1,161 @@
++import { expect, test, type Page } from "@playwright/test";
++import { samplePdf } from "../src/lib/storage/sample-proof";
++
++/**
++ * Walks a proof the whole way round: a designer uploads it, a proofreader
++ * sends it on, and the customer marks something and sends it back. These run
++ * against the seeded database, so MP-1042 starts out returned to the designer
++ * and MP-1039 starts out sitting with the customer.
++ */
++
++const DEMO_PASSWORD = "printsdemo2026";
++
++async function signIn(page: Page, email: string) {
++  await page.goto("/login");
++  await page.getByLabel("Email").fill(email);
++  await page.getByLabel("Password").fill(DEMO_PASSWORD);
++  await page.getByRole("button", { name: "Sign in" }).click();
++  await page.waitForURL((url) => !url.pathname.startsWith("/login"));
++}
++
++async function openOrder(page: Page, reference: string) {
++  await page.goto("/staff/queue");
++  await page.getByRole("link", { name: reference, exact: true }).click();
++  await page.waitForURL(/\/staff\/orders\//);
++}
++
++async function uploadProof(page: Page, fileName: string) {
++  await page.setInputFiles('input[type="file"]', {
++    name: fileName,
++    mimeType: "application/pdf",
++    buffer: samplePdf("Proof", ["Uploaded by the end-to-end test"]),
++  });
++  await page.getByRole("button", { name: "Upload proof" }).click();
++}
++
++test.describe("The proof queue", () => {
++  test("groups work by who it is waiting on", async ({ page }) => {
++    await signIn(page, "proofreader@example.com");
++    await page.goto("/staff/queue");
++
++    await expect(
++      page.getByRole("heading", { name: /Waiting on you/i }),
++    ).toBeVisible();
++    await expect(page.getByText("Needs proofreading").first()).toBeVisible();
++    await expect(page.getByRole("link", { name: "MP-1041" })).toBeVisible();
++  });
++
++  test("the dashboard counts what is outstanding", async ({ page }) => {
++    await signIn(page, "proofreader@example.com");
++    await page.goto("/staff");
++
++    await expect(
++      page.getByRole("heading", { name: "Studio dashboard" }),
++    ).toBeVisible();
++    await expect(page.getByText("Waiting on you")).toBeVisible();
++    await expect(page.getByText("With the customer")).toBeVisible();
++  });
++});
++
++test.describe("A proof from the studio to the customer", () => {
++  test("a designer uploads a new version after it was returned", async ({
++    page,
++  }) => {
++    await signIn(page, "designer@example.com");
++    await openOrder(page, "MP-1042");
++
++    // The proofreader's note is the reason this came back.
++    await expect(page.getByText(/Returned:/)).toBeVisible();
++
++    await uploadProof(page, "invitation-v2.pdf");
++
++    await expect(page.getByText(/Version 2/).first()).toBeVisible();
++    await expect(page.getByText("Needs proofreading").first()).toBeVisible();
++  });
++
++  test("a designer cannot send a proof to the customer", async ({ page }) => {
++    await signIn(page, "designer@example.com");
++    await openOrder(page, "MP-1042");
++
++    await expect(
++      page.getByRole("button", { name: /send to the customer/i }),
++    ).toHaveCount(0);
++    await expect(
++      page.getByText(/Only a proofreader or admin can change this/),
++    ).toBeVisible();
++  });
++
++  test("a proofreader sends it on, and the customer is told", async ({
++    page,
++  }) => {
++    await signIn(page, "proofreader@example.com");
++    await openOrder(page, "MP-1042");
++
++    await page
++      .getByRole("button", { name: /Approve and send to the customer/i })
++      .click();
++    await expect(page.getByText("With the customer").first()).toBeVisible();
++
++    // The customer's bell picks it up.
++    await signIn(page, "customer@example.com");
++    await page.goto("/account");
++    await expect(
++      page.getByRole("button", { name: /Notifications, \d+ unread/ }),
++    ).toBeVisible();
++  });
++});
++
++test.describe("The customer reviewing a proof", () => {
++  test("marks a spot and sends it back", async ({ page }) => {
++    await signIn(page, "customer@example.com");
++    await page.goto("/account/orders");
++
++    await page
++      .getByRole("link", { name: "Review your proof for MP-1042" })
++      .click();
++    await page.waitForURL(/\/proof$/);
++
++    await expect(
++      page.getByRole("heading", { name: "Your proof is ready" }),
++    ).toBeVisible();
++
++    // Click the artwork to drop a pin, then say what is wrong there.
++    const surface = page.locator(".cursor-crosshair");
++    await expect(surface).toBeVisible();
++    await surface.click({ position: { x: 120, y: 160 } });
++
++    await page.getByRole("textbox").first().fill("The date should be the 19th.");
++    await page.getByRole("button", { name: "Add comment" }).click();
++
++    await expect(page.getByText("Comments (1)")).toBeVisible();
++
++    await page.getByRole("button", { name: "Request changes" }).click();
++    await expect(
++      page.getByRole("heading", { name: "Changes requested" }),
++    ).toBeVisible();
++  });
++
++  test("cannot request changes without marking anything", async ({ page }) => {
++    await signIn(page, "customer@example.com");
++    await page.goto("/account/orders");
++
++    // MP-1039 is sitting with the customer with no comments on version 2.
++    await page
++      .getByRole("link", { name: "Review your proof for MP-1039" })
++      .click();
++    await page.waitForURL(/\/proof$/);
++
++    await page.getByRole("button", { name: "Request changes" }).click();
++    await expect(page.getByText(/mark what needs changing/i)).toBeVisible();
++  });
++
++  test("someone else's proof is not reachable", async ({ page }) => {
++    await signIn(page, "designer@example.com");
++
++    const response = await page.goto(
++      "/account/orders/00000000-0000-0000-0000-000000000000/proof",
++    );
++
++    expect(response?.status()).toBe(404);
++  });
++});
+diff --git a/package-lock.json b/package-lock.json
+index 550c4c1..dbfed4b 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -8,12 +8,15 @@
+       "name": "memories-in-prints",
+       "version": "0.1.0",
+       "dependencies": {
++        "@aws-sdk/client-s3": "^3.1136.0",
++        "@aws-sdk/s3-request-presigner": "^3.1136.0",
+         "@fontsource-variable/work-sans": "^5.3.0",
+         "@fontsource/eb-garamond": "^5.3.0",
+         "@node-rs/argon2": "^2.2.1",
+         "drizzle-orm": "^0.45.2",
+         "next": "16.3.5",
+         "nodemailer": "^10.0.10",
++        "pdfjs-dist": "^6.3.289",
+         "pg": "^8.23.0",
+         "react": "19.2.8",
+         "react-dom": "19.2.8",
+@@ -49,6 +52,331 @@
+         "url": "https://github.com/sponsors/sindresorhus"
+       }
+     },
++    "node_modules/@aws-sdk/checksums": {
++      "version": "3.1001.0",
++      "resolved": "https://registry.npmjs.org/@aws-sdk/checksums/-/checksums-3.1001.0.tgz",
++      "integrity": "sha512-6uTniZc87q+B5eXouGTl+7Tmc482rEeCcvxpsvREP8EfF0gvloRZ41UOA9sbSJlyy8TbqIBXb3kKfKarEArUQA==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@aws-sdk/core": "^3.978.0",
++        "@aws-sdk/types": "^3.974.5",
++        "@smithy/core": "^3.33.3",
++        "@smithy/types": "^4.17.2",
++        "tslib": "^2.6.2"
++      },
++      "engines": {
++        "node": ">=20.0.0"
++      }
++    },
++    "node_modules/@aws-sdk/client-s3": {
++      "version": "3.1136.0",
++      "resolved": "https://registry.npmjs.org/@aws-sdk/client-s3/-/client-s3-3.1136.0.tgz",
++      "integrity": "sha512-1FUvu6nuUi3y9VjQAYootkfWKQqZ8aT8wZoV5I0bpeMkGVgntYpJ11xLicGotGE6E1qtLXB+GdOJM9B+OQYWDA==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@aws-sdk/checksums": "^3.1001.0",
++        "@aws-sdk/core": "^3.978.0",
++        "@aws-sdk/credential-provider-node": "^3.972.83",
++        "@aws-sdk/middleware-sdk-s3": "^3.972.76",
++        "@aws-sdk/signature-v4-multi-region": "^3.996.46",
++        "@aws-sdk/types": "^3.974.5",
++        "@smithy/core": "^3.33.3",
++        "@smithy/fetch-http-handler": "^5.7.2",
++        "@smithy/node-http-handler": "^4.11.3",
++        "@smithy/types": "^4.17.2",
++        "tslib": "^2.6.2"
++      },
++      "engines": {
++        "node": ">=20.0.0"
++      }
++    },
++    "node_modules/@aws-sdk/core": {
++      "version": "3.978.0",
++      "resolved": "https://registry.npmjs.org/@aws-sdk/core/-/core-3.978.0.tgz",
++      "integrity": "sha512-2yX9LUmxPklVjSGTb8dfnWRJSiFQ3TeH2nn7G1mdKHTfnabzF0+gfrS8rYfLWmZrQ8A3mEcxMJjRc51dL5KWaA==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@aws-sdk/types": "^3.974.5",
++        "@aws-sdk/xml-builder": "^3.972.40",
++        "@aws/lambda-invoke-store": "^0.3.0",
++        "@smithy/core": "^3.33.3",
++        "@smithy/signature-v4": "^5.6.12",
++        "@smithy/types": "^4.17.2",
++        "bowser": "^2.11.0",
++        "tslib": "^2.6.2"
++      },
++      "engines": {
++        "node": ">=20.0.0"
++      }
++    },
++    "node_modules/@aws-sdk/credential-provider-env": {
++      "version": "3.972.71",
++      "resolved": "https://registry.npmjs.org/@aws-sdk/credential-provider-env/-/credential-provider-env-3.972.71.tgz",
++      "integrity": "sha512-JN+JHruYZw3GUZB8YGAlDk4wTDPOEAEEdEzj5nS0xodWR4smzHsN7PnK2j6IeOsDIj2aqua5DSbhXl9Gtf90FQ==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@aws-sdk/core": "^3.978.0",
++        "@aws-sdk/types": "^3.974.5",
++        "@smithy/core": "^3.33.3",
++        "@smithy/types": "^4.17.2",
++        "tslib": "^2.6.2"
++      },
++      "engines": {
++        "node": ">=20.0.0"
++      }
++    },
++    "node_modules/@aws-sdk/credential-provider-http": {
++      "version": "3.972.73",
++      "resolved": "https://registry.npmjs.org/@aws-sdk/credential-provider-http/-/credential-provider-http-3.972.73.tgz",
++      "integrity": "sha512-uyYYnJOnlis8uQzaYGPd7N1JoioCoNpXgnkXYixsWJXHXgXyYi8WXJSDfofxJeWfQIGWLe2Nwyq60Uc7MZdVOg==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@aws-sdk/core": "^3.978.0",
++        "@aws-sdk/types": "^3.974.5",
++        "@smithy/core": "^3.33.3",
++        "@smithy/fetch-http-handler": "^5.7.2",
++        "@smithy/node-http-handler": "^4.11.3",
++        "@smithy/types": "^4.17.2",
++        "tslib": "^2.6.2"
++      },
++      "engines": {
++        "node": ">=20.0.0"
++      }
++    },
++    "node_modules/@aws-sdk/credential-provider-ini": {
++      "version": "3.973.16",
++      "resolved": "https://registry.npmjs.org/@aws-sdk/credential-provider-ini/-/credential-provider-ini-3.973.16.tgz",
++      "integrity": "sha512-i++ly+0Uxa+u3ebSSyr0S/3CFhFJDxCXT3+Zj+mW2bXenEx5bKGCdTIKFu39SgXBNhWDjex/8cXUx9MUTMCrTw==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@aws-sdk/core": "^3.978.0",
++        "@aws-sdk/credential-provider-env": "^3.972.71",
++        "@aws-sdk/credential-provider-http": "^3.972.73",
++        "@aws-sdk/credential-provider-login": "^3.972.78",
++        "@aws-sdk/credential-provider-process": "^3.972.71",
++        "@aws-sdk/credential-provider-sso": "^3.973.15",
++        "@aws-sdk/credential-provider-web-identity": "^3.972.77",
++        "@aws-sdk/nested-clients": "^3.997.45",
++        "@aws-sdk/types": "^3.974.5",
++        "@smithy/core": "^3.33.3",
++        "@smithy/credential-provider-imds": "^4.4.16",
++        "@smithy/types": "^4.17.2",
++        "tslib": "^2.6.2"
++      },
++      "engines": {
++        "node": ">=20.0.0"
++      }
++    },
++    "node_modules/@aws-sdk/credential-provider-login": {
++      "version": "3.972.78",
++      "resolved": "https://registry.npmjs.org/@aws-sdk/credential-provider-login/-/credential-provider-login-3.972.78.tgz",
++      "integrity": "sha512-eUtswnXu0+Ii9ieRK+0L7aPFV3Z/dnW2VntJzjBP9xs8s+8p5nBNuymIXtXwZ+5r5+XJP3e32nMkuZ/r0HozEA==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@aws-sdk/core": "^3.978.0",
++        "@aws-sdk/nested-clients": "^3.997.45",
++        "@aws-sdk/types": "^3.974.5",
++        "@smithy/core": "^3.33.3",
++        "@smithy/types": "^4.17.2",
++        "tslib": "^2.6.2"
++      },
++      "engines": {
++        "node": ">=20.0.0"
++      }
++    },
++    "node_modules/@aws-sdk/credential-provider-node": {
++      "version": "3.972.83",
++      "resolved": "https://registry.npmjs.org/@aws-sdk/credential-provider-node/-/credential-provider-node-3.972.83.tgz",
++      "integrity": "sha512-jdso7ejzfRnatxMUZK4S/U6KbaDPCvfIV4XL+IQAPFDBt5rj5Fq595euqlK8Le4lNCMFR9oUpt+1l0aMgaayOQ==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@aws-sdk/credential-provider-env": "^3.972.71",
++        "@aws-sdk/credential-provider-http": "^3.972.73",
++        "@aws-sdk/credential-provider-ini": "^3.973.16",
++        "@aws-sdk/credential-provider-process": "^3.972.71",
++        "@aws-sdk/credential-provider-sso": "^3.973.15",
++        "@aws-sdk/credential-provider-web-identity": "^3.972.77",
++        "@aws-sdk/types": "^3.974.5",
++        "@smithy/core": "^3.33.3",
++        "@smithy/credential-provider-imds": "^4.4.16",
++        "@smithy/types": "^4.17.2",
++        "tslib": "^2.6.2"
++      },
++      "engines": {
++        "node": ">=20.0.0"
++      }
++    },
++    "node_modules/@aws-sdk/credential-provider-process": {
++      "version": "3.972.71",
++      "resolved": "https://registry.npmjs.org/@aws-sdk/credential-provider-process/-/credential-provider-process-3.972.71.tgz",
++      "integrity": "sha512-lYmXJa4gvq4xN1lrT5NiP5vIYYKcGWAdj8y+8o6dlcateB5eF3Dn8DtmjjHKfMBrTPAMr2pebIiX/UOj8c1/UA==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@aws-sdk/core": "^3.978.0",
++        "@aws-sdk/types": "^3.974.5",
++        "@smithy/core": "^3.33.3",
++        "@smithy/types": "^4.17.2",
++        "tslib": "^2.6.2"
++      },
++      "engines": {
++        "node": ">=20.0.0"
++      }
++    },
++    "node_modules/@aws-sdk/credential-provider-sso": {
++      "version": "3.973.15",
++      "resolved": "https://registry.npmjs.org/@aws-sdk/credential-provider-sso/-/credential-provider-sso-3.973.15.tgz",
++      "integrity": "sha512-6Jhcf4v0pSFdjk1EW2kvzuEBKD+UZ2uNcHUIglKKLndD20YhvkL2kdmDOV5/j4mYuWWwe/a1FQ1aomU86/Cg5Q==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@aws-sdk/core": "^3.978.0",
++        "@aws-sdk/nested-clients": "^3.997.45",
++        "@aws-sdk/token-providers": "3.1129.0",
++        "@aws-sdk/types": "^3.974.5",
++        "@smithy/core": "^3.33.3",
++        "@smithy/types": "^4.17.2",
++        "tslib": "^2.6.2"
++      },
++      "engines": {
++        "node": ">=20.0.0"
++      }
++    },
++    "node_modules/@aws-sdk/credential-provider-web-identity": {
++      "version": "3.972.77",
++      "resolved": "https://registry.npmjs.org/@aws-sdk/credential-provider-web-identity/-/credential-provider-web-identity-3.972.77.tgz",
++      "integrity": "sha512-uylIQSUWpfLuH2LovxEEfwzJGM/SabLOfLMg6YXu/E8jJEKUdpdILCVCQCdFvHyu/7dLJOHPMfrSwduxO56NkQ==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@aws-sdk/core": "^3.978.0",
++        "@aws-sdk/nested-clients": "^3.997.45",
++        "@aws-sdk/types": "^3.974.5",
++        "@smithy/core": "^3.33.3",
++        "@smithy/types": "^4.17.2",
++        "tslib": "^2.6.2"
++      },
++      "engines": {
++        "node": ">=20.0.0"
++      }
++    },
++    "node_modules/@aws-sdk/middleware-sdk-s3": {
++      "version": "3.972.76",
++      "resolved": "https://registry.npmjs.org/@aws-sdk/middleware-sdk-s3/-/middleware-sdk-s3-3.972.76.tgz",
++      "integrity": "sha512-NfnTkVUTBKTBuBgqaapFK9r3YdkKt1b2oRvgLzZq91bwNKh6ZS0S7sEcheguttREaL4iyfs/xQnqD7Z7AsWSsA==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@aws-sdk/core": "^3.978.0",
++        "@aws-sdk/signature-v4-multi-region": "^3.996.46",
++        "@aws-sdk/types": "^3.974.5",
++        "@smithy/core": "^3.33.3",
++        "@smithy/types": "^4.17.2",
++        "tslib": "^2.6.2"
++      },
++      "engines": {
++        "node": ">=20.0.0"
++      }
++    },
++    "node_modules/@aws-sdk/nested-clients": {
++      "version": "3.997.45",
++      "resolved": "https://registry.npmjs.org/@aws-sdk/nested-clients/-/nested-clients-3.997.45.tgz",
++      "integrity": "sha512-mooq9Q+jLa18VoM7HouczmslZU60iiB0aKc/Ztnq/luIL1ud0z4DnYprLR/ZO1gp331S9tJctM1HZr7u6YKBXQ==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@aws-sdk/core": "^3.978.0",
++        "@aws-sdk/signature-v4-multi-region": "^3.996.46",
++        "@aws-sdk/types": "^3.974.5",
++        "@smithy/core": "^3.33.3",
++        "@smithy/fetch-http-handler": "^5.7.2",
++        "@smithy/node-http-handler": "^4.11.3",
++        "@smithy/types": "^4.17.2",
++        "tslib": "^2.6.2"
++      },
++      "engines": {
++        "node": ">=20.0.0"
++      }
++    },
++    "node_modules/@aws-sdk/s3-request-presigner": {
++      "version": "3.1136.0",
++      "resolved": "https://registry.npmjs.org/@aws-sdk/s3-request-presigner/-/s3-request-presigner-3.1136.0.tgz",
++      "integrity": "sha512-SYH0+Eg8+4Tb03s3rfpNVtWEtgqmSf9LCieuCam/hk9bTib72uTjVz5dENCIkRkw3baq1QsePmjiN7IRyqHcnQ==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@aws-sdk/core": "^3.978.0",
++        "@aws-sdk/signature-v4-multi-region": "^3.996.46",
++        "@aws-sdk/types": "^3.974.5",
++        "@smithy/core": "^3.33.3",
++        "@smithy/types": "^4.17.2",
++        "tslib": "^2.6.2"
++      },
++      "engines": {
++        "node": ">=20.0.0"
++      }
++    },
++    "node_modules/@aws-sdk/signature-v4-multi-region": {
++      "version": "3.996.46",
++      "resolved": "https://registry.npmjs.org/@aws-sdk/signature-v4-multi-region/-/signature-v4-multi-region-3.996.46.tgz",
++      "integrity": "sha512-L+2xZTye/2T96f3lwCws0Zw6GG2JHZW9e8FpVgGBeeExSKyeoZ6CWRpBml/7DNiK/O26jrgPM9F+Ay8VkgzUWQ==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@aws-sdk/types": "^3.974.5",
++        "@smithy/signature-v4": "^5.6.12",
++        "@smithy/types": "^4.17.2",
++        "tslib": "^2.6.2"
++      },
++      "engines": {
++        "node": ">=20.0.0"
++      }
++    },
++    "node_modules/@aws-sdk/token-providers": {
++      "version": "3.1129.0",
++      "resolved": "https://registry.npmjs.org/@aws-sdk/token-providers/-/token-providers-3.1129.0.tgz",
++      "integrity": "sha512-Sbl3rpzQdsG4ZK2zh0JWUYyZPKKorJlVOddA2T0DVbKJFrsW8J6wgnslxxUH04+WaBMr4A1HzJZvZX0xUvkniA==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@aws-sdk/core": "^3.978.0",
++        "@aws-sdk/nested-clients": "^3.997.45",
++        "@aws-sdk/types": "^3.974.5",
++        "@smithy/core": "^3.33.3",
++        "@smithy/types": "^4.17.2",
++        "tslib": "^2.6.2"
++      },
++      "engines": {
++        "node": ">=20.0.0"
++      }
++    },
++    "node_modules/@aws-sdk/types": {
++      "version": "3.974.5",
++      "resolved": "https://registry.npmjs.org/@aws-sdk/types/-/types-3.974.5.tgz",
++      "integrity": "sha512-LkwLL2BLbC6wNNm4JaH9mbEqBMdOZCct6VAYqhdN4U1xrWM+fUJQEfbHwQgDypapOWTRtlk25akb5afM0P8CIQ==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@smithy/types": "^4.17.2",
++        "tslib": "^2.6.2"
++      },
++      "engines": {
++        "node": ">=20.0.0"
++      }
++    },
++    "node_modules/@aws-sdk/xml-builder": {
++      "version": "3.972.40",
++      "resolved": "https://registry.npmjs.org/@aws-sdk/xml-builder/-/xml-builder-3.972.40.tgz",
++      "integrity": "sha512-wlFmCIGUlwF4zx/kncw+bmxTQh1HeSJq4mYV/V5cZUSJadDP3kXvGW8Rn21cimj/7y9ju+47oYWXi97vF7czaA==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@smithy/types": "^4.17.2",
++        "tslib": "^2.6.2"
++      },
++      "engines": {
++        "node": ">=20.0.0"
++      }
++    },
++    "node_modules/@aws/lambda-invoke-store": {
++      "version": "0.3.0",
++      "resolved": "https://registry.npmjs.org/@aws/lambda-invoke-store/-/lambda-invoke-store-0.3.0.tgz",
++      "integrity": "sha512-sl4Bm6yiMNYrZKkqqDFWN0UfnWhlS8ivKxrYl+6t0gCLrqr8y3B2IqZZbFRkfaVVp7C/baApyh71P+LeE1A2sQ==",
++      "license": "Apache-2.0",
++      "engines": {
++        "node": ">=18.0.0"
++      }
++    },
+     "node_modules/@babel/code-frame": {
+       "version": "7.29.7",
+       "resolved": "https://registry.npmjs.org/@babel/code-frame/-/code-frame-7.29.7.tgz",
+@@ -1986,6 +2314,256 @@
+         "@jridgewell/sourcemap-codec": "^1.4.14"
+       }
+     },
++    "node_modules/@napi-rs/canvas": {
++      "version": "1.0.9",
++      "resolved": "https://registry.npmjs.org/@napi-rs/canvas/-/canvas-1.0.9.tgz",
++      "integrity": "sha512-QviPdJImDi/jMAvBfqaw+19BndMd/sizXVW3NnpMd3VJGz++QXkOHcP9kWR/smHG0hNjHeyuHFyrx/5lD0oNcQ==",
++      "license": "MIT",
++      "optional": true,
++      "workspaces": [
++        "e2e/*"
++      ],
++      "engines": {
++        "node": ">= 10"
++      },
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/Brooooooklyn"
++      },
++      "optionalDependencies": {
++        "@napi-rs/canvas-android-arm64": "1.0.9",
++        "@napi-rs/canvas-darwin-arm64": "1.0.9",
++        "@napi-rs/canvas-darwin-x64": "1.0.9",
++        "@napi-rs/canvas-linux-arm-gnueabihf": "1.0.9",
++        "@napi-rs/canvas-linux-arm64-gnu": "1.0.9",
++        "@napi-rs/canvas-linux-arm64-musl": "1.0.9",
++        "@napi-rs/canvas-linux-riscv64-gnu": "1.0.9",
++        "@napi-rs/canvas-linux-x64-gnu": "1.0.9",
++        "@napi-rs/canvas-linux-x64-musl": "1.0.9",
++        "@napi-rs/canvas-win32-arm64-msvc": "1.0.9",
++        "@napi-rs/canvas-win32-x64-msvc": "1.0.9"
++      }
++    },
++    "node_modules/@napi-rs/canvas-android-arm64": {
++      "version": "1.0.9",
++      "resolved": "https://registry.npmjs.org/@napi-rs/canvas-android-arm64/-/canvas-android-arm64-1.0.9.tgz",
++      "integrity": "sha512-4LGXk2/0HVzE29K8SzML5WubgCp++B1FH3qgl35XmSZE+lLdr6P9VRQEnZ0MCLZMTSuJP41yyhtoiVNEuvrTIA==",
++      "cpu": [
++        "arm64"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "android"
++      ],
++      "engines": {
++        "node": ">= 10"
++      },
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/Brooooooklyn"
++      }
++    },
++    "node_modules/@napi-rs/canvas-darwin-arm64": {
++      "version": "1.0.9",
++      "resolved": "https://registry.npmjs.org/@napi-rs/canvas-darwin-arm64/-/canvas-darwin-arm64-1.0.9.tgz",
++      "integrity": "sha512-YNdfLBzY0W/Pep9fo2L6RmoNlNksnn05LRnX66W63R3ij58S25QOTcjdtEt2v8+PnCESzqZsYzUo+QPeIR44NA==",
++      "cpu": [
++        "arm64"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "darwin"
++      ],
++      "engines": {
++        "node": ">= 10"
++      },
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/Brooooooklyn"
++      }
++    },
++    "node_modules/@napi-rs/canvas-darwin-x64": {
++      "version": "1.0.9",
++      "resolved": "https://registry.npmjs.org/@napi-rs/canvas-darwin-x64/-/canvas-darwin-x64-1.0.9.tgz",
++      "integrity": "sha512-ceZQSknTEcy3dOXoekv59LTCkXjvnLsq+VW5PeNNDHEPQbRS5Ervkm1EaDa7WLAjiYWMLuSQTRTHao1dEX4prg==",
++      "cpu": [
++        "x64"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "darwin"
++      ],
++      "engines": {
++        "node": ">= 10"
++      },
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/Brooooooklyn"
++      }
++    },
++    "node_modules/@napi-rs/canvas-linux-arm-gnueabihf": {
++      "version": "1.0.9",
++      "resolved": "https://registry.npmjs.org/@napi-rs/canvas-linux-arm-gnueabihf/-/canvas-linux-arm-gnueabihf-1.0.9.tgz",
++      "integrity": "sha512-XhfI0Wwv4llhd6nnWDtY3kQKjq0r+y1i91PlJlJI24ag2U9WrnwbG1qS3+fDLEyouwEVFchiKkTEHozK+5iUNA==",
++      "cpu": [
++        "arm"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": ">= 10"
++      },
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/Brooooooklyn"
++      }
++    },
++    "node_modules/@napi-rs/canvas-linux-arm64-gnu": {
++      "version": "1.0.9",
++      "resolved": "https://registry.npmjs.org/@napi-rs/canvas-linux-arm64-gnu/-/canvas-linux-arm64-gnu-1.0.9.tgz",
++      "integrity": "sha512-012oiYtKaE7i9oxc8q7nraT7kDOpLcaCmFLzVe9Ty34RHDdoDzbWLrVh827CNxYh/EADX1eSikA3ymLjo/nNuw==",
++      "cpu": [
++        "arm64"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": ">= 10"
++      },
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/Brooooooklyn"
++      }
++    },
++    "node_modules/@napi-rs/canvas-linux-arm64-musl": {
++      "version": "1.0.9",
++      "resolved": "https://registry.npmjs.org/@napi-rs/canvas-linux-arm64-musl/-/canvas-linux-arm64-musl-1.0.9.tgz",
++      "integrity": "sha512-Ls5UWYFFn63casTZEczbeyEg3vRDRkv9lscuGwfchtY5yLLQhgOB8SN4YGxmfJ5vTaBwZ2YUxBS3NtmjJmFXdA==",
++      "cpu": [
++        "arm64"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": ">= 10"
++      },
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/Brooooooklyn"
++      }
++    },
++    "node_modules/@napi-rs/canvas-linux-riscv64-gnu": {
++      "version": "1.0.9",
++      "resolved": "https://registry.npmjs.org/@napi-rs/canvas-linux-riscv64-gnu/-/canvas-linux-riscv64-gnu-1.0.9.tgz",
++      "integrity": "sha512-hLKEGxV7ZiRHqndePTokgDMdBlo/rDfzg7P4p4QIv9pUhuYobnu3R2NIFLCRghG0nwfo+s2sw+c1xZFeCmEAsw==",
++      "cpu": [
++        "riscv64"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": ">= 10"
++      },
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/Brooooooklyn"
++      }
++    },
++    "node_modules/@napi-rs/canvas-linux-x64-gnu": {
++      "version": "1.0.9",
++      "resolved": "https://registry.npmjs.org/@napi-rs/canvas-linux-x64-gnu/-/canvas-linux-x64-gnu-1.0.9.tgz",
++      "integrity": "sha512-6kaz3w0QMy77PDWk6rJ1ksIihdad3qzEyX2o2oGT8GwCaypfT5mhjr8buOO5hstyLxcWXDScuz56RsINLtBPIQ==",
++      "cpu": [
++        "x64"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": ">= 10"
++      },
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/Brooooooklyn"
++      }
++    },
++    "node_modules/@napi-rs/canvas-linux-x64-musl": {
++      "version": "1.0.9",
++      "resolved": "https://registry.npmjs.org/@napi-rs/canvas-linux-x64-musl/-/canvas-linux-x64-musl-1.0.9.tgz",
++      "integrity": "sha512-xrGvmS3v55hmZ86ls/kBLVNMUTYio3f6Ik0DireemG994VfPAwiA3ZXA0Uf1bByctkB3NQ1Sfb+H5bkdUnnzfQ==",
++      "cpu": [
++        "x64"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": ">= 10"
++      },
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/Brooooooklyn"
++      }
++    },
++    "node_modules/@napi-rs/canvas-win32-arm64-msvc": {
++      "version": "1.0.9",
++      "resolved": "https://registry.npmjs.org/@napi-rs/canvas-win32-arm64-msvc/-/canvas-win32-arm64-msvc-1.0.9.tgz",
++      "integrity": "sha512-yjmVS3ArZeRVCP7jqbPq4rpZa/BhTeI7ELE2XqJg3snICQBDevLZyArxswHkiTnT34KRic33/4fLirrHI+SY8A==",
++      "cpu": [
++        "arm64"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "win32"
++      ],
++      "engines": {
++        "node": ">= 10"
++      },
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/Brooooooklyn"
++      }
++    },
++    "node_modules/@napi-rs/canvas-win32-x64-msvc": {
++      "version": "1.0.9",
++      "resolved": "https://registry.npmjs.org/@napi-rs/canvas-win32-x64-msvc/-/canvas-win32-x64-msvc-1.0.9.tgz",
++      "integrity": "sha512-QlSYQdMQslB81nlABo9wNfQ6npFhE7/O+saCZdqVGueGanyRk4jCogD5EwQenfP3kIq9e+mm6GreQBjX5MrA8g==",
++      "cpu": [
++        "x64"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "win32"
++      ],
++      "engines": {
++        "node": ">= 10"
++      },
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/Brooooooklyn"
++      }
++    },
+     "node_modules/@napi-rs/wasm-runtime": {
+       "version": "1.2.4",
+       "resolved": "https://registry.npmjs.org/@napi-rs/wasm-runtime/-/wasm-runtime-1.2.4.tgz",
+@@ -2488,6 +3066,87 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/@smithy/core": {
++      "version": "3.34.1",
++      "resolved": "https://registry.npmjs.org/@smithy/core/-/core-3.34.1.tgz",
++      "integrity": "sha512-dLcOUxz8YCv1RZUMKq6GbyUf95pLbrqh34bPvpCZ1+CByFF31BEAFewZjsGCnVsZTKdThNENfGyAgk2TJqVwSw==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@smithy/types": "^4.18.0",
++        "tslib": "^2.6.2"
++      },
++      "engines": {
++        "node": ">=18.0.0"
++      }
++    },
++    "node_modules/@smithy/credential-provider-imds": {
++      "version": "4.5.2",
++      "resolved": "https://registry.npmjs.org/@smithy/credential-provider-imds/-/credential-provider-imds-4.5.2.tgz",
++      "integrity": "sha512-A9uSdn72ozbRUSit0eib0TW7nXuNPlaeM0zcGkJ+nE6tFcSDbnmtwoxbTCFBukVQcszDAyvsd7+rTduPTXpygg==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@smithy/core": "^3.33.2",
++        "@smithy/types": "^4.17.2",
++        "tslib": "^2.6.2"
++      },
++      "engines": {
++        "node": ">=18.0.0"
++      }
++    },
++    "node_modules/@smithy/fetch-http-handler": {
++      "version": "5.8.0",
++      "resolved": "https://registry.npmjs.org/@smithy/fetch-http-handler/-/fetch-http-handler-5.8.0.tgz",
++      "integrity": "sha512-ycSJu3tFAQ4v04CBB0agqFMVsSQ1iG3yw+SpgxRqKfaURpQD4CZ8Wn0zPMmSnOuTpTh65Vz+EA0rMrw089wvkA==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@smithy/core": "^3.33.3",
++        "@smithy/types": "^4.18.0",
++        "tslib": "^2.6.2"
++      },
++      "engines": {
++        "node": ">=18.0.0"
++      }
++    },
++    "node_modules/@smithy/node-http-handler": {
++      "version": "4.12.1",
++      "resolved": "https://registry.npmjs.org/@smithy/node-http-handler/-/node-http-handler-4.12.1.tgz",
++      "integrity": "sha512-ThMkboGeONWXAelq9FvGsuJC4rOi+qyC4/zhUF58xYpxUg5sQKx2VXZYJmtNjr4dSuBJ1HeJXETQILCz3wOHvw==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@smithy/core": "^3.33.3",
++        "@smithy/types": "^4.18.0",
++        "tslib": "^2.6.2"
++      },
++      "engines": {
++        "node": ">=18.0.0"
++      }
++    },
++    "node_modules/@smithy/signature-v4": {
++      "version": "5.7.3",
++      "resolved": "https://registry.npmjs.org/@smithy/signature-v4/-/signature-v4-5.7.3.tgz",
++      "integrity": "sha512-7ImGm+FkHRLcBaRttIAMZ6bzJZWb2cJGoYjq46F2UjycujWzrL9GEN9h4w7eQyXJYnltrUhxbbieBAIRrdqpow==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@smithy/core": "^3.33.3",
++        "@smithy/types": "^4.17.2",
++        "tslib": "^2.6.2"
++      },
++      "engines": {
++        "node": ">=18.0.0"
++      }
++    },
++    "node_modules/@smithy/types": {
++      "version": "4.18.0",
++      "resolved": "https://registry.npmjs.org/@smithy/types/-/types-4.18.0.tgz",
++      "integrity": "sha512-CgB6HHWer/vrKps24ulRIbpcpb7K4xAU7SkZ7YHzBPlwHsvsrCJFEXK421s+cJzX+ZrqtA/TuU5w1HzI7k9N8A==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "tslib": "^2.6.2"
++      },
++      "engines": {
++        "node": ">=18.0.0"
++      }
++    },
+     "node_modules/@swc/helpers": {
+       "version": "0.5.23",
+       "resolved": "https://registry.npmjs.org/@swc/helpers/-/helpers-0.5.23.tgz",
+@@ -3776,6 +4435,12 @@
+         "node": ">=6.0.0"
+       }
+     },
++    "node_modules/bowser": {
++      "version": "2.14.1",
++      "resolved": "https://registry.npmjs.org/bowser/-/bowser-2.14.1.tgz",
++      "integrity": "sha512-tzPjzCxygAKWFOJP011oxFHs57HzIhOEracIgAePE4pqB3LikALKnSzUyU4MGs9/iCEUuHlAJTjTc5M+u7YEGg==",
++      "license": "MIT"
++    },
+     "node_modules/brace-expansion": {
+       "version": "1.1.21",
+       "resolved": "https://registry.npmjs.org/brace-expansion/-/brace-expansion-1.1.21.tgz",
+@@ -7399,6 +8064,18 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/pdfjs-dist": {
++      "version": "6.3.289",
++      "resolved": "https://registry.npmjs.org/pdfjs-dist/-/pdfjs-dist-6.3.289.tgz",
++      "integrity": "sha512-ZHjSVpDa3D6izMq8/04lvkhkATUmL9px6ChPaXc1k6nU2Mrhlg1/7F0bdUqCwUjw3NsPTfPZsMDUU6ZIcRaeQw==",
++      "license": "Apache-2.0",
++      "engines": {
++        "node": ">=22.13.0 || >=24"
++      },
++      "optionalDependencies": {
++        "@napi-rs/canvas": "^1.0.0"
++      }
++    },
+     "node_modules/pg": {
+       "version": "8.23.0",
+       "resolved": "https://registry.npmjs.org/pg/-/pg-8.23.0.tgz",
+diff --git a/package.json b/package.json
+index 80c1764..feadc97 100644
+--- a/package.json
++++ b/package.json
+@@ -14,16 +14,19 @@
+     "db:seed": "tsx src/db/seed.ts",
+     "typecheck": "tsc --noEmit",
+     "test:e2e": "playwright test",
+-    "test:unit": "tsx --test src/**/*.test.ts",
++    "test:unit": "tsx --test \"src/**/*.test.ts\"",
+     "test": "npm run test:unit && npm run test:e2e"
+   },
+   "dependencies": {
++    "@aws-sdk/client-s3": "^3.1136.0",
++    "@aws-sdk/s3-request-presigner": "^3.1136.0",
+     "@fontsource-variable/work-sans": "^5.3.0",
+     "@fontsource/eb-garamond": "^5.3.0",
+     "@node-rs/argon2": "^2.2.1",
+     "drizzle-orm": "^0.45.2",
+     "next": "16.3.5",
+     "nodemailer": "^10.0.10",
++    "pdfjs-dist": "^6.3.289",
+     "pg": "^8.23.0",
+     "react": "19.2.8",
+     "react-dom": "19.2.8",
+diff --git a/playwright.config.ts b/playwright.config.ts
+index 010c1c0..32134c3 100644
+--- a/playwright.config.ts
++++ b/playwright.config.ts
+@@ -5,6 +5,7 @@ const baseURL = `http://127.0.0.1:${PORT}`;
+ 
+ export default defineConfig({
+   testDir: "./e2e",
++  globalSetup: "./e2e/global-setup.ts",
+   fullyParallel: false,
+   workers: 1,
+   retries: 0,
+@@ -35,6 +36,9 @@ export default defineConfig({
+     env: {
+       APP_URL: baseURL,
+       MAIL_TRANSPORT: "log",
++      // R2 isn't configured here, so proofs are written to .uploads/. The app
++      // refuses that in a production build unless this is set deliberately.
++      ALLOW_LOCAL_UPLOADS: "1",
+       // The suite signs in far more often than any real person would, so the
+       // lockout is raised here rather than weakened in the app. The limiter's
+       // own behaviour is covered by src/lib/rate-limit.test.ts.
+diff --git a/src/app/account/layout.tsx b/src/app/account/layout.tsx
+index 340d405..b12afdf 100644
+--- a/src/app/account/layout.tsx
++++ b/src/app/account/layout.tsx
+@@ -10,6 +10,9 @@ import {
+   ShieldIcon,
+   UserIcon,
+ } from "@/components/portal/icons";
++import { NotificationBell } from "@/components/portal/notification-bell";
++import { loadNotifications } from "@/lib/notifications/queries";
++import { markNotificationsReadAction } from "@/lib/notifications/actions";
+ 
+ const NAV = [
+   { href: "/account", label: "Dashboard", icon: <GridIcon /> },
+@@ -26,6 +29,7 @@ export default async function AccountLayout({
+   children: ReactNode;
+ }) {
+   const session = await requireUser();
++  const { items, unreadCount } = await loadNotifications(session.user.id);
+ 
+   return (
+     <PortalShell
+@@ -33,6 +37,13 @@ export default async function AccountLayout({
+       nav={NAV}
+       user={{ name: session.user.name, roleLabel: "Customer" }}
+       logout={<LogoutButton action={logoutAction} />}
++      bell={
++        <NotificationBell
++          items={items}
++          unreadCount={unreadCount}
++          markRead={markNotificationsReadAction}
++        />
++      }
+     >
+       {children}
+     </PortalShell>
+diff --git a/src/app/account/orders/[orderId]/proof/page.tsx b/src/app/account/orders/[orderId]/proof/page.tsx
+new file mode 100644
+index 0000000..78c1339
+--- /dev/null
++++ b/src/app/account/orders/[orderId]/proof/page.tsx
+@@ -0,0 +1,132 @@
++import type { Metadata } from "next";
++import Link from "next/link";
++import { notFound } from "next/navigation";
++import { and, asc, desc, eq } from "drizzle-orm";
++import { db } from "@/db";
++import { notifications, orders, proofComments, proofVersions, users } from "@/db/schema";
++import { requireUser } from "@/lib/auth/guards";
++import { signedReadUrl } from "@/lib/storage/storage";
++import { isPdf } from "@/lib/storage/uploads";
++import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
++import { ProofReviewer } from "@/components/proofs/proof-reviewer";
++
++export const metadata: Metadata = {
++  title: "Review your proof",
++  robots: { index: false, follow: false },
++};
++
++export default async function ProofReviewPage({
++  params,
++}: {
++  params: Promise<{ orderId: string }>;
++}) {
++  const session = await requireUser();
++  const { orderId } = await params;
++
++  const [order] = await db
++    .select({ id: orders.id, reference: orders.reference })
++    .from(orders)
++    .where(and(eq(orders.id, orderId), eq(orders.userId, session.user.id)))
++    .limit(1);
++
++  if (!order) notFound();
++
++  const [version] = await db
++    .select({
++      id: proofVersions.id,
++      versionNumber: proofVersions.versionNumber,
++      storageKey: proofVersions.storageKey,
++      mimeType: proofVersions.mimeType,
++      status: proofVersions.status,
++    })
++    .from(proofVersions)
++    .where(eq(proofVersions.orderId, orderId))
++    .orderBy(desc(proofVersions.versionNumber))
++    .limit(1);
++
++  if (!version) {
++    return (
++      <>
++        <PortalHeader title={`Proof — ${order.reference}`} />
++        <PortalBody>
++          <div className="rounded-md border border-line bg-white p-10 text-center">
++            <h2 className="font-display text-lg">No proof yet</h2>
++            <p className="mx-auto mt-2 max-w-[46ch] text-sm leading-relaxed text-ink-muted">
++              The studio is working on it. We&rsquo;ll email you the moment
++              there&rsquo;s something to look at.
++            </p>
++            <Link
++              href="/account/orders"
++              className="mt-6 inline-flex rounded-[2px] border border-field-line px-6 py-3 text-[13px] font-semibold text-ink-soft"
++            >
++              Back to orders
++            </Link>
++          </div>
++        </PortalBody>
++      </>
++    );
++  }
++
++  const rows = await db
++    .select({
++      id: proofComments.id,
++      body: proofComments.body,
++      xPct: proofComments.xPct,
++      yPct: proofComments.yPct,
++      pinNumber: proofComments.pinNumber,
++      authorId: proofComments.authorId,
++      authorName: users.name,
++    })
++    .from(proofComments)
++    .leftJoin(users, eq(users.id, proofComments.authorId))
++    .where(eq(proofComments.proofVersionId, version.id))
++    .orderBy(asc(proofComments.pinNumber));
++
++  const fileUrl = await signedReadUrl(version.storageKey);
++
++  // Opening the proof clears the notification that brought them here.
++  await db
++    .update(notifications)
++    .set({ readAt: new Date() })
++    .where(
++      and(
++        eq(notifications.userId, session.user.id),
++        eq(notifications.linkUrl, `/account/orders/${orderId}/proof`),
++      ),
++    );
++
++  return (
++    <>
++      <PortalHeader
++        title={`Proof — ${order.reference}`}
++        actions={
++          <Link
++            href="/account/orders"
++            className="text-[13px] font-semibold text-accent-text"
++          >
++            ← Orders
++          </Link>
++        }
++      />
++      <PortalBody>
++        <ProofReviewer
++          proofVersionId={version.id}
++          fileUrl={fileUrl}
++          downloadUrl={fileUrl}
++          isPdf={isPdf(version.mimeType)}
++          status={version.status}
++          versionNumber={version.versionNumber}
++          comments={rows.map((row) => ({
++            id: row.id,
++            body: row.body,
++            xPct: row.xPct,
++            yPct: row.yPct,
++            pinNumber: row.pinNumber,
++            authorName: row.authorName ?? "Someone",
++            isMine: row.authorId === session.user.id,
++          }))}
++        />
++      </PortalBody>
++    </>
++  );
++}
+diff --git a/src/app/account/orders/page.tsx b/src/app/account/orders/page.tsx
+index 27673b1..06b254a 100644
+--- a/src/app/account/orders/page.tsx
++++ b/src/app/account/orders/page.tsx
+@@ -1,7 +1,7 @@
+ import Link from "next/link";
+-import { desc, eq } from "drizzle-orm";
++import { desc, eq, inArray, sql } from "drizzle-orm";
+ import { db } from "@/db";
+-import { orders } from "@/db/schema";
++import { orders, proofVersions } from "@/db/schema";
+ import { requireUser } from "@/lib/auth/guards";
+ import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
+ import { StatusPill, type PillTone } from "@/components/portal/status-pill";
+@@ -57,6 +57,30 @@ export default async function AccountOrdersPage() {
+    */
+   const lines = await loadOrdersWithLines(rows.map((row) => row.id));
+ 
++  /**
++   * The latest proof per order, so a row can say whether there is anything to
++   * look at. One query for the whole list, not one per row.
++   */
++  const latestProofs = rows.length
++    ? await db
++        .selectDistinctOn([proofVersions.orderId], {
++          orderId: proofVersions.orderId,
++          status: proofVersions.status,
++        })
++        .from(proofVersions)
++        .where(
++          inArray(
++            proofVersions.orderId,
++            rows.map((row) => row.id),
++          ),
++        )
++        .orderBy(proofVersions.orderId, sql`${proofVersions.versionNumber} desc`)
++    : [];
++
++  const proofByOrder = new Map(
++    latestProofs.map((proof) => [proof.orderId, proof.status]),
++  );
++
+   const outcomes = await repriceOrders(
+     rows.map((row) => ({
+       id: row.id,
+@@ -137,6 +161,25 @@ export default async function AccountOrdersPage() {
+                         <span className="text-xs text-ink-quiet">
+                           Placed {dateFormat.format(row.createdAt)}
+                         </span>
++                        {proofByOrder.has(row.id) && (
++                          <Link
++                            href={`/account/orders/${row.id}/proof`}
++                            // Every row's link reads the same, so the
++                            // reference goes in the label rather than the
++                            // visible text, where it would just repeat the
++                            // line above it.
++                            aria-label={
++                              proofByOrder.get(row.id) === "awaiting_customer"
++                                ? `Review your proof for ${row.reference}`
++                                : `See the proof for ${row.reference}`
++                            }
++                            className="mt-0.5 w-fit text-[13px] font-semibold text-accent-text"
++                          >
++                            {proofByOrder.get(row.id) === "awaiting_customer"
++                              ? "Review your proof"
++                              : "See the proof"}
++                          </Link>
++                        )}
+                       </div>
+ 
+                       <div className="flex items-center gap-4">
+diff --git a/src/app/account/page.tsx b/src/app/account/page.tsx
+index 774fbb2..91cbfe3 100644
+--- a/src/app/account/page.tsx
++++ b/src/app/account/page.tsx
+@@ -1,10 +1,60 @@
+ import Link from "next/link";
++import { and, count, desc, eq, inArray } from "drizzle-orm";
++import { db } from "@/db";
++import { enquiries, orders, proofVersions, savedItems } from "@/db/schema";
+ import { requireUser } from "@/lib/auth/guards";
+ import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
+ 
+ export default async function AccountDashboardPage() {
+   const session = await requireUser();
+   const verified = Boolean(session.user.emailVerifiedAt);
++  const userId = session.user.id;
++
++  const myOrders = await db
++    .select({ id: orders.id, reference: orders.reference })
++    .from(orders)
++    .where(eq(orders.userId, userId))
++    .orderBy(desc(orders.createdAt));
++
++  const orderIds = myOrders.map((row) => row.id);
++
++  const [waiting, openQuotes, saved] = await Promise.all([
++    orderIds.length
++      ? db
++          .select({
++            orderId: proofVersions.orderId,
++            versionNumber: proofVersions.versionNumber,
++          })
++          .from(proofVersions)
++          .where(
++            and(
++              inArray(proofVersions.orderId, orderIds),
++              eq(proofVersions.status, "awaiting_customer"),
++            ),
++          )
++          .orderBy(desc(proofVersions.sentToCustomerAt))
++          .limit(1)
++      : Promise.resolve([]),
++    db
++      .select({ value: count() })
++      .from(enquiries)
++      .where(and(eq(enquiries.userId, userId), eq(enquiries.status, "new"))),
++    db.select({ value: count() }).from(savedItems).where(eq(savedItems.userId, userId)),
++  ]);
++
++  const proof = waiting[0]
++    ? {
++        ...waiting[0],
++        reference:
++          myOrders.find((row) => row.id === waiting[0].orderId)?.reference ?? "",
++      }
++    : null;
++
++  const tiles = [
++    { label: "Orders", value: myOrders.length, href: "/account/orders" },
++    { label: "Open quotes", value: openQuotes[0]?.value ?? 0, href: "/account/quotes" },
++    { label: "Saved items", value: saved[0]?.value ?? 0, href: "/account/saved" },
++  ];
+ 
+   return (
+     <>
+@@ -27,27 +77,64 @@ export default async function AccountDashboardPage() {
+             </div>
+           )}
+ 
+-          <div className="rounded-md border border-line bg-white p-8">
+-            <h2 className="text-lg">Your account is ready</h2>
+-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-muted">
+-              Orders, quotes, saved items and proof reviews arrive in the next
+-              build. Your profile and security settings are live now.
+-            </p>
+-
+-            <div className="mt-6 flex gap-3">
++          {/* The one thing that might actually be waiting on them. */}
++          {proof ? (
++            <div className="rounded-md border border-line bg-white p-8">
++              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-text">
++                Waiting for you
++              </span>
++              <h2 className="mt-1.5 text-lg">
++                Your proof for {proof.reference} is ready to look at
++              </h2>
++              <p className="mt-2 max-w-[62ch] text-sm leading-relaxed text-ink-muted">
++                Check the wording, the dates and the spellings. Nothing is
++                printed until you approve it, and there&rsquo;s no charge for
++                changes.
++              </p>
+               <Link
+-                href="/account/profile"
+-                className="rounded-[2px] bg-brand px-5 py-3 text-[13px] font-semibold text-on-accent"
++                href={`/account/orders/${proof.orderId}/proof`}
++                className="mt-6 inline-flex rounded-[2px] bg-brand px-6 py-3 text-[13px] font-semibold text-on-accent"
+               >
+-                Edit profile
++                Review version {proof.versionNumber}
+               </Link>
++            </div>
++          ) : (
++            <div className="rounded-md border border-line bg-white p-8">
++              <h2 className="text-lg">Nothing needs you right now</h2>
++              <p className="mt-2 max-w-[62ch] text-sm leading-relaxed text-ink-muted">
++                We&rsquo;ll email you and put a note here the moment a proof is
++                ready to look at.
++              </p>
++              <div className="mt-6 flex flex-wrap gap-3">
++                <Link
++                  href="/products"
++                  className="rounded-[2px] bg-brand px-5 py-3 text-[13px] font-semibold text-on-accent"
++                >
++                  Browse what we print
++                </Link>
++                <Link
++                  href="/quote"
++                  className="rounded-[2px] border border-field-line px-5 py-3 text-[13px] font-semibold text-ink-muted"
++                >
++                  Ask for a quote
++                </Link>
++              </div>
++            </div>
++          )}
++
++          <div className="grid gap-[18px] sm:grid-cols-3">
++            {tiles.map((tile) => (
+               <Link
+-                href="/account/security"
+-                className="rounded-[2px] border border-field-line px-5 py-3 text-[13px] font-semibold text-ink-muted"
++                key={tile.label}
++                href={tile.href}
++                className="flex flex-col gap-1.5 rounded-md border border-line bg-white p-6 transition-colors hover:border-brand-deep/40"
+               >
+-                Security settings
++                <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-quiet">
++                  {tile.label}
++                </span>
++                <span className="font-display text-[27px]">{tile.value}</span>
+               </Link>
+-            </div>
++            ))}
+           </div>
+         </div>
+       </PortalBody>
+diff --git a/src/app/api/uploads/[...key]/route.ts b/src/app/api/uploads/[...key]/route.ts
+new file mode 100644
+index 0000000..dbbedad
+--- /dev/null
++++ b/src/app/api/uploads/[...key]/route.ts
+@@ -0,0 +1,67 @@
++import { NextResponse } from "next/server";
++import { eq } from "drizzle-orm";
++import { db } from "@/db";
++import { orders, proofVersions } from "@/db/schema";
++import { getSession } from "@/lib/auth/session";
++import { isStaff } from "@/lib/auth/guards";
++import { isRemoteStorageConfigured, readObject } from "@/lib/storage/storage";
++
++/**
++ * Serves uploads in development, where there is no R2 bucket to sign against.
++ *
++ * It is not a public file server: the caller must be signed in and must
++ * either own the order the proof belongs to, or be studio staff. With R2
++ * configured this route refuses outright, because signed URLs are used
++ * instead.
++ */
++export async function GET(
++  _request: Request,
++  { params }: { params: Promise<{ key: string[] }> },
++) {
++  if (isRemoteStorageConfigured()) {
++    return NextResponse.json(
++      { error: "Uploads are served from object storage." },
++      { status: 404 },
++    );
++  }
++
++  const session = await getSession("site");
++  if (!session) return new NextResponse("Not found", { status: 404 });
++
++  const { key } = await params;
++  const storageKey = key.map(decodeURIComponent).join("/");
++
++  const [proof] = await db
++    .select({
++      id: proofVersions.id,
++      mimeType: proofVersions.mimeType,
++      fileName: proofVersions.fileName,
++      ownerId: orders.userId,
++    })
++    .from(proofVersions)
++    .innerJoin(orders, eq(orders.id, proofVersions.orderId))
++    .where(eq(proofVersions.storageKey, storageKey))
++    .limit(1);
++
++  if (!proof) return new NextResponse("Not found", { status: 404 });
++
++  const allowed =
++    proof.ownerId === session.user.id || isStaff(session.user.role);
++
++  // A stranger gets the same answer as a missing file, so this can't be used
++  // to work out which proofs exist.
++  if (!allowed) return new NextResponse("Not found", { status: 404 });
++
++  try {
++    const body = await readObject(storageKey);
++    return new NextResponse(new Uint8Array(body), {
++      headers: {
++        "Content-Type": proof.mimeType ?? "application/octet-stream",
++        "Content-Disposition": `inline; filename="${proof.fileName ?? "proof"}"`,
++        "Cache-Control": "private, no-store",
++      },
++    });
++  } catch {
++    return new NextResponse("Not found", { status: 404 });
++  }
++}
+diff --git a/src/app/staff/orders/[orderId]/page.tsx b/src/app/staff/orders/[orderId]/page.tsx
+new file mode 100644
+index 0000000..fed02cf
+--- /dev/null
++++ b/src/app/staff/orders/[orderId]/page.tsx
+@@ -0,0 +1,325 @@
++import Link from "next/link";
++import { notFound } from "next/navigation";
++import { asc, desc, eq } from "drizzle-orm";
++import { db } from "@/db";
++import {
++  activityEvents,
++  orders,
++  proofComments,
++  proofVersions,
++  users,
++} from "@/db/schema";
++import { requireStaff } from "@/lib/auth/guards";
++import { loadDesigners } from "@/lib/proofs/staff-queries";
++import { signedReadUrl } from "@/lib/storage/storage";
++import { formatMoney } from "@/lib/pricing/money";
++import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
++import { StatusPill, type PillTone } from "@/components/portal/status-pill";
++import {
++  AssignDesignerForm,
++  ProofreaderActions,
++  UploadProofForm,
++} from "./proof-actions";
++
++const PROOF_LABEL: Record<string, { label: string; tone: PillTone }> = {
++  awaiting_proofreading: { label: "Needs proofreading", tone: "pending" },
++  returned_to_designer: { label: "Returned to designer", tone: "alert" },
++  awaiting_customer: { label: "With the customer", tone: "neutral" },
++  approved: { label: "Approved", tone: "good" },
++  changes_requested: { label: "Changes requested", tone: "alert" },
++};
++
++const PAYMENT: Record<string, { label: string; tone: PillTone }> = {
++  unpaid: { label: "Unpaid", tone: "neutral" },
++  paid: { label: "Paid", tone: "good" },
++  refunded: { label: "Refunded", tone: "alert" },
++};
++
++const dateFormat = new Intl.DateTimeFormat("en-GB", {
++  day: "numeric",
++  month: "short",
++  hour: "2-digit",
++  minute: "2-digit",
++});
++
++export default async function StaffOrderDetailPage({
++  params,
++}: {
++  params: Promise<{ orderId: string }>;
++}) {
++  const session = await requireStaff();
++  const { orderId } = await params;
++
++  const [order] = await db
++    .select({
++      id: orders.id,
++      reference: orders.reference,
++      status: orders.status,
++      paymentStatus: orders.paymentStatus,
++      totalMinor: orders.totalMinor,
++      currency: orders.currency,
++      assignedDesignerId: orders.assignedDesignerId,
++      customerName: users.name,
++      customerEmail: users.email,
++    })
++    .from(orders)
++    .innerJoin(users, eq(users.id, orders.userId))
++    .where(eq(orders.id, orderId))
++    .limit(1);
++
++  if (!order) notFound();
++
++  const [versions, designers, activity] = await Promise.all([
++    db
++      .select({
++        id: proofVersions.id,
++        versionNumber: proofVersions.versionNumber,
++        status: proofVersions.status,
++        storageKey: proofVersions.storageKey,
++        fileName: proofVersions.fileName,
++        createdAt: proofVersions.createdAt,
++        proofreaderNotes: proofVersions.proofreaderNotes,
++        uploadedBy: users.name,
++      })
++      .from(proofVersions)
++      .leftJoin(users, eq(users.id, proofVersions.uploadedById))
++      .where(eq(proofVersions.orderId, orderId))
++      .orderBy(desc(proofVersions.versionNumber)),
++    loadDesigners(),
++    db
++      .select({
++        id: activityEvents.id,
++        summary: activityEvents.summary,
++        createdAt: activityEvents.createdAt,
++      })
++      .from(activityEvents)
++      .where(eq(activityEvents.orderId, orderId))
++      .orderBy(desc(activityEvents.createdAt))
++      .limit(8),
++  ]);
++
++  const current = versions[0] ?? null;
++
++  /**
++   * The comments shown are the newest ones the customer left, which is
++   * usually on an *earlier* version — a new version is uploaded precisely
++   * because of them, and the designer still needs to see what they said.
++   */
++  const commentedOn =
++    versions.find((version) => version.status === "changes_requested") ??
++    current;
++
++  const comments = commentedOn
++    ? await db
++        .select({
++          id: proofComments.id,
++          body: proofComments.body,
++          pinNumber: proofComments.pinNumber,
++          authorName: users.name,
++        })
++        .from(proofComments)
++        .leftJoin(users, eq(users.id, proofComments.authorId))
++        .where(eq(proofComments.proofVersionId, commentedOn.id))
++        .orderBy(asc(proofComments.pinNumber))
++    : [];
++
++  const currentFileUrl = current ? await signedReadUrl(current.storageKey) : null;
++
++  const canProofread =
++    session.user.role === "proofreader" || session.user.role === "admin";
++
++  return (
++    <>
++      <PortalHeader
++        title={order.reference}
++        actions={
++          <Link
++            href="/staff/queue"
++            className="text-[13px] font-semibold text-accent-text"
++          >
++            ← Queue
++          </Link>
++        }
++      />
++
++      <PortalBody>
++        <div className="grid gap-8 lg:grid-cols-[1.5fr_1fr]">
++          <div className="flex flex-col gap-6">
++            <section className="rounded-md border border-line bg-white p-6">
++              <h2 className="font-display text-lg">Upload a proof</h2>
++              <p className="mb-5 mt-1 text-[13px] text-ink-muted">
++                Each upload becomes a new version. Nothing is overwritten.
++              </p>
++              <UploadProofForm orderId={order.id} />
++            </section>
++
++            {current && canProofread && current.status === "awaiting_proofreading" && (
++              <section className="rounded-md border border-line bg-white p-6">
++                <h2 className="font-display text-lg">Proofread version {current.versionNumber}</h2>
++                <p className="mb-5 mt-1 text-[13px] text-ink-muted">
++                  Check it, then either send it on or return it.
++                </p>
++                <ProofreaderActions orderId={order.id} />
++              </section>
++            )}
++
++            {comments.length > 0 && (
++              <section className="overflow-hidden rounded-md border border-line bg-white">
++                <div className="border-b border-line-soft px-6 py-4">
++                  <h2 className="font-display text-lg">
++                    What the customer marked on version{" "}
++                    {commentedOn?.versionNumber} ({comments.length})
++                  </h2>
++                </div>
++                <ul>
++                  {comments.map((comment) => (
++                    <li
++                      key={comment.id}
++                      className="flex gap-3 border-b border-line-soft px-6 py-4 last:border-b-0"
++                    >
++                      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-brand text-[11px] font-bold text-on-accent">
++                        {comment.pinNumber}
++                      </span>
++                      <div className="flex flex-col gap-0.5">
++                        <p className="text-[14px] leading-relaxed">
++                          {comment.body}
++                        </p>
++                        <span className="text-[12px] text-ink-quiet">
++                          {comment.authorName ?? "Customer"}
++                        </span>
++                      </div>
++                    </li>
++                  ))}
++                </ul>
++              </section>
++            )}
++
++            <section className="overflow-hidden rounded-md border border-line bg-white">
++              <div className="border-b border-line-soft px-6 py-4">
++                <h2 className="font-display text-lg">
++                  Version history ({versions.length})
++                </h2>
++              </div>
++
++              {versions.length === 0 ? (
++                <p className="px-6 py-5 text-sm text-ink-muted">
++                  Nothing uploaded yet.
++                </p>
++              ) : (
++                <ul>
++                  {versions.map((version) => (
++                    <li
++                      key={version.id}
++                      className="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft px-6 py-4 last:border-b-0"
++                    >
++                      <div className="flex flex-col gap-1">
++                        <span className="text-sm font-semibold">
++                          Version {version.versionNumber}
++                          {version.fileName ? ` · ${version.fileName}` : ""}
++                        </span>
++                        <span className="text-xs text-ink-quiet">
++                          {version.uploadedBy ?? "Someone"} ·{" "}
++                          {dateFormat.format(version.createdAt)}
++                        </span>
++                        {version.proofreaderNotes && (
++                          <span className="mt-1 max-w-[60ch] rounded-[4px] bg-pending-tint px-3 py-2 text-[12px] leading-relaxed text-pending-deep">
++                            Returned: {version.proofreaderNotes}
++                          </span>
++                        )}
++                      </div>
++
++                      <StatusPill
++                        tone={PROOF_LABEL[version.status]?.tone ?? "neutral"}
++                      >
++                        {PROOF_LABEL[version.status]?.label ?? version.status}
++                      </StatusPill>
++                    </li>
++                  ))}
++                </ul>
++              )}
++            </section>
++          </div>
++
++          <aside className="flex h-fit flex-col gap-6">
++            <section className="rounded-md border border-line bg-white p-6">
++              <h2 className="font-display text-lg">Order</h2>
++              <dl className="mt-3 flex flex-col gap-2 text-[13px]">
++                <div className="flex justify-between gap-4">
++                  <dt className="text-ink-muted">Customer</dt>
++                  <dd className="text-right font-semibold">
++                    {order.customerName}
++                  </dd>
++                </div>
++                <div className="flex justify-between gap-4">
++                  <dt className="text-ink-muted">Total</dt>
++                  <dd className="font-semibold">
++                    {order.totalMinor !== null
++                      ? formatMoney(order.totalMinor, order.currency)
++                      : "—"}
++                  </dd>
++                </div>
++                <div className="flex justify-between gap-4">
++                  <dt className="text-ink-muted">Payment</dt>
++                  <dd>
++                    <StatusPill
++                      tone={PAYMENT[order.paymentStatus]?.tone ?? "neutral"}
++                    >
++                      {PAYMENT[order.paymentStatus]?.label ??
++                        order.paymentStatus}
++                    </StatusPill>
++                  </dd>
++                </div>
++              </dl>
++
++              {currentFileUrl && (
++                <a
++                  href={currentFileUrl}
++                  className="mt-4 inline-flex text-[13px] font-semibold text-accent-text"
++                >
++                  Open the current proof
++                </a>
++              )}
++            </section>
++
++            <section className="rounded-md border border-line bg-white p-6">
++              <h2 className="font-display text-lg">Assignment</h2>
++              <div className="mt-4">
++                {canProofread ? (
++                  <AssignDesignerForm
++                    orderId={order.id}
++                    designers={designers}
++                    currentDesignerId={order.assignedDesignerId}
++                  />
++                ) : (
++                  <p className="text-[13px] text-ink-muted">
++                    {designers.find((d) => d.id === order.assignedDesignerId)
++                      ?.name ?? "Unassigned"}
++                    . Only a proofreader or admin can change this.
++                  </p>
++                )}
++              </div>
++            </section>
++
++            {activity.length > 0 && (
++              <section className="rounded-md border border-line bg-white p-6">
++                <h2 className="font-display text-lg">Recent activity</h2>
++                <ul className="mt-3 flex flex-col gap-3">
++                  {activity.map((event) => (
++                    <li key={event.id} className="flex flex-col gap-0.5">
++                      <span className="text-[13px] leading-relaxed">
++                        {event.summary}
++                      </span>
++                      <span className="text-[11px] text-ink-quiet">
++                        {dateFormat.format(event.createdAt)}
++                      </span>
++                    </li>
++                  ))}
++                </ul>
++              </section>
++            )}
++          </aside>
++        </div>
++      </PortalBody>
++    </>
++  );
++}
+diff --git a/src/app/staff/orders/[orderId]/proof-actions.tsx b/src/app/staff/orders/[orderId]/proof-actions.tsx
+new file mode 100644
+index 0000000..07832b2
+--- /dev/null
++++ b/src/app/staff/orders/[orderId]/proof-actions.tsx
+@@ -0,0 +1,143 @@
++"use client";
++
++import { useActionState } from "react";
++import {
++  assignDesignerAction,
++  returnProofToDesignerAction,
++  sendProofToCustomerAction,
++  uploadProofAction,
++} from "@/lib/proofs/actions";
++import { emptyFormState } from "@/lib/auth/form-state";
++import { ACCEPT_ATTRIBUTE, MAX_UPLOAD_BYTES } from "@/lib/storage/uploads";
++import { FormMessage, SubmitButton } from "@/components/ui/form";
++
++export function UploadProofForm({ orderId }: { orderId: string }) {
++  const [state, formAction] = useActionState(uploadProofAction, emptyFormState);
++
++  return (
++    <form action={formAction} className="flex flex-col gap-4">
++      <FormMessage state={state} />
++      <input type="hidden" name="orderId" value={orderId} />
++
++      <label className="flex flex-col gap-2">
++        <span className="text-[13px] font-semibold text-ink-soft">
++          Proof file
++        </span>
++        <input
++          type="file"
++          name="file"
++          accept={ACCEPT_ATTRIBUTE}
++          required
++          className="rounded-[3px] border border-field-line bg-white px-3 py-2.5 text-sm file:mr-3 file:rounded-[2px] file:border-0 file:bg-surface-grey file:px-3 file:py-1.5 file:text-[13px] file:font-semibold"
++        />
++        <span className="text-[12px] text-ink-quiet">
++          PDF, JPEG, PNG or WebP, up to{" "}
++          {Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))}MB. Each upload becomes
++          a new version.
++        </span>
++      </label>
++
++      <SubmitButton className="self-start" pendingLabel="Uploading…">
++        Upload proof
++      </SubmitButton>
++    </form>
++  );
++}
++
++export function ProofreaderActions({ orderId }: { orderId: string }) {
++  const [sendState, sendAction] = useActionState(
++    sendProofToCustomerAction,
++    emptyFormState,
++  );
++  const [returnState, returnAction] = useActionState(
++    returnProofToDesignerAction,
++    emptyFormState,
++  );
++
++  return (
++    <div className="flex flex-col gap-6">
++      <form action={sendAction} className="flex flex-col gap-3">
++        <FormMessage state={sendState} />
++        <input type="hidden" name="orderId" value={orderId} />
++        <SubmitButton className="self-start" pendingLabel="Sending…">
++          Approve and send to the customer
++        </SubmitButton>
++      </form>
++
++      <form
++        action={returnAction}
++        className="flex flex-col gap-3 border-t border-line-soft pt-6"
++      >
++        <FormMessage state={returnState} />
++        <input type="hidden" name="orderId" value={orderId} />
++
++        <label className="flex flex-col gap-2">
++          <span className="text-[13px] font-semibold text-ink-soft">
++            Or return it to the designer, with notes
++          </span>
++          <textarea
++            name="notes"
++            rows={3}
++            required
++            placeholder="The date on page 2 reads 14th, it should be 4th."
++            className="w-full rounded-[3px] border border-field-line bg-white px-3 py-2.5 font-sans text-sm"
++          />
++        </label>
++
++        <SubmitButton
++          className="self-start"
++          variant="secondary"
++          pendingLabel="Returning…"
++        >
++          Return to designer
++        </SubmitButton>
++      </form>
++    </div>
++  );
++}
++
++export function AssignDesignerForm({
++  orderId,
++  designers,
++  currentDesignerId,
++}: {
++  orderId: string;
++  designers: { id: string; name: string }[];
++  currentDesignerId: string | null;
++}) {
++  const [state, formAction] = useActionState(
++    assignDesignerAction,
++    emptyFormState,
++  );
++
++  return (
++    <form action={formAction} className="flex flex-col gap-3">
++      <FormMessage state={state} />
++      <input type="hidden" name="orderId" value={orderId} />
++
++      <label className="flex flex-col gap-2">
++        <span className="text-[13px] font-semibold text-ink-soft">Designer</span>
++        <select
++          name="designerId"
++          defaultValue={currentDesignerId ?? ""}
++          className="rounded-[3px] border border-field-line bg-white px-3 py-2.5 text-sm"
++        >
++          <option value="">Unassigned</option>
++          {designers.map((designer) => (
++            <option key={designer.id} value={designer.id}>
++              {designer.name}
++            </option>
++          ))}
++        </select>
++      </label>
++
++      <SubmitButton
++        className="self-start"
++        variant="secondary"
++        pendingLabel="Saving…"
++      >
++        Save assignment
++      </SubmitButton>
++    </form>
++  );
++}
+diff --git a/src/app/staff/page.tsx b/src/app/staff/page.tsx
+index c6b6bd5..d3411aa 100644
+--- a/src/app/staff/page.tsx
++++ b/src/app/staff/page.tsx
+@@ -1,22 +1,219 @@
++import Link from "next/link";
++import { and, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
++import { db } from "@/db";
++import { activityEvents, orders, proofVersions, users } from "@/db/schema";
+ import { requireStaff } from "@/lib/auth/guards";
++import { loadQueue } from "@/lib/proofs/staff-queries";
++import { groupFor } from "@/lib/proofs/queue";
+ import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
++import {
++  TurnaroundSparkline,
++  type TurnaroundPoint,
++} from "@/components/proofs/turnaround-sparkline";
++
++const dateFormat = new Intl.DateTimeFormat("en-GB", {
++  day: "numeric",
++  month: "short",
++  hour: "2-digit",
++  minute: "2-digit",
++});
++
++/** Average days from a proof reaching the customer to their decision. */
++async function turnaroundByWeek(): Promise<TurnaroundPoint[]> {
++  const eightWeeksAgo = new Date(Date.now() - 8 * 7 * 86_400_000);
++
++  const rows = await db
++    .select({
++      week: sql<string>`to_char(date_trunc('week', ${proofVersions.customerDecisionAt}), 'DD Mon')`,
++      weekStart: sql<string>`date_trunc('week', ${proofVersions.customerDecisionAt})`,
++      avgDays: sql<number>`avg(
++        extract(epoch from (${proofVersions.customerDecisionAt} - ${proofVersions.sentToCustomerAt})) / 86400
++      )::float`,
++    })
++    .from(proofVersions)
++    .where(
++      and(
++        isNotNull(proofVersions.customerDecisionAt),
++        isNotNull(proofVersions.sentToCustomerAt),
++        gte(proofVersions.customerDecisionAt, eightWeeksAgo),
++      ),
++    )
++    .groupBy(sql`date_trunc('week', ${proofVersions.customerDecisionAt})`)
++    .orderBy(sql`date_trunc('week', ${proofVersions.customerDecisionAt})`);
++
++  return rows.map((row) => ({
++    label: row.week,
++    days: row.avgDays === null ? null : Number(row.avgDays),
++  }));
++}
+ 
+ export default async function StaffDashboardPage() {
+   const session = await requireStaff();
++  const viewer = {
++    id: session.user.id,
++    role: session.user.role as "designer" | "proofreader",
++  };
++
++  const [items, workload, activity, approvedThisMonth, turnaround] =
++    await Promise.all([
++      loadQueue(),
++      db
++        .select({
++          designerId: users.id,
++          name: users.name,
++          open: sql<number>`count(${orders.id})::int`,
++        })
++        .from(users)
++        .leftJoin(
++          orders,
++          and(
++            eq(orders.assignedDesignerId, users.id),
++            sql`${orders.status} not in ('delivered', 'shipped', 'cancelled')`,
++          ),
++        )
++        .where(eq(users.role, "designer"))
++        .groupBy(users.id, users.name)
++        .orderBy(desc(sql`count(${orders.id})`)),
++      db
++        .select({
++          id: activityEvents.id,
++          summary: activityEvents.summary,
++          createdAt: activityEvents.createdAt,
++        })
++        .from(activityEvents)
++        .orderBy(desc(activityEvents.createdAt))
++        .limit(8),
++      db
++        .select({ count: sql<number>`count(*)::int` })
++        .from(proofVersions)
++        .where(
++          and(
++            eq(proofVersions.status, "approved"),
++            gte(
++              proofVersions.customerDecisionAt,
++              new Date(new Date().getFullYear(), new Date().getMonth(), 1),
++            ),
++          ),
++        ),
++      turnaroundByWeek(),
++    ]);
++
++  const counts = {
++    awaitingProofreading: items.filter(
++      (item) => item.proofStatus === "awaiting_proofreading",
++    ).length,
++    awaitingCustomer: items.filter(
++      (item) => item.proofStatus === "awaiting_customer",
++    ).length,
++    returned: items.filter(
++      (item) => item.proofStatus === "returned_to_designer",
++    ).length,
++    changesRequested: items.filter(
++      (item) => item.proofStatus === "changes_requested",
++    ).length,
++    approvedThisMonth: approvedThisMonth[0]?.count ?? 0,
++  };
++
++  const yours = items.filter(
++    (item) => groupFor({ ...item }, viewer) === "awaiting_you",
++  ).length;
++
++  const tiles = [
++    { label: "Waiting on you", value: yours, href: "/staff/queue" },
++    { label: "Needs proofreading", value: counts.awaitingProofreading },
++    { label: "With the customer", value: counts.awaitingCustomer },
++    { label: "Returned to designer", value: counts.returned },
++    { label: "Changes requested", value: counts.changesRequested },
++    { label: "Approved this month", value: counts.approvedThisMonth },
++  ];
++
++  const busiest = Math.max(1, ...workload.map((row) => row.open));
+ 
+   return (
+     <>
+-      <PortalHeader title="Studio dashboard" />
++      <PortalHeader
++        title="Studio dashboard"
++        actions={
++          <Link
++            href="/staff/queue"
++            className="text-[13px] font-semibold text-accent-text"
++          >
++            Open the queue →
++          </Link>
++        }
++      />
++
+       <PortalBody>
+-        <div className="rounded-md border border-line bg-white p-8">
+-          <h2 className="text-lg">
+-            Signed in as {session.user.role === "proofreader" ? "a proofreader" : "a designer"}
+-          </h2>
+-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-muted">
+-            The work queue, proof uploads and proofreading actions arrive in the
+-            next build. The role gate is live: designers and proofreaders reach
+-            this area, customers don&rsquo;t.
+-          </p>
++        <div className="flex flex-col gap-7">
++          <div className="grid gap-[18px] sm:grid-cols-3 lg:grid-cols-6">
++            {tiles.map((tile) => (
++              <div
++                key={tile.label}
++                className="flex flex-col gap-1.5 rounded-md border border-line bg-white p-5"
++              >
++                <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-quiet">
++                  {tile.label}
++                </span>
++                <span className="font-display text-[27px]">{tile.value}</span>
++              </div>
++            ))}
++          </div>
++
++          <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
++            <section className="rounded-md border border-line bg-white p-6">
++              <TurnaroundSparkline points={turnaround} />
++            </section>
++
++            <section className="rounded-md border border-line bg-white p-6">
++              <h2 className="font-display text-[15px]">Designer workload</h2>
++              <ul className="mt-4 flex flex-col gap-3.5">
++                {workload.map((row) => (
++                  <li key={row.designerId} className="flex flex-col gap-1.5">
++                    <div className="flex justify-between text-[13px]">
++                      <span>{row.name}</span>
++                      <span className="font-semibold">{row.open} open</span>
++                    </div>
++                    <div className="h-[7px] w-full overflow-hidden rounded-full bg-surface-grey">
++                      <div
++                        className="h-full rounded-full bg-brand"
++                        style={{ width: `${(row.open / busiest) * 100}%` }}
++                      />
++                    </div>
++                  </li>
++                ))}
++                {workload.length === 0 && (
++                  <li className="text-[13px] text-ink-muted">
++                    No designers set up yet.
++                  </li>
++                )}
++              </ul>
++            </section>
++          </div>
++
++          <section className="overflow-hidden rounded-md border border-line bg-white">
++            <div className="border-b border-line-soft px-6 py-4">
++              <h2 className="font-display text-[15px]">Recent activity</h2>
++            </div>
++            {activity.length === 0 ? (
++              <p className="px-6 py-5 text-sm text-ink-muted">
++                Nothing has happened yet.
++              </p>
++            ) : (
++              <ul>
++                {activity.map((event) => (
++                  <li
++                    key={event.id}
++                    className="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft px-6 py-3.5 last:border-b-0"
++                  >
++                    <span className="text-[13px]">{event.summary}</span>
++                    <span className="text-[11px] text-ink-quiet">
++                      {dateFormat.format(event.createdAt)}
++                    </span>
++                  </li>
++                ))}
++              </ul>
++            )}
++          </section>
+         </div>
+       </PortalBody>
+     </>
+diff --git a/src/app/staff/queue/page.tsx b/src/app/staff/queue/page.tsx
+new file mode 100644
+index 0000000..c25946f
+--- /dev/null
++++ b/src/app/staff/queue/page.tsx
+@@ -0,0 +1,101 @@
++import Link from "next/link";
++import { requireStaff } from "@/lib/auth/guards";
++import { loadQueue } from "@/lib/proofs/staff-queries";
++import { GROUP_LABEL, sortQueue } from "@/lib/proofs/queue";
++import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
++import { StatusPill, type PillTone } from "@/components/portal/status-pill";
++
++const PROOF_LABEL: Record<string, { label: string; tone: PillTone }> = {
++  awaiting_proofreading: { label: "Needs proofreading", tone: "pending" },
++  returned_to_designer: { label: "Returned to designer", tone: "alert" },
++  awaiting_customer: { label: "With the customer", tone: "neutral" },
++  approved: { label: "Approved", tone: "good" },
++  changes_requested: { label: "Changes requested", tone: "alert" },
++};
++
++function waitedFor(since: Date): string {
++  const days = Math.floor((Date.now() - since.getTime()) / 86_400_000);
++  if (days <= 0) return "today";
++  if (days === 1) return "1 day";
++  return `${days} days`;
++}
++
++export default async function StaffQueuePage() {
++  const session = await requireStaff();
++  const items = await loadQueue();
++
++  const groups = sortQueue(
++    items.map((item) => ({ ...item, waitingSince: item.waitingSince })),
++    { id: session.user.id, role: session.user.role as "designer" | "proofreader" },
++  );
++
++  return (
++    <>
++      <PortalHeader title="Work queue" />
++      <PortalBody>
++        {groups.length === 0 ? (
++          <div className="rounded-md border border-line bg-white p-10 text-center">
++            <h2 className="font-display text-lg">Nothing in the queue</h2>
++            <p className="mt-2 text-sm text-ink-muted">
++              Every order is either delivered or cancelled.
++            </p>
++          </div>
++        ) : (
++          <div className="flex flex-col gap-8">
++            {groups.map((group) => (
++              <section key={group.group} className="flex flex-col gap-3">
++                <h2 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-ink-quiet">
++                  {GROUP_LABEL[group.group]} ({group.items.length})
++                </h2>
++
++                <div className="overflow-hidden rounded-md border border-line bg-white">
++                  <ul>
++                    {group.items.map((item) => {
++                      const proof = item.proofStatus
++                        ? PROOF_LABEL[item.proofStatus]
++                        : { label: "No proof yet", tone: "pending" as PillTone };
++
++                      return (
++                        <li
++                          key={item.orderId}
++                          className="flex flex-wrap items-center justify-between gap-4 border-b border-line-soft px-6 py-4 last:border-b-0"
++                        >
++                          <div className="flex min-w-0 flex-col gap-1">
++                            <Link
++                              href={`/staff/orders/${item.orderId}`}
++                              className="text-sm font-semibold hover:underline"
++                            >
++                              {item.reference}
++                            </Link>
++                            <span className="text-xs text-ink-quiet">
++                              {item.customerName}
++                              {item.designerName
++                                ? ` · ${item.designerName}`
++                                : " · unassigned"}
++                              {item.versionNumber
++                                ? ` · v${item.versionNumber}`
++                                : ""}
++                            </span>
++                          </div>
++
++                          <div className="flex items-center gap-4">
++                            <span className="text-xs text-ink-quiet">
++                              waiting {waitedFor(item.waitingSince)}
++                            </span>
++                            <StatusPill tone={proof.tone}>
++                              {proof.label}
++                            </StatusPill>
++                          </div>
++                        </li>
++                      );
++                    })}
++                  </ul>
++                </div>
++              </section>
++            ))}
++          </div>
++        )}
++      </PortalBody>
++    </>
++  );
++}
+diff --git a/src/components/portal/icons.tsx b/src/components/portal/icons.tsx
+index dc5fb3e..3303178 100644
+--- a/src/components/portal/icons.tsx
++++ b/src/components/portal/icons.tsx
+@@ -109,3 +109,10 @@ export const FileIcon = () => (
+     <polyline points="14 2 14 8 20 8" />
+   </Icon>
+ );
++
++export const BellIcon = () => (
++  <Icon>
++    <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
++    <path d="M13.7 21a2 2 0 0 1-3.4 0" />
++  </Icon>
++);
+diff --git a/src/components/portal/notification-bell.tsx b/src/components/portal/notification-bell.tsx
+new file mode 100644
+index 0000000..733fb0f
+--- /dev/null
++++ b/src/components/portal/notification-bell.tsx
+@@ -0,0 +1,161 @@
++"use client";
++
++import Link from "next/link";
++import { useEffect, useRef, useState, useTransition } from "react";
++import { BellIcon } from "./icons";
++import type { NotificationRow } from "@/lib/notifications/types";
++
++const dateFormat = new Intl.DateTimeFormat("en-GB", {
++  day: "numeric",
++  month: "short",
++  hour: "2-digit",
++  minute: "2-digit",
++});
++
++/**
++ * Sits in the sidebar so it follows the customer around the portal.
++ *
++ * Opening the panel is what marks things read — the count is about what they
++ * have looked at, not about clicking a particular line. The badge clears
++ * straight away rather than waiting for the server, because the round trip is
++ * only bookkeeping.
++ */
++export function NotificationBell({
++  items,
++  unreadCount,
++  markRead,
++}: {
++  items: NotificationRow[];
++  unreadCount: number;
++  markRead: () => Promise<void>;
++}) {
++  const [open, setOpen] = useState(false);
++  const [seen, setSeen] = useState(false);
++  const [, startTransition] = useTransition();
++  const containerRef = useRef<HTMLDivElement>(null);
++
++  const badge = seen ? 0 : unreadCount;
++
++  useEffect(() => {
++    if (!open) return;
++
++    function onPointerDown(event: MouseEvent) {
++      if (!containerRef.current?.contains(event.target as Node)) {
++        setOpen(false);
++      }
++    }
++    function onKeyDown(event: KeyboardEvent) {
++      if (event.key === "Escape") setOpen(false);
++    }
++
++    document.addEventListener("mousedown", onPointerDown);
++    document.addEventListener("keydown", onKeyDown);
++    return () => {
++      document.removeEventListener("mousedown", onPointerDown);
++      document.removeEventListener("keydown", onKeyDown);
++    };
++  }, [open]);
++
++  function toggle() {
++    const next = !open;
++    setOpen(next);
++
++    if (next && unreadCount > 0 && !seen) {
++      setSeen(true);
++      startTransition(async () => {
++        await markRead();
++      });
++    }
++  }
++
++  return (
++    <div ref={containerRef} className="relative">
++      <button
++        type="button"
++        onClick={toggle}
++        aria-expanded={open}
++        aria-haspopup="dialog"
++        aria-label={
++          badge > 0
++            ? `Notifications, ${badge} unread`
++            : "Notifications, none unread"
++        }
++        className="flex w-full items-center gap-3 rounded px-3.5 py-2.5 text-sm font-medium text-white/70 transition-colors hover:bg-white/5 hover:text-white"
++      >
++        <span className="relative flex">
++          <BellIcon />
++          {badge > 0 && (
++            <span className="absolute -right-1.5 -top-1.5 size-2 rounded-full bg-brand-on-dark" />
++          )}
++        </span>
++        <span className="flex-1 text-left">Notifications</span>
++        {badge > 0 && (
++          <span className="rounded-full bg-brand-on-dark px-1.5 py-0.5 text-[10px] font-bold text-blue-deep">
++            {badge}
++          </span>
++        )}
++      </button>
++
++      {open && (
++        <div
++          role="dialog"
++          aria-label="Notifications"
++          className="absolute left-0 top-full z-30 mt-1.5 w-[290px] overflow-hidden rounded-md border border-line bg-white shadow-lg"
++        >
++          {items.length === 0 ? (
++            <p className="px-4 py-5 text-[13px] text-ink-muted">
++              Nothing yet. We&rsquo;ll let you know when your proof is ready.
++            </p>
++          ) : (
++            <ul className="max-h-[340px] overflow-y-auto">
++              {items.map((item) => {
++                const inner = (
++                  <span className="flex items-start gap-2">
++                    {item.isUnread && (
++                      <span
++                        aria-hidden="true"
++                        className="mt-1.5 size-1.5 shrink-0 rounded-full bg-brand-deep"
++                      />
++                    )}
++                    <span className="flex flex-col gap-0.5">
++                      <span className="text-[13px] font-semibold leading-snug">
++                        {item.title}
++                      </span>
++                      {item.body && (
++                        <span className="text-[12px] leading-relaxed text-ink-muted">
++                          {item.body}
++                        </span>
++                      )}
++                      <span className="text-[11px] text-ink-quiet">
++                        {dateFormat.format(new Date(item.createdAt))}
++                      </span>
++                    </span>
++                  </span>
++                );
++
++                return (
++                  <li
++                    key={item.id}
++                    className="border-b border-line-soft last:border-b-0"
++                  >
++                    {item.linkUrl ? (
++                      <Link
++                        href={item.linkUrl}
++                        onClick={() => setOpen(false)}
++                        className="block px-4 py-3 hover:bg-surface-grey"
++                      >
++                        {inner}
++                      </Link>
++                    ) : (
++                      <div className="px-4 py-3">{inner}</div>
++                    )}
++                  </li>
++                );
++              })}
++            </ul>
++          )}
++        </div>
++      )}
++    </div>
++  );
++}
+diff --git a/src/components/portal/portal-shell.tsx b/src/components/portal/portal-shell.tsx
+index d1ee8db..e1317b8 100644
+--- a/src/components/portal/portal-shell.tsx
++++ b/src/components/portal/portal-shell.tsx
+@@ -33,12 +33,15 @@ export function PortalShell({
+   nav,
+   user,
+   logout,
++  bell,
+   children,
+ }: {
+   variant: Variant;
+   nav: NavItem[];
+   user: { name: string; roleLabel: string };
+   logout: ReactNode;
++  /** Optional notification bell, rendered under the nav. */
++  bell?: ReactNode;
+   children: ReactNode;
+ }) {
+   const badge = BADGE[variant];
+@@ -63,7 +66,10 @@ export function PortalShell({
+             </span>
+           </div>
+ 
+-          <PortalNav items={nav} />
++          <div className="flex flex-col gap-0.5">
++            <PortalNav items={nav} />
++            {bell}
++          </div>
+         </div>
+ 
+         <div className="flex flex-col gap-3 px-1.5">
+diff --git a/src/components/proofs/proof-canvas.tsx b/src/components/proofs/proof-canvas.tsx
+new file mode 100644
+index 0000000..d8f04f1
+--- /dev/null
++++ b/src/components/proofs/proof-canvas.tsx
+@@ -0,0 +1,194 @@
++"use client";
++
++import { useEffect, useRef, useState } from "react";
++import { pinFromClick, type Pin } from "@/lib/proofs/pins";
++
++export type ProofComment = {
++  id: string;
++  body: string;
++  xPct: number;
++  yPct: number;
++  pinNumber: number;
++  authorName: string;
++  isMine: boolean;
++};
++
++/**
++ * The proof itself, with comments pinned to it.
++ *
++ * A PDF is rendered in the browser rather than converted on the server, so
++ * there's one stored file and the artwork the customer marks up is the
++ * artwork the studio sent. Pins sit in a layer over the top, positioned as
++ * percentages, so they hold wherever the page is resized.
++ */
++export function ProofCanvas({
++  fileUrl,
++  isPdf,
++  comments,
++  readOnly,
++  pending,
++  onPlace,
++  activeCommentId,
++  onSelectComment,
++}: {
++  fileUrl: string;
++  isPdf: boolean;
++  comments: ProofComment[];
++  readOnly: boolean;
++  pending: Pin | null;
++  onPlace: (pin: Pin | null) => void;
++  activeCommentId: string | null;
++  onSelectComment: (id: string | null) => void;
++}) {
++  const surfaceRef = useRef<HTMLDivElement>(null);
++  const canvasRef = useRef<HTMLCanvasElement>(null);
++  const [pdfError, setPdfError] = useState<string | null>(null);
++  const [loaded, setLoaded] = useState(!isPdf);
++
++  /** Renders the first page of a PDF onto the canvas. */
++  useEffect(() => {
++    if (!isPdf) return;
++
++    let cancelled = false;
++
++    (async () => {
++      try {
++        // Must run before pdf.js is evaluated — it reaches for these on load.
++        const { installMapUpsertPolyfill } = await import(
++          "@/lib/proofs/map-upsert-polyfill"
++        );
++        installMapUpsertPolyfill();
++
++        const pdfjs = await import("pdfjs-dist");
++
++        pdfjs.GlobalWorkerOptions.workerSrc = new URL(
++          "pdfjs-dist/build/pdf.worker.min.mjs",
++          import.meta.url,
++        ).toString();
++
++        const document = await pdfjs.getDocument({ url: fileUrl }).promise;
++        const page = await document.getPage(1);
++
++        if (cancelled) return;
++
++        const canvas = canvasRef.current;
++        if (!canvas) return;
++
++        // Render at twice the display width so the artwork stays sharp when
++        // someone leans in to check a date or a spelling.
++        const target = (surfaceRef.current?.clientWidth ?? 900) * 2;
++        const base = page.getViewport({ scale: 1 });
++        const viewport = page.getViewport({ scale: target / base.width });
++
++        canvas.width = viewport.width;
++        canvas.height = viewport.height;
++
++        const context = canvas.getContext("2d");
++        if (!context) return;
++
++        await page.render({ canvas, canvasContext: context, viewport }).promise;
++
++        if (!cancelled) setLoaded(true);
++      } catch (error) {
++        console.error("[proof] could not render pdf", error);
++        if (!cancelled) {
++          setPdfError(
++            "We couldn't display this proof here. Download it to view it.",
++          );
++        }
++      }
++    })();
++
++    return () => {
++      cancelled = true;
++    };
++  }, [fileUrl, isPdf]);
++
++  function handleClick(event: React.MouseEvent<HTMLDivElement>) {
++    if (readOnly) return;
++
++    const rect = event.currentTarget.getBoundingClientRect();
++    const pin = pinFromClick(
++      { clientX: event.clientX, clientY: event.clientY },
++      rect,
++    );
++
++    if (pin) {
++      onSelectComment(null);
++      onPlace(pin);
++    }
++  }
++
++  return (
++    <div className="flex flex-col gap-3">
++      <div
++        ref={surfaceRef}
++        onClick={handleClick}
++        className={`relative overflow-hidden rounded-md border border-line bg-white ${
++          readOnly ? "" : "cursor-crosshair"
++        }`}
++      >
++        {isPdf ? (
++          <>
++            <canvas ref={canvasRef} className="block w-full" />
++            {!loaded && !pdfError && (
++              <p className="p-16 text-center text-sm text-ink-muted">
++                Opening your proof…
++              </p>
++            )}
++            {pdfError && (
++              <p className="p-16 text-center text-sm text-alert">{pdfError}</p>
++            )}
++          </>
++        ) : (
++          /* eslint-disable-next-line @next/next/no-img-element */
++          <img
++            src={fileUrl}
++            alt="Your proof"
++            className="block w-full"
++            onLoad={() => setLoaded(true)}
++          />
++        )}
++
++        {/* Existing comments */}
++        {comments.map((comment) => (
++          <button
++            key={comment.id}
++            type="button"
++            onClick={(event) => {
++              event.stopPropagation();
++              onSelectComment(
++                activeCommentId === comment.id ? null : comment.id,
++              );
++            }}
++            style={{ left: `${comment.xPct}%`, top: `${comment.yPct}%` }}
++            aria-label={`Comment ${comment.pinNumber}: ${comment.body}`}
++            className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white text-[12px] font-bold shadow-sm transition-transform ${
++              activeCommentId === comment.id
++                ? "z-20 scale-110 bg-blue text-white"
++                : "z-10 bg-brand text-on-accent hover:scale-110"
++            } flex size-7 items-center justify-center`}
++          >
++            {comment.pinNumber}
++          </button>
++        ))}
++
++        {/* The pin being placed right now */}
++        {pending && (
++          <span
++            style={{ left: `${pending.xPct}%`, top: `${pending.yPct}%` }}
++            className="absolute z-20 flex size-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-blue text-[12px] font-bold text-white shadow-sm"
++          >
++            +
++          </span>
++        )}
++      </div>
++
++      {!readOnly && (
++        <p className="text-[13px] text-ink-muted">
++          Click anywhere on the proof to leave a comment at that spot.
++        </p>
++      )}
++    </div>
++  );
++}
+diff --git a/src/components/proofs/proof-reviewer.tsx b/src/components/proofs/proof-reviewer.tsx
+new file mode 100644
+index 0000000..459c961
+--- /dev/null
++++ b/src/components/proofs/proof-reviewer.tsx
+@@ -0,0 +1,244 @@
++"use client";
++
++import { useState, useTransition } from "react";
++import type { Pin } from "@/lib/proofs/pins";
++import {
++  addProofCommentAction,
++  decideProofAction,
++  deleteProofCommentAction,
++} from "@/lib/proofs/actions";
++import { emptyFormState, type FormState } from "@/lib/auth/form-state";
++import { FormMessage } from "@/components/ui/form";
++import { ProofCanvas, type ProofComment } from "./proof-canvas";
++
++export function ProofReviewer({
++  proofVersionId,
++  fileUrl,
++  downloadUrl,
++  isPdf,
++  comments,
++  status,
++  versionNumber,
++}: {
++  proofVersionId: string;
++  fileUrl: string;
++  downloadUrl: string;
++  isPdf: boolean;
++  comments: ProofComment[];
++  status: string;
++  versionNumber: number;
++}) {
++  const [pending, setPending] = useState<Pin | null>(null);
++  const [draft, setDraft] = useState("");
++  const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
++  const [state, setState] = useState<FormState>(emptyFormState);
++  const [busy, startTransition] = useTransition();
++
++  const decided = status === "approved" || status === "changes_requested";
++  const readOnly = decided;
++
++  function submitComment() {
++    if (!pending || !draft.trim()) return;
++
++    const formData = new FormData();
++    formData.set("proofVersionId", proofVersionId);
++    formData.set("body", draft);
++    formData.set("xPct", String(pending.xPct));
++    formData.set("yPct", String(pending.yPct));
++
++    startTransition(async () => {
++      const result = await addProofCommentAction(emptyFormState, formData);
++      setState(result);
++      if (result.ok) {
++        setPending(null);
++        setDraft("");
++      }
++    });
++  }
++
++  function decide(decision: "approve" | "changes") {
++    const formData = new FormData();
++    formData.set("proofVersionId", proofVersionId);
++    formData.set("decision", decision);
++
++    startTransition(async () => {
++      setState(await decideProofAction(emptyFormState, formData));
++    });
++  }
++
++  return (
++    <div className="grid gap-8 lg:grid-cols-[1.7fr_1fr]">
++      <ProofCanvas
++        fileUrl={fileUrl}
++        isPdf={isPdf}
++        comments={comments}
++        readOnly={readOnly}
++        pending={pending}
++        onPlace={setPending}
++        activeCommentId={activeCommentId}
++        onSelectComment={setActiveCommentId}
++      />
++
++      <aside className="flex h-fit flex-col gap-5">
++        <div className="flex flex-col gap-2 rounded-md border border-line bg-white p-6">
++          <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-text">
++            Version {versionNumber}
++          </span>
++          <h2 className="font-display text-lg">
++            {status === "approved"
++              ? "You approved this proof"
++              : status === "changes_requested"
++                ? "Changes requested"
++                : "Your proof is ready"}
++          </h2>
++          <p className="text-[14px] leading-relaxed text-ink-muted">
++            {decided
++              ? status === "approved"
++                ? "Nothing more to do — we've started printing."
++                : "The studio has your comments and will send a new version."
++              : "Check the wording, the dates and the spellings. Click anywhere on the proof to point at something."}
++          </p>
++          <a
++            href={downloadUrl}
++            className="mt-1 w-fit text-[13px] font-semibold text-accent-text"
++          >
++            Download the file
++          </a>
++        </div>
++
++        <FormMessage state={state} />
++
++        {/* Writing a comment */}
++        {pending && !readOnly && (
++          <div className="flex flex-col gap-3 rounded-md border border-blue/30 bg-blue-tint p-5">
++            <h3 className="text-[13px] font-semibold text-ink-soft">
++              What should change here?
++            </h3>
++            <textarea
++              value={draft}
++              onChange={(event) => setDraft(event.target.value)}
++              rows={3}
++              autoFocus
++              placeholder="The middle initial should be J, not T."
++              className="w-full rounded-[3px] border border-field-line bg-white px-3 py-2.5 font-sans text-sm"
++            />
++            <div className="flex gap-2">
++              <button
++                type="button"
++                onClick={submitComment}
++                disabled={busy || !draft.trim()}
++                className="rounded-[2px] bg-brand px-5 py-2.5 text-[13px] font-semibold text-on-accent disabled:opacity-60"
++              >
++                {busy ? "Adding…" : "Add comment"}
++              </button>
++              <button
++                type="button"
++                onClick={() => {
++                  setPending(null);
++                  setDraft("");
++                }}
++                className="rounded-[2px] border border-field-line px-5 py-2.5 text-[13px] font-semibold text-ink-muted"
++              >
++                Cancel
++              </button>
++            </div>
++          </div>
++        )}
++
++        {/* The comments so far */}
++        <div className="overflow-hidden rounded-md border border-line bg-white">
++          <div className="border-b border-line-soft px-5 py-4">
++            <h3 className="font-display text-[15px]">
++              Comments ({comments.length})
++            </h3>
++          </div>
++
++          {comments.length === 0 ? (
++            <p className="px-5 py-6 text-[13px] leading-relaxed text-ink-muted">
++              {readOnly
++                ? "No comments were left on this version."
++                : "Nothing marked yet. If everything reads correctly, approve it below."}
++            </p>
++          ) : (
++            <ul>
++              {comments.map((comment) => (
++                <li
++                  key={comment.id}
++                  className={`flex gap-3 border-b border-line-soft px-5 py-4 last:border-b-0 ${
++                    activeCommentId === comment.id ? "bg-blue-tint" : ""
++                  }`}
++                >
++                  <button
++                    type="button"
++                    onClick={() =>
++                      setActiveCommentId(
++                        activeCommentId === comment.id ? null : comment.id,
++                      )
++                    }
++                    className="flex size-6 shrink-0 items-center justify-center rounded-full bg-brand text-[11px] font-bold text-on-accent"
++                    aria-label={`Show comment ${comment.pinNumber} on the proof`}
++                  >
++                    {comment.pinNumber}
++                  </button>
++
++                  <div className="flex min-w-0 flex-col gap-1">
++                    <p className="text-[14px] leading-relaxed">{comment.body}</p>
++                    <span className="text-[12px] text-ink-quiet">
++                      {comment.authorName}
++                    </span>
++
++                    {comment.isMine && !readOnly && (
++                      <form action={deleteProofCommentAction} className="mt-1">
++                        <input
++                          type="hidden"
++                          name="commentId"
++                          value={comment.id}
++                        />
++                        <button
++                          type="submit"
++                          className="text-[12px] font-semibold text-ink-quiet hover:text-alert"
++                        >
++                          Remove
++                        </button>
++                      </form>
++                    )}
++                  </div>
++                </li>
++              ))}
++            </ul>
++          )}
++        </div>
++
++        {/* The decision */}
++        {!decided && (
++          <div className="flex flex-col gap-3 rounded-md border border-line bg-white p-6">
++            <h3 className="font-display text-[15px]">Ready to decide?</h3>
++            <p className="text-[13px] leading-relaxed text-ink-muted">
++              Nothing is printed until you approve. If something isn&rsquo;t
++              right, mark it on the proof and send it back — there&rsquo;s no
++              charge for changes.
++            </p>
++            <div className="mt-1 flex flex-col gap-2.5">
++              <button
++                type="button"
++                onClick={() => decide("approve")}
++                disabled={busy}
++                className="rounded-[2px] bg-brand px-6 py-3.5 text-sm font-semibold text-on-accent hover:bg-brand-deep hover:text-white disabled:opacity-60"
++              >
++                Approve this proof
++              </button>
++              <button
++                type="button"
++                onClick={() => decide("changes")}
++                disabled={busy}
++                className="rounded-[2px] border border-field-line px-6 py-3.5 text-sm font-semibold text-ink-soft hover:bg-surface-grey disabled:opacity-60"
++              >
++                Request changes
++              </button>
++            </div>
++          </div>
++        )}
++      </aside>
++    </div>
++  );
++}
+diff --git a/src/components/proofs/turnaround-sparkline.tsx b/src/components/proofs/turnaround-sparkline.tsx
+new file mode 100644
+index 0000000..c16dda1
+--- /dev/null
++++ b/src/components/proofs/turnaround-sparkline.tsx
+@@ -0,0 +1,134 @@
++/**
++ * Weekly average approval time.
++ *
++ * One series, so no legend — the heading names it. The line uses the deeper
++ * green rather than the brand green, because a 2px mark of #2DBC9A on white
++ * measures 2.39:1 and would be hard to follow; #20846C clears the 3:1 floor
++ * for graphical objects. Only the latest point is labelled, and the same
++ * numbers are available as a table for anyone who can't read the line.
++ */
++export type TurnaroundPoint = {
++  label: string;
++  /** Average days from proof sent to customer decision. */
++  days: number | null;
++};
++
++export function TurnaroundSparkline({
++  points,
++}: {
++  points: TurnaroundPoint[];
++}) {
++  const withData = points.filter(
++    (point): point is { label: string; days: number } => point.days !== null,
++  );
++
++  if (withData.length < 2) {
++    return (
++      <div className="flex flex-col gap-2">
++        <h2 className="font-display text-[15px]">Turnaround, last 8 weeks</h2>
++        <p className="text-[13px] text-ink-muted">
++          Not enough approvals yet to show a trend.
++        </p>
++      </div>
++    );
++  }
++
++  const WIDTH = 520;
++  const HEIGHT = 120;
++  const PAD = 10;
++
++  const values = withData.map((point) => point.days);
++  const max = Math.max(...values);
++  const min = Math.min(...values);
++  const flat = max === min;
++
++  const x = (index: number) =>
++    PAD + (index * (WIDTH - PAD * 2)) / (withData.length - 1);
++  // A run of identical weeks would otherwise sit flat on the baseline and read
++  // as an empty chart. Centre it instead: the figure beside the heading says
++  // what it is.
++  const y = (value: number) =>
++    flat
++      ? HEIGHT / 2
++      : HEIGHT - PAD - ((value - min) / (max - min)) * (HEIGHT - PAD * 2);
++
++  const path = withData
++    .map((point, index) => `${x(index)},${y(point.days)}`)
++    .join(" ");
++
++  const latest = withData.at(-1)!;
++
++  return (
++    <div className="flex flex-col gap-3">
++      <div className="flex items-baseline justify-between gap-4">
++        <h2 className="font-display text-[15px]">Turnaround, last 8 weeks</h2>
++        <span className="text-[13px] text-ink-muted">
++          <strong className="font-semibold text-blue">
++            {latest.days.toFixed(1)} days
++          </strong>{" "}
++          this week
++        </span>
++      </div>
++
++      <svg
++        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
++        className="h-[120px] w-full"
++        role="img"
++        aria-label={`Average approval time by week: ${withData
++          .map((point) => `${point.label}, ${point.days.toFixed(1)} days`)
++          .join("; ")}`}
++      >
++        {/* A single recessive baseline rather than a grid. */}
++        <line
++          x1={PAD}
++          y1={HEIGHT - PAD}
++          x2={WIDTH - PAD}
++          y2={HEIGHT - PAD}
++          stroke="var(--color-line)"
++          strokeWidth="1"
++        />
++        <polyline
++          points={path}
++          fill="none"
++          stroke="var(--color-brand-deep)"
++          strokeWidth="2"
++          strokeLinecap="round"
++          strokeLinejoin="round"
++        />
++        <circle
++          cx={x(withData.length - 1)}
++          cy={y(latest.days)}
++          r="4.5"
++          fill="var(--color-brand-deep)"
++          stroke="var(--color-surface)"
++          strokeWidth="2"
++        />
++      </svg>
++
++      <div className="flex justify-between text-[11px] text-ink-quiet">
++        <span>{withData[0].label}</span>
++        <span>{latest.label}</span>
++      </div>
++
++      <details className="text-[12px] text-ink-quiet">
++        <summary className="cursor-pointer">See the figures</summary>
++        <table className="mt-2 w-full text-left">
++          <thead>
++            <tr>
++              <th className="py-1 font-semibold">Week</th>
++              <th className="py-1 font-semibold">Average days</th>
++            </tr>
++          </thead>
++          <tbody>
++            {withData.map((point) => (
++              <tr key={point.label}>
++                <td className="py-1">{point.label}</td>
++                <td className="py-1">{point.days.toFixed(1)}</td>
++              </tr>
++            ))}
++          </tbody>
++        </table>
++      </details>
++    </div>
++  );
++}
+diff --git a/src/db/schema.ts b/src/db/schema.ts
+index 1c1a47f..ddb78cb 100644
+--- a/src/db/schema.ts
++++ b/src/db/schema.ts
+@@ -391,9 +391,11 @@ export const proofVersions = pgTable(
+       .notNull()
+       .references(() => orders.id, { onDelete: "cascade" }),
+     versionNumber: integer("version_number").notNull(),
+-    fileUrl: text("file_url").notNull(),
++    /** Object key in R2. Never a public URL — reads go through a signed link. */
++    storageKey: text("storage_key").notNull(),
+     fileName: text("file_name"),
+     mimeType: text("mime_type"),
++    sizeBytes: integer("size_bytes"),
+     widthPx: integer("width_px"),
+     heightPx: integer("height_px"),
+ 
+diff --git a/src/db/seed.ts b/src/db/seed.ts
+index 12e4572..34f451f 100644
+--- a/src/db/seed.ts
++++ b/src/db/seed.ts
+@@ -1,4 +1,6 @@
+ import "dotenv/config";
++import { mkdir, writeFile } from "node:fs/promises";
++import path from "node:path";
+ import { hash } from "@node-rs/argon2";
+ import { db } from "./index";
+ import {
+@@ -24,6 +26,8 @@ import {
+   users,
+   verificationTokens,
+ } from "./schema";
++import { buildStorageKey, localUploadPath } from "@/lib/storage/keys";
++import { samplePdf, samplePng } from "@/lib/storage/sample-proof";
+ 
+ /**
+  * Development seed. It clears everything first, so it can be re-run freely
+@@ -33,6 +37,230 @@ import {
+  */
+ const DEMO_PASSWORD = "printsdemo2026";
+ 
++type SeedOrder = { id: string; reference: string };
++
++/**
++ * Puts a proof in each state the studio queue knows about, so the staff and
++ * customer screens have something real to show. The artwork is generated
++ * rather than committed, and written straight to the local upload directory —
++ * in development there is no R2 bucket to put it in.
++ */
++async function seedProofs({
++  customerId,
++  designerId,
++  proofreaderId,
++  orders: seeded,
++  now,
++}: {
++  customerId: string;
++  designerId: string;
++  proofreaderId: string;
++  orders: {
++    awaitingCustomer: SeedOrder;
++    delivered: SeedOrder;
++    needsProofreading: SeedOrder;
++    returned: SeedOrder;
++  };
++  now: Date;
++}) {
++  async function store(
++    fileName: string,
++    body: Buffer,
++  ): Promise<{ storageKey: string; sizeBytes: number }> {
++    const storageKey = buildStorageKey("proofs", fileName);
++    const target = localUploadPath(storageKey);
++    await mkdir(path.dirname(target), { recursive: true });
++    await writeFile(target, body);
++    return { storageKey, sizeBytes: body.length };
++  }
++
++  const memorial = await store(
++    "order-of-service-v2.pdf",
++    samplePdf("In loving memory", [
++      "Elizabeth Anne Hartley",
++      "14th March 1946 — 2nd February 2026",
++      "St Mary's Church, Tuesday 14th April at 11am",
++    ]),
++  );
++  const thankYou = await store(
++    "thank-you-card-v1.pdf",
++    samplePdf("With grateful thanks", [
++      "The family of Elizabeth Hartley",
++      "thank you for your kindness and sympathy",
++    ]),
++  );
++  const attendance = await store("attendance-card-v1.png", samplePng());
++  const wedding = await store(
++    "invitation-v1.pdf",
++    samplePdf("Save the date", [
++      "Hannah & Joseph",
++      "Saturday 12th September 2026",
++    ]),
++  );
++
++  const [withCustomer] = await db
++    .insert(proofVersions)
++    .values([
++      {
++        orderId: seeded.awaitingCustomer.id,
++        versionNumber: 1,
++        ...memorial,
++        fileName: "order-of-service-v1.pdf",
++        mimeType: "application/pdf",
++        uploadedById: designerId,
++        status: "changes_requested",
++        proofreaderId,
++        proofreadAt: new Date(now.getTime() - 6 * 86_400_000),
++        sentToCustomerAt: new Date(now.getTime() - 6 * 86_400_000),
++        customerDecisionAt: new Date(now.getTime() - 5 * 86_400_000),
++        createdAt: new Date(now.getTime() - 7 * 86_400_000),
++      },
++      {
++        orderId: seeded.awaitingCustomer.id,
++        versionNumber: 2,
++        ...memorial,
++        fileName: "order-of-service-v2.pdf",
++        mimeType: "application/pdf",
++        uploadedById: designerId,
++        status: "awaiting_customer",
++        proofreaderId,
++        proofreadAt: new Date(now.getTime() - 86_400_000),
++        sentToCustomerAt: new Date(now.getTime() - 86_400_000),
++        createdAt: new Date(now.getTime() - 2 * 86_400_000),
++      },
++      {
++        orderId: seeded.needsProofreading.id,
++        versionNumber: 1,
++        ...attendance,
++        fileName: "attendance-card-v1.png",
++        mimeType: "image/png",
++        uploadedById: designerId,
++        status: "awaiting_proofreading",
++        createdAt: new Date(now.getTime() - 5 * 3_600_000),
++      },
++      {
++        orderId: seeded.returned.id,
++        versionNumber: 1,
++        ...wedding,
++        fileName: "invitation-v1.pdf",
++        mimeType: "application/pdf",
++        uploadedById: designerId,
++        status: "returned_to_designer",
++        proofreaderId,
++        proofreadAt: new Date(now.getTime() - 3 * 3_600_000),
++        proofreaderNotes:
++          "The date reads 12th September but the enquiry says the 19th. Worth checking before this goes out.",
++        createdAt: new Date(now.getTime() - 2 * 86_400_000),
++      },
++      {
++        orderId: seeded.delivered.id,
++        versionNumber: 1,
++        ...thankYou,
++        fileName: "thank-you-card-v1.pdf",
++        mimeType: "application/pdf",
++        uploadedById: designerId,
++        status: "approved",
++        proofreaderId,
++        proofreadAt: new Date(now.getTime() - 38 * 86_400_000),
++        sentToCustomerAt: new Date(now.getTime() - 38 * 86_400_000),
++        customerDecisionAt: new Date(now.getTime() - 37 * 86_400_000),
++        createdAt: new Date(now.getTime() - 39 * 86_400_000),
++      },
++    ])
++    .returning({ id: proofVersions.id });
++
++  // What the customer marked on the first version, which is why there is a
++  // second one.
++  await db.insert(proofComments).values([
++    {
++      proofVersionId: withCustomer.id,
++      authorId: customerId,
++      body: "Could her middle name be included here? It should read Elizabeth Anne.",
++      xPct: 38,
++      yPct: 27,
++      pinNumber: 1,
++      createdAt: new Date(now.getTime() - 5 * 86_400_000),
++    },
++    {
++      proofVersionId: withCustomer.id,
++      authorId: customerId,
++      body: "The service is at 11am, not 11.30.",
++      xPct: 55,
++      yPct: 61,
++      pinNumber: 2,
++      createdAt: new Date(now.getTime() - 5 * 86_400_000),
++    },
++  ]);
++
++  /**
++   * A little history on the delivered order, so the dashboard's turnaround
++   * line has more than one week to draw. These are all approved and long past.
++   */
++  const history = [3.5, 2.5, 4, 1.5, 2, 1] // days from sending to approval
++    .map((days, index) => {
++      const weeksAgo = 7 - index;
++      const sent = new Date(now.getTime() - weeksAgo * 7 * 86_400_000);
++
++      return {
++        orderId: seeded.delivered.id,
++        versionNumber: index + 2,
++        ...thankYou,
++        fileName: `archive-v${index + 2}.pdf`,
++        mimeType: "application/pdf",
++        uploadedById: designerId,
++        status: "approved" as const,
++        proofreaderId,
++        proofreadAt: sent,
++        sentToCustomerAt: sent,
++        customerDecisionAt: new Date(sent.getTime() + days * 86_400_000),
++        createdAt: new Date(sent.getTime() - 86_400_000),
++      };
++    });
++
++  await db.insert(proofVersions).values(history);
++
++  await db.insert(notifications).values({
++    userId: customerId,
++    type: "proof_ready",
++    title: `Your proof for ${seeded.awaitingCustomer.reference} is ready`,
++    body: "Have a look and let us know if anything needs changing.",
++    linkUrl: `/account/orders/${seeded.awaitingCustomer.id}/proof`,
++    createdAt: new Date(now.getTime() - 86_400_000),
++  });
++
++  await db.insert(activityEvents).values([
++    {
++      orderId: seeded.awaitingCustomer.id,
++      actorId: proofreaderId,
++      type: "proof_sent",
++      summary: `Version 2 of ${seeded.awaitingCustomer.reference} sent to the customer`,
++      createdAt: new Date(now.getTime() - 86_400_000),
++    },
++    {
++      orderId: seeded.awaitingCustomer.id,
++      actorId: customerId,
++      type: "changes_requested",
++      summary: `Changes requested on ${seeded.awaitingCustomer.reference}`,
++      createdAt: new Date(now.getTime() - 5 * 86_400_000),
++    },
++    {
++      orderId: seeded.returned.id,
++      actorId: proofreaderId,
++      type: "proof_returned",
++      summary: `${seeded.returned.reference} returned to the designer`,
++      createdAt: new Date(now.getTime() - 3 * 3_600_000),
++    },
++    {
++      orderId: seeded.needsProofreading.id,
++      actorId: designerId,
++      type: "proof_uploaded",
++      summary: `A proof for ${seeded.needsProofreading.reference} is waiting to be proofread`,
++      createdAt: new Date(now.getTime() - 5 * 3_600_000),
++    },
++  ]);
++
++}
++
+ async function reset() {
+   // Children before parents; foreign keys are enforced.
+   await db.delete(proofComments);
+@@ -259,29 +487,58 @@ async function main() {
+     })
+     .returning({ id: enquiries.id });
+ 
+-  await db.insert(orders).values([
+-    {
+-      reference: "MP-1039",
+-      userId: customer.id,
+-      enquiryId: enquiry.id,
+-      status: "awaiting_proof",
+-      paymentStatus: "paid",
+-      totalMinor: 18500,
+-      assignedDesignerId: designer.id,
+-      paperStock: "300gsm Cover",
+-      finish: "Foil detailing",
+-      placedAt: now,
+-    },
+-    {
+-      reference: "MP-1036",
+-      userId: customer.id,
+-      status: "delivered",
+-      paymentStatus: "paid",
+-      totalMinor: 9600,
+-      assignedDesignerId: designer.id,
+-      placedAt: new Date(now.getTime() - 40 * 86_400_000),
+-    },
+-  ]);
++  const [awaitingCustomer, delivered, needsProofreading, returned] = await db
++    .insert(orders)
++    .values([
++      {
++        reference: "MP-1039",
++        userId: customer.id,
++        enquiryId: enquiry.id,
++        status: "awaiting_proof",
++        paymentStatus: "paid",
++        totalMinor: 18500,
++        assignedDesignerId: designer.id,
++        paperStock: "300gsm Cover",
++        finish: "Foil detailing",
++        placedAt: now,
++      },
++      {
++        reference: "MP-1036",
++        userId: customer.id,
++        status: "delivered",
++        paymentStatus: "paid",
++        totalMinor: 9600,
++        assignedDesignerId: designer.id,
++        placedAt: new Date(now.getTime() - 40 * 86_400_000),
++      },
++      {
++        reference: "MP-1041",
++        userId: customer.id,
++        status: "awaiting_proof",
++        paymentStatus: "paid",
++        totalMinor: 14500,
++        assignedDesignerId: designer.id,
++        placedAt: new Date(now.getTime() - 2 * 86_400_000),
++      },
++      {
++        reference: "MP-1042",
++        userId: customer.id,
++        status: "awaiting_proof",
++        paymentStatus: "unpaid",
++        totalMinor: 11000,
++        assignedDesignerId: designer.id,
++        placedAt: new Date(now.getTime() - 4 * 86_400_000),
++      },
++    ])
++    .returning({ id: orders.id, reference: orders.reference });
++
++  await seedProofs({
++    customerId: customer.id,
++    designerId: designer.id,
++    proofreaderId: proofreader.id,
++    orders: { awaitingCustomer, delivered, needsProofreading, returned },
++    now,
++  });
+ 
+   await db.insert(savedItems).values([
+     { userId: customer.id, productId: bySlug["memorial-thank-you-card"] },
+diff --git a/src/lib/notifications/actions.ts b/src/lib/notifications/actions.ts
+new file mode 100644
+index 0000000..705072f
+--- /dev/null
++++ b/src/lib/notifications/actions.ts
+@@ -0,0 +1,29 @@
++"use server";
++
++import { revalidatePath } from "next/cache";
++import { and, eq, isNull } from "drizzle-orm";
++import { db } from "@/db";
++import { notifications } from "@/db/schema";
++import { requireUser } from "@/lib/auth/guards";
++
++/**
++ * Clears the unread badge.
++ *
++ * Called when the panel is opened, so the bell reflects what the customer has
++ * actually seen. The user id comes from the session — never from the client.
++ */
++export async function markNotificationsReadAction(): Promise<void> {
++  const session = await requireUser();
++
++  await db
++    .update(notifications)
++    .set({ readAt: new Date() })
++    .where(
++      and(
++        eq(notifications.userId, session.user.id),
++        isNull(notifications.readAt),
++      ),
++    );
++
++  revalidatePath("/account", "layout");
++}
+diff --git a/src/lib/notifications/queries.ts b/src/lib/notifications/queries.ts
+new file mode 100644
+index 0000000..01ce028
+--- /dev/null
++++ b/src/lib/notifications/queries.ts
+@@ -0,0 +1,49 @@
++import "server-only";
++import { and, desc, eq, isNull, sql } from "drizzle-orm";
++import { db } from "@/db";
++import { notifications } from "@/db/schema";
++import type { NotificationRow } from "./types";
++
++export type { NotificationRow };
++
++/** The bell shows the ten most recent; the count covers everything unread. */
++const RECENT_LIMIT = 10;
++
++export async function loadNotifications(userId: string): Promise<{
++  items: NotificationRow[];
++  unreadCount: number;
++}> {
++  const [rows, [unread]] = await Promise.all([
++    db
++      .select({
++        id: notifications.id,
++        title: notifications.title,
++        body: notifications.body,
++        linkUrl: notifications.linkUrl,
++        createdAt: notifications.createdAt,
++        readAt: notifications.readAt,
++      })
++      .from(notifications)
++      .where(eq(notifications.userId, userId))
++      .orderBy(desc(notifications.createdAt))
++      .limit(RECENT_LIMIT),
++    db
++      .select({ count: sql<number>`count(*)::int` })
++      .from(notifications)
++      .where(
++        and(eq(notifications.userId, userId), isNull(notifications.readAt)),
++      ),
++  ]);
++
++  return {
++    items: rows.map((row) => ({
++      id: row.id,
++      title: row.title,
++      body: row.body,
++      linkUrl: row.linkUrl,
++      createdAt: row.createdAt,
++      isUnread: row.readAt === null,
++    })),
++    unreadCount: unread?.count ?? 0,
++  };
++}
+diff --git a/src/lib/notifications/types.ts b/src/lib/notifications/types.ts
+new file mode 100644
+index 0000000..e4550d3
+--- /dev/null
++++ b/src/lib/notifications/types.ts
+@@ -0,0 +1,14 @@
++/**
++ * Shared shape for a bell row.
++ *
++ * Kept out of queries.ts because that module is `server-only`, and the bell
++ * itself is a client component that needs the type.
++ */
++export type NotificationRow = {
++  id: string;
++  title: string;
++  body: string | null;
++  linkUrl: string | null;
++  createdAt: Date;
++  isUnread: boolean;
++};
+diff --git a/src/lib/proofs/actions.ts b/src/lib/proofs/actions.ts
+new file mode 100644
+index 0000000..5c98dac
+--- /dev/null
++++ b/src/lib/proofs/actions.ts
+@@ -0,0 +1,454 @@
++"use server";
++
++import { revalidatePath } from "next/cache";
++import { and, desc, eq, sql } from "drizzle-orm";
++import { db } from "@/db";
++import {
++  activityEvents,
++  notifications,
++  orders,
++  proofComments,
++  proofVersions,
++  users,
++} from "@/db/schema";
++import { isStaff, requireStaff, requireUser } from "@/lib/auth/guards";
++import { getSession } from "@/lib/auth/session";
++import { buildStorageKey, putObject } from "@/lib/storage/storage";
++import { checkUpload } from "@/lib/storage/uploads";
++import { fail, type FormState } from "@/lib/auth/form-state";
++import { clampPin } from "./pins";
++
++/* -------------------------------------------------------------------------- */
++/* Designer: upload a proof                                                   */
++/* -------------------------------------------------------------------------- */
++
++/**
++ * Every upload is a new version. Nothing is ever overwritten, so the history
++ * of what was sent and when survives — which matters when a family disputes
++ * what they approved.
++ */
++export async function uploadProofAction(
++  _prev: FormState,
++  formData: FormData,
++): Promise<FormState> {
++  const session = await requireStaff();
++
++  const orderId = String(formData.get("orderId") ?? "");
++  const file = formData.get("file");
++
++  if (!orderId) return fail("Missing order.");
++  if (!(file instanceof File)) return fail("Choose a file to upload.");
++
++  const check = checkUpload({ type: file.type, size: file.size, name: file.name });
++  if (!check.ok) return fail(check.reason);
++
++  const [order] = await db
++    .select({ id: orders.id, reference: orders.reference, userId: orders.userId })
++    .from(orders)
++    .where(eq(orders.id, orderId))
++    .limit(1);
++
++  if (!order) return fail("That order no longer exists.");
++
++  const storageKey = buildStorageKey(`proofs/${order.reference}`, file.name);
++  const bytes = Buffer.from(await file.arrayBuffer());
++
++  try {
++    await putObject(storageKey, bytes, check.mimeType);
++  } catch (error) {
++    console.error("[proofs] upload failed", error);
++    return fail(
++      "We couldn't store that file. Nothing has changed — please try again.",
++    );
++  }
++
++  // Version numbers are per order and must not collide if two uploads land
++  // together, so the next number is computed inside the insert.
++  const nextVersion = sql<number>`(
++    select coalesce(max(${proofVersions.versionNumber}), 0) + 1
++    from ${proofVersions}
++    where ${proofVersions.orderId} = ${orderId}::uuid
++  )`;
++
++  await db.insert(proofVersions).values({
++    orderId,
++    versionNumber: nextVersion,
++    storageKey,
++    fileName: file.name,
++    mimeType: check.mimeType,
++    sizeBytes: file.size,
++    uploadedById: session.user.id,
++    status: "awaiting_proofreading",
++  });
++
++  await db
++    .update(orders)
++    .set({ status: "in_production", updatedAt: new Date() })
++    .where(eq(orders.id, orderId));
++
++  await db.insert(activityEvents).values({
++    orderId,
++    actorId: session.user.id,
++    type: "proof_uploaded",
++    summary: `${session.user.name} uploaded a proof for ${order.reference}`,
++  });
++
++  revalidatePath(`/staff/orders/${orderId}`);
++  revalidatePath("/staff");
++  revalidatePath("/staff/queue");
++
++  return { ok: true, message: "Proof uploaded and sent for proofreading." };
++}
++
++/* -------------------------------------------------------------------------- */
++/* Proofreader: approve to the customer, or return to the designer            */
++/* -------------------------------------------------------------------------- */
++
++async function latestVersion(orderId: string) {
++  const [version] = await db
++    .select({
++      id: proofVersions.id,
++      versionNumber: proofVersions.versionNumber,
++      status: proofVersions.status,
++    })
++    .from(proofVersions)
++    .where(eq(proofVersions.orderId, orderId))
++    .orderBy(desc(proofVersions.versionNumber))
++    .limit(1);
++
++  return version ?? null;
++}
++
++export async function sendProofToCustomerAction(
++  _prev: FormState,
++  formData: FormData,
++): Promise<FormState> {
++  const session = await requireStaff();
++
++  if (session.user.role !== "proofreader" && session.user.role !== "admin") {
++    return fail("Only a proofreader can send a proof to the customer.");
++  }
++
++  const orderId = String(formData.get("orderId") ?? "");
++  const version = await latestVersion(orderId);
++  if (!version) return fail("There's no proof to send yet.");
++
++  const [order] = await db
++    .select({ id: orders.id, reference: orders.reference, userId: orders.userId })
++    .from(orders)
++    .where(eq(orders.id, orderId))
++    .limit(1);
++
++  if (!order) return fail("That order no longer exists.");
++
++  await db
++    .update(proofVersions)
++    .set({
++      status: "awaiting_customer",
++      proofreaderId: session.user.id,
++      proofreadAt: new Date(),
++      sentToCustomerAt: new Date(),
++    })
++    .where(eq(proofVersions.id, version.id));
++
++  await db.insert(notifications).values({
++    userId: order.userId,
++    type: "proof_ready",
++    title: `Your proof for ${order.reference} is ready`,
++    body: "Have a look and either approve it or tell us what to change.",
++    linkUrl: `/account/orders/${order.id}/proof`,
++  });
++
++  await db.insert(activityEvents).values({
++    orderId,
++    actorId: session.user.id,
++    type: "proof_sent",
++    summary: `${session.user.name} sent version ${version.versionNumber} of ${order.reference} to the customer`,
++  });
++
++  revalidatePath(`/staff/orders/${orderId}`);
++  revalidatePath("/staff/queue");
++
++  return { ok: true, message: "Sent to the customer." };
++}
++
++export async function returnProofToDesignerAction(
++  _prev: FormState,
++  formData: FormData,
++): Promise<FormState> {
++  const session = await requireStaff();
++
++  if (session.user.role !== "proofreader" && session.user.role !== "admin") {
++    return fail("Only a proofreader can return a proof.");
++  }
++
++  const orderId = String(formData.get("orderId") ?? "");
++  const notes = String(formData.get("notes") ?? "").trim();
++
++  if (!notes) return fail("Say what needs changing, so it's clear to fix.");
++
++  const version = await latestVersion(orderId);
++  if (!version) return fail("There's no proof to return yet.");
++
++  await db
++    .update(proofVersions)
++    .set({
++      status: "returned_to_designer",
++      proofreaderId: session.user.id,
++      proofreadAt: new Date(),
++      proofreaderNotes: notes,
++    })
++    .where(eq(proofVersions.id, version.id));
++
++  await db.insert(activityEvents).values({
++    orderId,
++    actorId: session.user.id,
++    type: "proof_returned",
++    summary: `${session.user.name} returned version ${version.versionNumber} to the designer`,
++    meta: { notes },
++  });
++
++  revalidatePath(`/staff/orders/${orderId}`);
++  revalidatePath("/staff/queue");
++
++  return { ok: true, message: "Returned to the designer with your notes." };
++}
++
++/* -------------------------------------------------------------------------- */
++/* Assigning a designer                                                       */
++/* -------------------------------------------------------------------------- */
++
++export async function assignDesignerAction(
++  _prev: FormState,
++  formData: FormData,
++): Promise<FormState> {
++  const session = await requireStaff();
++
++  // Designers can't reassign work; that's a proofreader or admin decision.
++  if (session.user.role !== "proofreader" && session.user.role !== "admin") {
++    return fail("Only a proofreader or an admin can assign work.");
++  }
++
++  const orderId = String(formData.get("orderId") ?? "");
++  const designerId = String(formData.get("designerId") ?? "");
++
++  if (!orderId) return fail("Missing order.");
++
++  if (designerId) {
++    const [designer] = await db
++      .select({ id: users.id, name: users.name, role: users.role })
++      .from(users)
++      .where(and(eq(users.id, designerId), eq(users.role, "designer")))
++      .limit(1);
++
++    if (!designer) return fail("That person isn't a designer.");
++
++    await db
++      .update(orders)
++      .set({ assignedDesignerId: designer.id, updatedAt: new Date() })
++      .where(eq(orders.id, orderId));
++
++    await db.insert(activityEvents).values({
++      orderId,
++      actorId: session.user.id,
++      type: "designer_assigned",
++      summary: `${session.user.name} assigned the order to ${designer.name}`,
++    });
++  } else {
++    await db
++      .update(orders)
++      .set({ assignedDesignerId: null, updatedAt: new Date() })
++      .where(eq(orders.id, orderId));
++  }
++
++  revalidatePath(`/staff/orders/${orderId}`);
++  revalidatePath("/staff/queue");
++
++  return { ok: true, message: "Assignment updated." };
++}
++
++/* -------------------------------------------------------------------------- */
++/* Customer: comment, approve, request changes                                */
++/* -------------------------------------------------------------------------- */
++
++/** Confirms this proof belongs to the caller, or to staff looking at it. */
++async function proofForViewer(proofVersionId: string) {
++  const session = await getSession("site");
++  if (!session) return null;
++
++  const [row] = await db
++    .select({
++      id: proofVersions.id,
++      orderId: proofVersions.orderId,
++      status: proofVersions.status,
++      versionNumber: proofVersions.versionNumber,
++      ownerId: orders.userId,
++      reference: orders.reference,
++    })
++    .from(proofVersions)
++    .innerJoin(orders, eq(orders.id, proofVersions.orderId))
++    .where(eq(proofVersions.id, proofVersionId))
++    .limit(1);
++
++  if (!row) return null;
++
++  const isOwner = row.ownerId === session.user.id;
++  if (!isOwner && !isStaff(session.user.role)) return null;
++
++  return { ...row, session, isOwner };
++}
++
++export async function addProofCommentAction(
++  _prev: FormState,
++  formData: FormData,
++): Promise<FormState> {
++  await requireUser();
++
++  const proofVersionId = String(formData.get("proofVersionId") ?? "");
++  const body = String(formData.get("body") ?? "").trim();
++  const xPct = Number.parseFloat(String(formData.get("xPct") ?? ""));
++  const yPct = Number.parseFloat(String(formData.get("yPct") ?? ""));
++
++  if (!body) return fail("Write what you'd like changed.");
++  if (!Number.isFinite(xPct) || !Number.isFinite(yPct)) {
++    return fail("Click the proof to place your comment.");
++  }
++
++  const proof = await proofForViewer(proofVersionId);
++  if (!proof) return fail("That proof isn't available.");
++
++  if (proof.status === "approved") {
++    return fail("This proof has been approved, so it can't take new comments.");
++  }
++
++  const [{ count }] = await db
++    .select({ count: sql<number>`count(*)::int` })
++    .from(proofComments)
++    .where(eq(proofComments.proofVersionId, proofVersionId));
++
++  const pin = clampPin(xPct, yPct);
++
++  await db.insert(proofComments).values({
++    proofVersionId,
++    authorId: proof.session.user.id,
++    body: body.slice(0, 2000),
++    xPct: pin.xPct,
++    yPct: pin.yPct,
++    pinNumber: count + 1,
++  });
++
++  revalidatePath(`/account/orders/${proof.orderId}/proof`);
++  revalidatePath(`/staff/orders/${proof.orderId}`);
++
++  return { ok: true, message: "Comment added." };
++}
++
++export async function deleteProofCommentAction(
++  formData: FormData,
++): Promise<void> {
++  const session = await requireUser();
++  const commentId = String(formData.get("commentId") ?? "");
++  if (!commentId) return;
++
++  // Ownership is in the WHERE clause, so a forged id matches nothing.
++  const [deleted] = await db
++    .delete(proofComments)
++    .where(
++      and(
++        eq(proofComments.id, commentId),
++        eq(proofComments.authorId, session.user.id),
++      ),
++    )
++    .returning({ proofVersionId: proofComments.proofVersionId });
++
++  if (deleted) {
++    const [proof] = await db
++      .select({ orderId: proofVersions.orderId })
++      .from(proofVersions)
++      .where(eq(proofVersions.id, deleted.proofVersionId))
++      .limit(1);
++
++    if (proof) revalidatePath(`/account/orders/${proof.orderId}/proof`);
++  }
++}
++
++export async function decideProofAction(
++  _prev: FormState,
++  formData: FormData,
++): Promise<FormState> {
++  const session = await requireUser();
++
++  const proofVersionId = String(formData.get("proofVersionId") ?? "");
++  const decision = String(formData.get("decision") ?? "");
++
++  const proof = await proofForViewer(proofVersionId);
++  if (!proof) return fail("That proof isn't available.");
++
++  // Only the customer whose order it is can approve or reject it.
++  if (!proof.isOwner) {
++    return fail("Only the customer can approve their own proof.");
++  }
++
++  if (proof.status !== "awaiting_customer") {
++    return fail("This proof isn't waiting on you.");
++  }
++
++  if (decision === "approve") {
++    await db
++      .update(proofVersions)
++      .set({ status: "approved", customerDecisionAt: new Date() })
++      .where(eq(proofVersions.id, proofVersionId));
++
++    await db
++      .update(orders)
++      .set({ status: "in_production", updatedAt: new Date() })
++      .where(eq(orders.id, proof.orderId));
++
++    await db.insert(activityEvents).values({
++      orderId: proof.orderId,
++      actorId: session.user.id,
++      type: "proof_approved",
++      summary: `${session.user.name} approved version ${proof.versionNumber} of ${proof.reference}`,
++    });
++
++    revalidatePath(`/account/orders/${proof.orderId}/proof`);
++    revalidatePath("/staff/queue");
++
++    return { ok: true, message: "Approved — thank you. We'll start printing." };
++  }
++
++  if (decision === "changes") {
++    const [{ count }] = await db
++      .select({ count: sql<number>`count(*)::int` })
++      .from(proofComments)
++      .where(eq(proofComments.proofVersionId, proofVersionId));
++
++    if (count === 0) {
++      return fail(
++        "Click the proof to mark what needs changing, so the studio knows where to look.",
++      );
++    }
++
++    await db
++      .update(proofVersions)
++      .set({ status: "changes_requested", customerDecisionAt: new Date() })
++      .where(eq(proofVersions.id, proofVersionId));
++
++    await db.insert(activityEvents).values({
++      orderId: proof.orderId,
++      actorId: session.user.id,
++      type: "changes_requested",
++      summary: `${session.user.name} requested changes to ${proof.reference} (${count} comment${count === 1 ? "" : "s"})`,
++    });
++
++    revalidatePath(`/account/orders/${proof.orderId}/proof`);
++    revalidatePath("/staff/queue");
++
++    return {
++      ok: true,
++      message: "Thank you — the studio has your comments and will send a new proof.",
++    };
++  }
++
++  return fail("Choose whether to approve or request changes.");
++}
+diff --git a/src/lib/proofs/map-upsert-polyfill.ts b/src/lib/proofs/map-upsert-polyfill.ts
+new file mode 100644
+index 0000000..bd5087d
+--- /dev/null
++++ b/src/lib/proofs/map-upsert-polyfill.ts
+@@ -0,0 +1,50 @@
++/**
++ * `Map.prototype.getOrInsert` and friends, for browsers that don't have them.
++ *
++ * pdf.js 6 uses these internally. They only reached Chrome, Firefox and Safari
++ * during 2025, so without this the proof viewer throws on any browser a year
++ * or two old — and a good share of the people approving a funeral proof are on
++ * exactly those devices. Each method is defined only when it is missing, so a
++ * current browser keeps its own.
++ */
++
++type Upsertable<K, V> = {
++  has(key: K): boolean;
++  get(key: K): V | undefined;
++  set(key: K, value: V): unknown;
++};
++
++function define(target: object, name: string, value: () => unknown): void {
++  if (name in target) return;
++
++  Object.defineProperty(target, name, {
++    value,
++    writable: true,
++    enumerable: false,
++    configurable: true,
++  });
++}
++
++function getOrInsert<K, V>(this: Upsertable<K, V>, key: K, value: V): V {
++  if (this.has(key)) return this.get(key) as V;
++  this.set(key, value);
++  return value;
++}
++
++function getOrInsertComputed<K, V>(
++  this: Upsertable<K, V>,
++  key: K,
++  callback: (key: K) => V,
++): V {
++  if (this.has(key)) return this.get(key) as V;
++  const value = callback(key);
++  this.set(key, value);
++  return value;
++}
++
++export function installMapUpsertPolyfill(): void {
++  for (const proto of [Map.prototype, WeakMap.prototype]) {
++    define(proto, "getOrInsert", getOrInsert as () => unknown);
++    define(proto, "getOrInsertComputed", getOrInsertComputed as () => unknown);
++  }
++}
+diff --git a/src/lib/proofs/pins.ts b/src/lib/proofs/pins.ts
+new file mode 100644
+index 0000000..27bb690
+--- /dev/null
++++ b/src/lib/proofs/pins.ts
+@@ -0,0 +1,45 @@
++/**
++ * Where a comment sits on a proof.
++ *
++ * Positions are stored as a percentage of the rendered artwork, not pixels,
++ * so a pin stays on the same word whether the proof is viewed on a phone, a
++ * studio monitor, or re-rendered at a different zoom.
++ */
++
++/** Keeps a pin far enough inside the edge that its marker stays visible. */
++const MIN = 1.5;
++const MAX = 98.5;
++
++export type Pin = { xPct: number; yPct: number };
++
++export function clampPin(xPct: number, yPct: number): Pin {
++  return {
++    xPct: Math.min(MAX, Math.max(MIN, xPct)),
++    yPct: Math.min(MAX, Math.max(MIN, yPct)),
++  };
++}
++
++/**
++ * Turns a click into a position on the artwork. Takes the rectangle rather
++ * than the element so it can be tested without a DOM.
++ */
++export function pinFromClick(
++  click: { clientX: number; clientY: number },
++  rect: { left: number; top: number; width: number; height: number },
++): Pin | null {
++  if (rect.width <= 0 || rect.height <= 0) return null;
++
++  return clampPin(
++    ((click.clientX - rect.left) / rect.width) * 100,
++    ((click.clientY - rect.top) / rect.height) * 100,
++  );
++}
++
++/** Pins are numbered in the order they were left, so notes can refer to them. */
++export function numberPins<T extends { createdAt: Date }>(
++  comments: T[],
++): (T & { pinNumber: number })[] {
++  return [...comments]
++    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
++    .map((comment, index) => ({ ...comment, pinNumber: index + 1 }));
++}
+diff --git a/src/lib/proofs/proofs.test.ts b/src/lib/proofs/proofs.test.ts
+new file mode 100644
+index 0000000..36affd8
+--- /dev/null
++++ b/src/lib/proofs/proofs.test.ts
+@@ -0,0 +1,191 @@
++import assert from "node:assert/strict";
++import test from "node:test";
++import { groupFor, sortQueue, type QueueItem, type Viewer } from "./queue";
++import { clampPin, numberPins, pinFromClick } from "./pins";
++
++const PROOFREADER: Viewer = { id: "reader-1", role: "proofreader" };
++const DESIGNER: Viewer = { id: "designer-1", role: "designer" };
++
++function item(overrides: Partial<QueueItem> = {}): QueueItem {
++  return {
++    orderId: "order-1",
++    reference: "MP-1001",
++    proofStatus: "awaiting_proofreading",
++    assignedDesignerId: "designer-1",
++    waitingSince: new Date("2026-09-01T09:00:00Z"),
++    ...overrides,
++  };
++}
++
++/* -------------------------------------------------------------------------- */
++/* Queue grouping                                                             */
++/* -------------------------------------------------------------------------- */
++
++test("a proof waiting to be checked belongs to the proofreader", () => {
++  assert.equal(
++    groupFor(item({ proofStatus: "awaiting_proofreading" }), PROOFREADER),
++    "awaiting_you",
++  );
++});
++
++test("the same proof is not the designer's problem while it's being checked", () => {
++  assert.equal(
++    groupFor(item({ proofStatus: "awaiting_proofreading" }), DESIGNER),
++    "awaiting_customer",
++  );
++});
++
++test("work returned to the designer lands on the designer", () => {
++  assert.equal(
++    groupFor(item({ proofStatus: "returned_to_designer" }), DESIGNER),
++    "awaiting_you",
++  );
++  assert.equal(
++    groupFor(item({ proofStatus: "returned_to_designer" }), PROOFREADER),
++    "needs_work",
++  );
++});
++
++test("changes requested by the customer go back to the designer", () => {
++  assert.equal(
++    groupFor(item({ proofStatus: "changes_requested" }), DESIGNER),
++    "awaiting_you",
++  );
++});
++
++test("an order with nothing uploaded yet is the designer's to start", () => {
++  assert.equal(
++    groupFor(item({ proofStatus: null }), DESIGNER),
++    "awaiting_you",
++  );
++});
++
++test("another designer's returned work isn't yours", () => {
++  assert.equal(
++    groupFor(
++      item({ proofStatus: "returned_to_designer", assignedDesignerId: "someone-else" }),
++      DESIGNER,
++    ),
++    "needs_work",
++  );
++});
++
++test("a proof with the customer is nobody's to act on", () => {
++  for (const viewer of [PROOFREADER, DESIGNER]) {
++    assert.equal(
++      groupFor(item({ proofStatus: "awaiting_customer" }), viewer),
++      "awaiting_customer",
++    );
++  }
++});
++
++test("approved work drops to the bottom", () => {
++  assert.equal(groupFor(item({ proofStatus: "approved" }), PROOFREADER), "done");
++});
++
++/* -------------------------------------------------------------------------- */
++/* Queue ordering                                                             */
++/* -------------------------------------------------------------------------- */
++
++test("what you should act on comes first, oldest waiting first within it", () => {
++  const groups = sortQueue(
++    [
++      item({
++        reference: "NEWEST-YOURS",
++        proofStatus: "awaiting_proofreading",
++        waitingSince: new Date("2026-09-10T09:00:00Z"),
++      }),
++      item({
++        reference: "WITH-CUSTOMER",
++        proofStatus: "awaiting_customer",
++        waitingSince: new Date("2026-08-01T09:00:00Z"),
++      }),
++      item({
++        reference: "OLDEST-YOURS",
++        proofStatus: "awaiting_proofreading",
++        waitingSince: new Date("2026-09-02T09:00:00Z"),
++      }),
++    ],
++    PROOFREADER,
++  );
++
++  assert.equal(groups[0].group, "awaiting_you");
++  assert.deepEqual(
++    groups[0].items.map((i) => i.reference),
++    ["OLDEST-YOURS", "NEWEST-YOURS"],
++    "the piece that has waited longest should be first",
++  );
++
++  // An older item in a later group still doesn't jump the queue.
++  assert.equal(groups.at(-1)?.group, "awaiting_customer");
++});
++
++test("empty groups are left out rather than shown as headings", () => {
++  const groups = sortQueue(
++    [item({ proofStatus: "awaiting_proofreading" })],
++    PROOFREADER,
++  );
++  assert.equal(groups.length, 1);
++});
++
++/* -------------------------------------------------------------------------- */
++/* Comment pins                                                               */
++/* -------------------------------------------------------------------------- */
++
++test("a click becomes a percentage of the artwork", () => {
++  const pin = pinFromClick(
++    { clientX: 150, clientY: 100 },
++    { left: 100, top: 50, width: 200, height: 200 },
++  );
++
++  assert.deepEqual(pin, { xPct: 25, yPct: 25 });
++});
++
++test("a pin never sits so close to the edge that its marker is cut off", () => {
++  const topLeft = pinFromClick(
++    { clientX: 0, clientY: 0 },
++    { left: 0, top: 0, width: 400, height: 400 },
++  );
++  assert.ok(topLeft!.xPct >= 1.5 && topLeft!.yPct >= 1.5);
++
++  const bottomRight = pinFromClick(
++    { clientX: 400, clientY: 400 },
++    { left: 0, top: 0, width: 400, height: 400 },
++  );
++  assert.ok(bottomRight!.xPct <= 98.5 && bottomRight!.yPct <= 98.5);
++});
++
++test("a click outside the artwork is pulled back onto it", () => {
++  const pin = pinFromClick(
++    { clientX: -50, clientY: 900 },
++    { left: 0, top: 0, width: 400, height: 400 },
++  );
++  assert.deepEqual(pin, clampPin(-12.5, 225));
++});
++
++test("a zero-sized container yields no pin rather than dividing by zero", () => {
++  assert.equal(
++    pinFromClick(
++      { clientX: 10, clientY: 10 },
++      { left: 0, top: 0, width: 0, height: 0 },
++    ),
++    null,
++  );
++});
++
++test("pins are numbered in the order they were left", () => {
++  const numbered = numberPins([
++    { body: "second", createdAt: new Date("2026-09-02T10:00:00Z") },
++    { body: "first", createdAt: new Date("2026-09-01T10:00:00Z") },
++    { body: "third", createdAt: new Date("2026-09-03T10:00:00Z") },
++  ]);
++
++  assert.deepEqual(
++    numbered.map((c) => [c.pinNumber, c.body]),
++    [
++      [1, "first"],
++      [2, "second"],
++      [3, "third"],
++    ],
++  );
++});
+diff --git a/src/lib/proofs/queue.ts b/src/lib/proofs/queue.ts
+new file mode 100644
+index 0000000..08f2fc3
+--- /dev/null
++++ b/src/lib/proofs/queue.ts
+@@ -0,0 +1,104 @@
++/**
++ * How the studio work queue is ordered, kept free of database imports so the
++ * rule can be tested on its own.
++ *
++ * The spec asks for whatever this viewer should act on next to come first,
++ * and oldest-waiting first within that. So the ordering is by group, and by
++ * age inside each group — the piece that has been sitting longest is the one
++ * most likely to be someone's bad day.
++ */
++
++export type QueueGroup =
++  | "awaiting_you"
++  | "needs_work"
++  | "awaiting_customer"
++  | "done";
++
++export type QueueItem = {
++  orderId: string;
++  reference: string;
++  proofStatus: string | null;
++  assignedDesignerId: string | null;
++  /** When the proof entered its current state. */
++  waitingSince: Date;
++};
++
++export type Viewer = {
++  id: string;
++  role: "designer" | "proofreader" | "admin";
++};
++
++/**
++ * Which pile an item sits in for this particular viewer. A proofreader's
++ * "yours" is a proof waiting to be checked; a designer's is one that came
++ * back to them.
++ */
++export function groupFor(item: QueueItem, viewer: Viewer): QueueGroup {
++  const status = item.proofStatus;
++
++  if (status === "approved") return "done";
++
++  if (status === "awaiting_customer") return "awaiting_customer";
++
++  if (viewer.role === "proofreader" || viewer.role === "admin") {
++    if (status === "awaiting_proofreading") return "awaiting_you";
++    if (status === "returned_to_designer" || status === "changes_requested") {
++      return "needs_work";
++    }
++    // Nothing uploaded yet: someone still has to draw it.
++    return "needs_work";
++  }
++
++  // Designers act on work that has come back to them, or that they own and
++  // hasn't been drawn yet.
++  const isTheirs =
++    item.assignedDesignerId === viewer.id || item.assignedDesignerId === null;
++
++  if (
++    (status === "returned_to_designer" ||
++      status === "changes_requested" ||
++      status === null) &&
++    isTheirs
++  ) {
++    return "awaiting_you";
++  }
++
++  if (status === "awaiting_proofreading") return "awaiting_customer";
++
++  return "needs_work";
++}
++
++const GROUP_ORDER: QueueGroup[] = [
++  "awaiting_you",
++  "needs_work",
++  "awaiting_customer",
++  "done",
++];
++
++export const GROUP_LABEL: Record<QueueGroup, string> = {
++  awaiting_you: "Waiting on you",
++  needs_work: "Needs work",
++  awaiting_customer: "With the customer",
++  done: "Approved",
++};
++
++export function sortQueue<T extends QueueItem>(
++  items: T[],
++  viewer: Viewer,
++): { group: QueueGroup; items: T[] }[] {
++  const buckets = new Map<QueueGroup, T[]>();
++
++  for (const group of GROUP_ORDER) buckets.set(group, []);
++
++  for (const item of items) {
++    buckets.get(groupFor(item, viewer))!.push(item);
++  }
++
++  return GROUP_ORDER.map((group) => ({
++    group,
++    items: buckets
++      .get(group)!
++      // Oldest waiting first: the longer something has sat, the more urgent.
++      .sort((a, b) => a.waitingSince.getTime() - b.waitingSince.getTime()),
++  })).filter((bucket) => bucket.items.length > 0);
++}
+diff --git a/src/lib/proofs/staff-queries.ts b/src/lib/proofs/staff-queries.ts
+new file mode 100644
+index 0000000..8c7b7a3
+--- /dev/null
++++ b/src/lib/proofs/staff-queries.ts
+@@ -0,0 +1,69 @@
++import "server-only";
++
++import { desc, eq, sql } from "drizzle-orm";
++import { db } from "@/db";
++import { orders, proofVersions, users } from "@/db/schema";
++
++/**
++ * One query for the whole queue: every order with the state of its newest
++ * proof, rather than a lookup per row.
++ */
++export async function loadQueue() {
++  const latest = db
++    .select({
++      orderId: proofVersions.orderId,
++      status: proofVersions.status,
++      versionNumber: proofVersions.versionNumber,
++      createdAt: proofVersions.createdAt,
++      proofreadAt: proofVersions.proofreadAt,
++      customerDecisionAt: proofVersions.customerDecisionAt,
++      rank: sql<number>`row_number() over (
++        partition by ${proofVersions.orderId}
++        order by ${proofVersions.versionNumber} desc
++      )`.as("rank"),
++    })
++    .from(proofVersions)
++    .as("latest");
++
++  const rows = await db
++    .select({
++      orderId: orders.id,
++      reference: orders.reference,
++      orderStatus: orders.status,
++      paymentStatus: orders.paymentStatus,
++      assignedDesignerId: orders.assignedDesignerId,
++      designerName: users.name,
++      customerName: sql<string>`(
++        select name from users where id = ${orders.userId}
++      )`,
++      orderCreatedAt: orders.createdAt,
++      proofStatus: latest.status,
++      versionNumber: latest.versionNumber,
++      proofCreatedAt: latest.createdAt,
++      proofreadAt: latest.proofreadAt,
++      customerDecisionAt: latest.customerDecisionAt,
++    })
++    .from(orders)
++    .leftJoin(latest, sql`${latest.orderId} = ${orders.id} and ${latest.rank} = 1`)
++    .leftJoin(users, eq(users.id, orders.assignedDesignerId))
++    .where(sql`${orders.status} not in ('cancelled', 'delivered', 'shipped')`)
++    .orderBy(desc(orders.createdAt));
++
++  return rows.map((row) => ({
++    ...row,
++    // When the item entered its current state — what the queue sorts on.
++    waitingSince:
++      row.customerDecisionAt ??
++      row.proofreadAt ??
++      row.proofCreatedAt ??
++      row.orderCreatedAt,
++  }));
++}
++
++export async function loadDesigners() {
++  return db
++    .select({ id: users.id, name: users.name })
++    .from(users)
++    .where(eq(users.role, "designer"))
++    .orderBy(users.name);
++}
+diff --git a/src/lib/storage/keys.ts b/src/lib/storage/keys.ts
+new file mode 100644
+index 0000000..779ff67
+--- /dev/null
++++ b/src/lib/storage/keys.ts
+@@ -0,0 +1,35 @@
++import { randomBytes } from "node:crypto";
++import path from "node:path";
++
++/**
++ * Key naming, kept out of storage.ts because that module is `server-only`
++ * and the seed script needs these too.
++ */
++
++/** Where the development fallback writes, when R2 isn't configured. */
++export const LOCAL_UPLOAD_DIR = path.join(process.cwd(), ".uploads");
++
++/** Keys are prefixed and randomised so one can't be guessed from another. */
++export function buildStorageKey(prefix: string, fileName: string): string {
++  const safeName = fileName
++    .toLowerCase()
++    .replace(/[^a-z0-9.-]+/g, "-")
++    .replace(/^-+|-+$/g, "")
++    .slice(-80);
++
++  return `${prefix}/${Date.now().toString(36)}-${randomBytes(8).toString("hex")}-${safeName}`;
++}
++
++/**
++ * Resolves a key under the local upload directory.
++ *
++ * Keys are generated above and never come from user input, but a traversal
++ * guard costs nothing and keeps that true if that ever changes.
++ */
++export function localUploadPath(storageKey: string): string {
++  const resolved = path.resolve(LOCAL_UPLOAD_DIR, storageKey);
++  if (!resolved.startsWith(path.resolve(LOCAL_UPLOAD_DIR))) {
++    throw new Error("Refusing a storage key that escapes the upload directory");
++  }
++  return resolved;
++}
+diff --git a/src/lib/storage/sample-proof.ts b/src/lib/storage/sample-proof.ts
+new file mode 100644
+index 0000000..a46ca49
+--- /dev/null
++++ b/src/lib/storage/sample-proof.ts
+@@ -0,0 +1,124 @@
++import { deflateSync } from "node:zlib";
++
++/**
++ * Stand-in artwork for seeding and for the end-to-end tests.
++ *
++ * Both files are built here rather than committed as binaries, so the repo
++ * carries no stray assets and the tests have something real to upload. The
++ * PDF exercises the browser-side renderer; the PNG exercises the image path.
++ */
++
++function pdfEscape(text: string): string {
++  return text.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
++}
++
++/** A one-page A4 PDF with a few lines of text on it. */
++export function samplePdf(title: string, lines: string[]): Buffer {
++  const content = [
++    "BT",
++    "/F1 22 Tf",
++    "72 720 Td",
++    `(${pdfEscape(title)}) Tj`,
++    "/F1 12 Tf",
++    ...lines.flatMap((line) => ["0 -28 Td", `(${pdfEscape(line)}) Tj`]),
++    "ET",
++  ].join("\n");
++
++  const objects = [
++    "<< /Type /Catalog /Pages 2 0 R >>",
++    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
++    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] " +
++      "/Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
++    `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
++    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
++  ];
++
++  let pdf = "%PDF-1.4\n";
++  const offsets: number[] = [];
++
++  objects.forEach((body, index) => {
++    offsets.push(pdf.length);
++    pdf += `${index + 1} 0 obj\n${body}\nendobj\n`;
++  });
++
++  const xrefStart = pdf.length;
++  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
++  for (const offset of offsets) {
++    pdf += `${offset.toString().padStart(10, "0")} 00000 n \n`;
++  }
++  pdf +=
++    `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\n` +
++    `startxref\n${xrefStart}\n%%EOF\n`;
++
++  return Buffer.from(pdf, "latin1");
++}
++
++const CRC_TABLE = (() => {
++  const table = new Int32Array(256);
++  for (let n = 0; n < 256; n += 1) {
++    let c = n;
++    for (let k = 0; k < 8; k += 1) {
++      c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
++    }
++    table[n] = c;
++  }
++  return table;
++})();
++
++function crc32(buffer: Buffer): number {
++  let crc = -1;
++  for (const byte of buffer) {
++    crc = CRC_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8);
++  }
++  return (crc ^ -1) >>> 0;
++}
++
++function chunk(type: string, data: Buffer): Buffer {
++  const length = Buffer.alloc(4);
++  length.writeUInt32BE(data.length);
++
++  const body = Buffer.concat([Buffer.from(type, "latin1"), data]);
++  const crc = Buffer.alloc(4);
++  crc.writeUInt32BE(crc32(body));
++
++  return Buffer.concat([length, body, crc]);
++}
++
++/** A flat-colour PNG, large enough to look like a piece of artwork. */
++export function samplePng(
++  width = 800,
++  height = 1131,
++  rgb: [number, number, number] = [0xf3, 0xf1, 0xea],
++): Buffer {
++  const stride = width * 3 + 1;
++  const raw = Buffer.alloc(stride * height);
++
++  for (let y = 0; y < height; y += 1) {
++    const row = y * stride;
++    raw[row] = 0; // filter: none
++    for (let x = 0; x < width; x += 1) {
++      const at = row + 1 + x * 3;
++      // A wide band across the middle, so the image isn't a blank rectangle.
++      const inBand = y > height * 0.32 && y < height * 0.38;
++      raw[at] = inBand ? 0x2d : rgb[0];
++      raw[at + 1] = inBand ? 0xbc : rgb[1];
++      raw[at + 2] = inBand ? 0x9a : rgb[2];
++    }
++  }
++
++  const ihdr = Buffer.alloc(13);
++  ihdr.writeUInt32BE(width, 0);
++  ihdr.writeUInt32BE(height, 4);
++  ihdr[8] = 8; // bit depth
++  ihdr[9] = 2; // colour type: truecolour
++  ihdr[10] = 0;
++  ihdr[11] = 0;
++  ihdr[12] = 0;
++
++  return Buffer.concat([
++    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
++    chunk("IHDR", ihdr),
++    chunk("IDAT", deflateSync(raw)),
++    chunk("IEND", Buffer.alloc(0)),
++  ]);
++}
+diff --git a/src/lib/storage/storage.ts b/src/lib/storage/storage.ts
+new file mode 100644
+index 0000000..9cc9659
+--- /dev/null
++++ b/src/lib/storage/storage.ts
+@@ -0,0 +1,148 @@
++import "server-only";
++
++import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
++import path from "node:path";
++import {
++  DeleteObjectCommand,
++  GetObjectCommand,
++  PutObjectCommand,
++  S3Client,
++} from "@aws-sdk/client-s3";
++import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
++import { buildStorageKey, localUploadPath } from "./keys";
++
++export { buildStorageKey };
++
++/**
++ * Proof artwork lives in Cloudflare R2, which speaks the S3 API.
++ *
++ * The bucket is private. Nothing is ever served from a public URL — every read
++ * goes through a signed link that expires, so a proof can't be passed around
++ * or indexed once someone has seen it.
++ *
++ * Until the R2 credentials are added, files are written to .uploads/ on disk
++ * instead, so the whole proof journey is testable locally. That fallback is
++ * refused outright in a production build rather than quietly losing files —
++ * unless ALLOW_LOCAL_UPLOADS is set, which is how the end-to-end suite runs
++ * the journey against a real build. Nothing sets that by accident.
++ */
++
++const SIGNED_URL_TTL_SECONDS = 60 * 10;
++
++function localUploadsAllowed(): boolean {
++  return (
++    process.env.NODE_ENV !== "production" ||
++    process.env.ALLOW_LOCAL_UPLOADS === "1"
++  );
++}
++
++export type StoredObject = {
++  storageKey: string;
++  fileName: string;
++  mimeType: string;
++  sizeBytes: number;
++};
++
++function config() {
++  return {
++    accountId: process.env.R2_ACCOUNT_ID ?? "",
++    accessKeyId: process.env.R2_ACCESS_KEY_ID ?? "",
++    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY ?? "",
++    bucket: process.env.R2_BUCKET ?? "",
++  };
++}
++
++export function isRemoteStorageConfigured(): boolean {
++  const { accountId, accessKeyId, secretAccessKey, bucket } = config();
++  return Boolean(accountId && accessKeyId && secretAccessKey && bucket);
++}
++
++let client: S3Client | null = null;
++
++function s3(): S3Client {
++  if (client) return client;
++
++  const { accountId, accessKeyId, secretAccessKey } = config();
++
++  client = new S3Client({
++    // R2 is single-region; "auto" is what Cloudflare expects here.
++    region: "auto",
++    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
++    credentials: { accessKeyId, secretAccessKey },
++  });
++
++  return client;
++}
++
++export async function putObject(
++  storageKey: string,
++  body: Buffer,
++  mimeType: string,
++): Promise<void> {
++  if (!isRemoteStorageConfigured()) {
++    if (!localUploadsAllowed()) {
++      throw new Error(
++        "R2 is not configured. Refusing to write uploads to local disk in production.",
++      );
++    }
++
++    const target = localUploadPath(storageKey);
++    await mkdir(path.dirname(target), { recursive: true });
++    await writeFile(target, body);
++    return;
++  }
++
++  await s3().send(
++    new PutObjectCommand({
++      Bucket: config().bucket,
++      Key: storageKey,
++      Body: body,
++      ContentType: mimeType,
++    }),
++  );
++}
++
++/**
++ * A short-lived link to read one object. In development this points at the
++ * route that serves from disk instead.
++ */
++export async function signedReadUrl(storageKey: string): Promise<string> {
++  if (!isRemoteStorageConfigured()) {
++    // Each segment is encoded separately: a single encodeURIComponent would
++    // turn the slashes into %2F, which some servers refuse outright.
++    const segments = storageKey.split("/").map(encodeURIComponent).join("/");
++    return `/api/uploads/${segments}`;
++  }
++
++  return getSignedUrl(
++    s3(),
++    new GetObjectCommand({ Bucket: config().bucket, Key: storageKey }),
++    { expiresIn: SIGNED_URL_TTL_SECONDS },
++  );
++}
++
++export async function readObject(storageKey: string): Promise<Buffer> {
++  if (!isRemoteStorageConfigured()) {
++    return readFile(localUploadPath(storageKey));
++  }
++
++  const response = await s3().send(
++    new GetObjectCommand({ Bucket: config().bucket, Key: storageKey }),
++  );
++
++  const bytes = await response.Body?.transformToByteArray();
++  if (!bytes) throw new Error(`No body returned for ${storageKey}`);
++
++  return Buffer.from(bytes);
++}
++
++export async function deleteObject(storageKey: string): Promise<void> {
++  if (!isRemoteStorageConfigured()) {
++    await unlink(localUploadPath(storageKey)).catch(() => {});
++    return;
++  }
++
++  await s3().send(
++    new DeleteObjectCommand({ Bucket: config().bucket, Key: storageKey }),
++  );
++}
+diff --git a/src/lib/storage/uploads.ts b/src/lib/storage/uploads.ts
+new file mode 100644
+index 0000000..b28ddae
+--- /dev/null
++++ b/src/lib/storage/uploads.ts
+@@ -0,0 +1,58 @@
++/**
++ * What the studio is willing to accept as a proof, kept free of server
++ * imports so the rules can be tested directly and reused on the client.
++ */
++
++export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024; // 25 MB
++
++export const ACCEPTED_MIME_TYPES = [
++  "application/pdf",
++  "image/jpeg",
++  "image/png",
++  "image/webp",
++] as const;
++
++export type AcceptedMimeType = (typeof ACCEPTED_MIME_TYPES)[number];
++
++export const ACCEPT_ATTRIBUTE = ACCEPTED_MIME_TYPES.join(",");
++
++export type UploadCheck =
++  | { ok: true; mimeType: AcceptedMimeType }
++  | { ok: false; reason: string };
++
++/**
++ * Checked on the server, not just in the file picker — the `accept` attribute
++ * is a convenience for the person choosing a file, never a control.
++ */
++export function checkUpload(file: {
++  type: string;
++  size: number;
++  name: string;
++}): UploadCheck {
++  if (!file.name || file.size === 0) {
++    return { ok: false, reason: "That file appears to be empty." };
++  }
++
++  if (file.size > MAX_UPLOAD_BYTES) {
++    const limit = Math.round(MAX_UPLOAD_BYTES / (1024 * 1024));
++    return {
++      ok: false,
++      reason: `That file is larger than ${limit}MB. Flatten the artwork or send it over separately.`,
++    };
++  }
++
++  const mimeType = file.type.toLowerCase().split(";")[0]?.trim() ?? "";
++
++  if (!ACCEPTED_MIME_TYPES.includes(mimeType as AcceptedMimeType)) {
++    return {
++      ok: false,
++      reason: "Proofs must be a PDF, JPEG, PNG or WebP.",
++    };
++  }
++
++  return { ok: true, mimeType: mimeType as AcceptedMimeType };
++}
++
++export function isPdf(mimeType: string | null | undefined): boolean {
++  return (mimeType ?? "").toLowerCase().startsWith("application/pdf");
++}
+-- 
+2.43.0
+

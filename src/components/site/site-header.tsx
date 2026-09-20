@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { isStaff } from "@/lib/auth/guards";
 import { getCartCount } from "@/lib/cart/cart";
 import { MobileNav } from "./mobile-nav";
+import { LoginPopupTrigger } from "./login-popup-trigger";
 
 const LINKS = [
   { href: "/portfolio", label: "Our Work" },
@@ -51,12 +52,16 @@ export async function SiteHeader() {
         </nav>
 
         <div className="hidden items-center gap-3 lg:flex">
-          <Link
-            href={accountHref}
-            className="text-sm font-semibold text-ink-soft hover:text-blue"
-          >
-            {accountLabel}
-          </Link>
+          {session ? (
+            <Link
+              href={accountHref}
+              className="text-sm font-semibold text-ink-soft hover:text-blue"
+            >
+              {accountLabel}
+            </Link>
+          ) : (
+            <LoginPopupTrigger label={accountLabel} />
+          )}
           <Link
             href="/cart"
             className="flex items-center gap-2 text-sm font-semibold text-ink-soft hover:text-blue"
