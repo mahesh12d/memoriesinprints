@@ -12,6 +12,9 @@ import {
 } from "@/lib/catalogue";
 import { Breadcrumb, CtaBand, Section } from "@/components/site/section";
 import { ImagePlaceholder } from "@/components/site/image-placeholder";
+import { SaveButton } from "@/components/site/save-button";
+import { resolveImageUrls } from "@/lib/storage/image-url";
+import { loadSavedProductIds } from "@/lib/saved/queries";
 
 export const metadata: Metadata = {
   title: "Products",
@@ -37,6 +40,7 @@ export default async function ProductsPage({
       summary: products.summary,
       category: products.category,
       minimumQuantity: products.minimumQuantity,
+      heroImageUrl: products.heroImageUrl,
     })
     .from(products)
     .where(
@@ -45,6 +49,10 @@ export default async function ProductsPage({
         : eq(products.isActive, true),
     )
     .orderBy(asc(products.sortOrder));
+
+  const images = await resolveImageUrls(rows.map((row) => row.heroImageUrl));
+  const saved = await loadSavedProductIds();
+  const listPath = active ? `/products?category=${active}` : "/products";
 
   // One query for every size, rather than one per product.
   const sizes = rows.length
@@ -135,13 +143,20 @@ export default async function ProductsPage({
         </nav>
 
         <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {rows.map((product) => (
+          {rows.map((product, index) => (
             <li
               key={product.id}
-              className="flex flex-col overflow-hidden rounded-md border border-line bg-white"
+              className="relative flex flex-col overflow-hidden rounded-md border border-line bg-white"
             >
+              <SaveButton
+                productId={product.id}
+                productName={product.name}
+                isSaved={saved.has(product.id)}
+                returnTo={listPath}
+              />
               <ImagePlaceholder
                 caption={`[Photograph — ${product.name.toLowerCase()}]`}
+                src={images[index]}
                 className="aspect-[4/3] w-full"
               />
               <div className="flex flex-1 flex-col gap-3 p-6">

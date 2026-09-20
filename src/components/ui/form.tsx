@@ -109,3 +109,49 @@ export function FormMessage({
     </p>
   );
 }
+
+/**
+ * A labelled <select>.
+ *
+ * A <label> wrapped round a <select> takes its accessible name from everything
+ * inside it, options included — so the field announces as "Role Customer
+ * Designer Proofreader Administrator". Associating by id instead keeps the
+ * name to the label, which is what someone listening to the page needs.
+ */
+export function SelectField({
+  id,
+  label,
+  name,
+  defaultValue,
+  hint,
+  required,
+  className = "",
+  children,
+}: {
+  id: string;
+  label: string;
+  name: string;
+  defaultValue?: string;
+  hint?: string;
+  required?: boolean;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={`flex flex-col gap-2 ${className}`}>
+      <label htmlFor={id} className="text-[13px] font-semibold text-ink-soft">
+        {label}
+      </label>
+      <select
+        id={id}
+        name={name}
+        defaultValue={defaultValue}
+        required={required}
+        className="w-full rounded-[3px] border border-field-line bg-white px-3 py-2.5 text-sm"
+      >
+        {children}
+      </select>
+      {hint && <span className="text-[12px] text-ink-quiet">{hint}</span>}
+    </div>
+  );
+}

@@ -9,6 +9,9 @@ import { ProductPurchase, type SizeOption } from "./product-purchase";
 import { TURNAROUND_NOTE } from "@/lib/studio";
 import { Breadcrumb, Section } from "@/components/site/section";
 import { ImagePlaceholder } from "@/components/site/image-placeholder";
+import { SaveButton } from "@/components/site/save-button";
+import { resolveImageUrl } from "@/lib/storage/image-url";
+import { loadSavedProductIds } from "@/lib/saved/queries";
 
 async function loadProduct(slug: string) {
   const [product] = await db
@@ -45,6 +48,9 @@ export default async function ProductDetailPage({
   const product = await loadProduct(slug);
 
   if (!product) notFound();
+
+  const heroImage = await resolveImageUrl(product.heroImageUrl);
+  const saved = await loadSavedProductIds();
 
   const [sizes, prices, related] = await Promise.all([
     db
@@ -126,6 +132,7 @@ export default async function ProductDetailPage({
         <div className="flex flex-col gap-4">
           <ImagePlaceholder
             caption={`[Photograph — ${product.name.toLowerCase()}, styled on a linen background]`}
+            src={heroImage}
             className="aspect-[4/3] w-full rounded-md"
           />
           <div className="grid grid-cols-3 gap-4">
@@ -157,6 +164,14 @@ export default async function ProductDetailPage({
             slug={product.slug}
             sizes={sizeOptions}
             minimumQuantity={product.minimumQuantity}
+          />
+
+          <SaveButton
+            variant="inline"
+            productId={product.id}
+            productName={product.name}
+            isSaved={saved.has(product.id)}
+            returnTo={`/products/${product.slug}`}
           />
 
           <div className="rounded-md border border-line bg-white p-6">

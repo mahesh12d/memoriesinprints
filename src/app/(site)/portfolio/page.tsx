@@ -11,6 +11,7 @@ import {
 } from "@/lib/catalogue";
 import { CtaBand, Section } from "@/components/site/section";
 import { ImagePlaceholder } from "@/components/site/image-placeholder";
+import { resolveImageUrls } from "@/lib/storage/image-url";
 
 export const metadata: Metadata = {
   title: "Our Work",
@@ -34,6 +35,7 @@ export default async function PortfolioPage({
       title: portfolioItems.title,
       category: portfolioItems.category,
       description: portfolioItems.description,
+      imageUrl: portfolioItems.imageUrl,
     })
     .from(portfolioItems)
     .where(
@@ -45,6 +47,8 @@ export default async function PortfolioPage({
         : eq(portfolioItems.isPublished, true),
     )
     .orderBy(asc(portfolioItems.sortOrder));
+
+  const images = await resolveImageUrls(items.map((item) => item.imageUrl));
 
   const filters = [
     { href: "/portfolio", label: "All work", isActive: !active },
@@ -97,10 +101,11 @@ export default async function PortfolioPage({
           </p>
         ) : (
           <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {items.map((item) => (
+            {items.map((item, index) => (
               <li key={item.id} className="flex flex-col gap-3">
                 <ImagePlaceholder
                   caption={`[Photograph — ${item.title.toLowerCase()}]`}
+                  src={images[index]}
                   className="aspect-[4/3] w-full rounded-md"
                 />
                 <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-text">

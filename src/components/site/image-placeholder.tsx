@@ -1,17 +1,34 @@
 /**
- * The studio's photography isn't in yet, so every image slot renders as a
- * labelled placeholder carrying the caption from the approved design. Swapping
- * one for a real photograph is a one-line change at the call site.
+ * An image slot that shows the real photograph when there is one.
+ *
+ * The studio's own photography isn't in yet, so anything without a picture
+ * still renders as a labelled placeholder carrying the caption from the
+ * approved design. Once a photograph is uploaded against a product or a
+ * portfolio piece, passing its `src` here is all that's needed.
  */
 export function ImagePlaceholder({
   caption,
+  src,
   className = "",
   tone = "light",
 }: {
   caption: string;
+  /** A resolved image URL. Falls back to the placeholder when absent. */
+  src?: string | null;
   className?: string;
   tone?: "light" | "dark";
 }) {
+  if (src) {
+    return (
+      /* eslint-disable-next-line @next/next/no-img-element */
+      <img
+        src={src}
+        alt={caption}
+        className={`block object-cover ${className}`}
+      />
+    );
+  }
+
   const toneClasses =
     tone === "dark"
       ? "bg-blue-deep text-white/50"
