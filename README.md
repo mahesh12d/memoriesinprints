@@ -8,19 +8,24 @@ This repository is the fresh build that replaces the current site.
 
 ## Status
 
-Milestone 1 (foundation) is complete and tested:
+**Milestone 1 — foundation.** Database schema for users, sessions, products,
+portfolio, enquiries, orders, proofs with positioned comments, payments,
+notifications and pricing. Sign up with email confirmation, sign in and out,
+forgotten-password reset, change password, active session list with revoke and
+"sign out everywhere else", profile editing, and three role gates — customer
+(`/account`), studio staff (`/staff`) and admin (`/admin`), with admin sign-in
+independent of customer sign-in.
 
-- Database schema for users, sessions, products, portfolio, enquiries, orders,
-  proofs with positioned comments, payments, notifications and pricing.
-- Sign up, email confirmation, sign in, sign out.
-- Forgotten password and reset, change password.
-- Active session list with revoke, and "sign out everywhere else".
-- Three role gates: customer (`/account`), studio staff (`/staff`) and admin
-  (`/admin`), with admin sign-in independent of customer sign-in.
-- Profile editing.
+**Milestone 2 — public site.** Home, Our Work, Products and product detail,
+Process, About and FAQ, all reading from the database, plus a working quote
+form: it validates, stores the enquiry with a human reference, emails both the
+sender and the studio, attaches to the signed-in account when there is one, and
+appears in the customer's Quotes page where they can withdraw it. Terms,
+privacy and cookies pages exist but say plainly that the wording is still to
+come from the studio.
 
-Still to come: the public marketing site, the order and quote screens, the proof
-review tool, payments (Razorpay and PayPal), and the admin CRUD screens.
+Still to come: cart and checkout, payments (Razorpay and PayPal), the proof
+review tool, the studio work queue, and the admin CRUD screens.
 
 ## Stack
 
@@ -84,7 +89,9 @@ variables to send for real.
 | `npm run db:migrate`  | Apply pending migrations                          |
 | `npm run db:seed`     | Load demo data                                    |
 | `npm run db:studio`   | Browse the database in Drizzle Studio             |
+| `npm run test:unit`   | Node unit tests                                   |
 | `npm run test:e2e`    | Playwright end-to-end tests                       |
+| `npm test`            | Both                                              |
 
 ## How authentication works
 
@@ -105,7 +112,12 @@ moment someone asks — which is what makes "sign out my other devices" honest.
 ## Before launch
 
 - [ ] Replace the in-memory rate limiter in `src/lib/rate-limit.ts` with Redis —
-      it is per-instance and resets on deploy.
+      it is per-instance and resets on deploy. (Limits are tunable per
+      environment via `RATE_LIMIT_*`; the defaults are the production values.)
+- [ ] Fill in the real studio details in `src/lib/studio.ts` — phone, email,
+      city, founder name and the social links are placeholders.
+- [ ] Write the terms, privacy and cookie notices.
+- [ ] Replace the image placeholders with the studio's photography.
 - [ ] Confirm the four pricing layers; the seeded figures are placeholders.
 - [ ] Point `MAIL_TRANSPORT` at a real provider and verify the sending domain.
 - [ ] Add Razorpay and PayPal credentials.
@@ -117,14 +129,17 @@ moment someone asks — which is what makes "sign out my other devices" honest.
 ```
 src/
   app/
+    (site)/          public marketing site, products, quote form
     (auth)/          sign in, sign up, verify, reset
     account/         customer area
     staff/           studio staff portal
     admin/           admin back office (login sits outside the portal group)
-  components/        shared UI and portal chrome
+  components/        shared UI, site chrome and portal chrome
+  content/           editorial copy, kept out of the layout
   db/                schema, client, seed
   lib/
     auth/            passwords, sessions, tokens, guards, server actions
+    enquiries/       quote request handling
     mail/            transport and templates
   proxy.ts           cookie-level redirects
 drizzle/             generated SQL migrations

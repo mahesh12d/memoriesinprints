@@ -1,4 +1,9 @@
-import "server-only";
+/**
+ * Deliberately not marked "server-only": this module holds no secrets and no
+ * request state, and the guard would make it unimportable from a plain Node
+ * test. The modules that do touch cookies, the database or credentials —
+ * session, tokens, guards, mailer — carry the guard instead.
+ */
 
 type Bucket = { count: number; resetAt: number };
 
@@ -45,6 +50,32 @@ export function rateLimit(
 export function clearRateLimit(key: string): void {
   buckets.delete(key);
 }
+
+/** Exposed for tests. */
+export function resetAllRateLimits(): void {
+  buckets.clear();
+}
+
+/**
+ * Limits are read from the environment so they can be tuned without a deploy —
+ * and so the end-to-end suite, which signs in far more often than any real
+ * person, isn't fighting the lockout. Defaults are the production values.
+ */
+export function limitFromEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+export const LIMITS = {
+  login: () => limitFromEnv("RATE_LIMIT_LOGIN", 8),
+  adminLogin: () => limitFromEnv("RATE_LIMIT_ADMIN_LOGIN", 5),
+  signup: () => limitFromEnv("RATE_LIMIT_SIGNUP", 5),
+  forgotPassword: () => limitFromEnv("RATE_LIMIT_FORGOT", 5),
+  enquiry: () => limitFromEnv("RATE_LIMIT_ENQUIRY", 5),
+} as const;
 
 /** Keeps the Map from growing without bound on a long-lived server. */
 if (typeof setInterval === "function") {

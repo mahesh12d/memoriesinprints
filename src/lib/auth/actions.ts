@@ -15,7 +15,7 @@ import {
   resetPasswordSchema,
   signupSchema,
 } from "@/lib/validation";
-import { rateLimit } from "@/lib/rate-limit";
+import { LIMITS, rateLimit } from "@/lib/rate-limit";
 import { sendMail } from "@/lib/mail/mailer";
 import {
   passwordChangedMail,
@@ -69,7 +69,7 @@ export async function signupAction(
     return fail("Please check the form.", fieldErrors(parsed.error));
   }
 
-  const limit = rateLimit(`signup:${await clientKey()}`, 5, 900);
+  const limit = rateLimit(`signup:${await clientKey()}`, LIMITS.signup(), 900);
   if (!limit.ok) {
     return fail("Too many attempts. Please try again in a few minutes.");
   }
@@ -122,7 +122,7 @@ export async function loginAction(
 
   const { email, password } = parsed.data;
 
-  const limit = rateLimit(`login:${email}:${await clientKey()}`, 8, 900);
+  const limit = rateLimit(`login:${email}:${await clientKey()}`, LIMITS.login(), 900);
   if (!limit.ok) {
     return fail(
       `Too many sign-in attempts. Please try again in ${Math.ceil(limit.retryAfterSeconds / 60)} minutes.`,
@@ -192,7 +192,7 @@ export async function adminLoginAction(
 
   const { email, password } = parsed.data;
 
-  const limit = rateLimit(`admin-login:${email}:${await clientKey()}`, 5, 900);
+  const limit = rateLimit(`admin-login:${email}:${await clientKey()}`, LIMITS.adminLogin(), 900);
   if (!limit.ok) {
     return fail("Too many sign-in attempts. Please try again shortly.");
   }
@@ -284,7 +284,7 @@ export async function forgotPasswordAction(
     return fail("Please check the form.", fieldErrors(parsed.error));
   }
 
-  const limit = rateLimit(`forgot:${await clientKey()}`, 5, 900);
+  const limit = rateLimit(`forgot:${await clientKey()}`, LIMITS.forgotPassword(), 900);
   if (!limit.ok) {
     return fail("Too many requests. Please try again in a few minutes.");
   }

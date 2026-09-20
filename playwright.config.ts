@@ -35,6 +35,14 @@ export default defineConfig({
     env: {
       APP_URL: baseURL,
       MAIL_TRANSPORT: "log",
+      // The suite signs in far more often than any real person would, so the
+      // lockout is raised here rather than weakened in the app. The limiter's
+      // own behaviour is covered by src/lib/rate-limit.test.ts.
+      RATE_LIMIT_LOGIN: "500",
+      RATE_LIMIT_ADMIN_LOGIN: "500",
+      RATE_LIMIT_SIGNUP: "500",
+      RATE_LIMIT_FORGOT: "500",
+      RATE_LIMIT_ENQUIRY: "500",
     },
   },
 });
