@@ -75,7 +75,7 @@ export function PortalShell({
               <span className="truncate text-[13px] font-semibold text-white">
                 {user.name}
               </span>
-              <span className="text-[11px] text-ink-quiet">
+              <span className="text-[11px] text-on-blue-muted">
                 {user.roleLabel}
               </span>
             </span>
@@ -113,7 +113,7 @@ export function LogoutButton({ action }: { action: () => Promise<void> }) {
     <form action={action}>
       <button
         type="submit"
-        className="text-[13px] font-semibold text-ink-pale hover:text-white"
+        className="text-[13px] font-semibold text-on-blue-muted hover:text-white"
       >
         Log out
       </button>

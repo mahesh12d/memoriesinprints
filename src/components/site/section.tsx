@@ -42,7 +42,7 @@ export function SectionHeading({
   tone?: "dark" | "light";
 }) {
   const introColour = tone === "light" ? "text-white/65" : "text-ink-muted";
-  const eyebrowColour = tone === "light" ? "text-brand" : "text-accent-text";
+  const eyebrowColour = tone === "light" ? "text-brand-on-dark" : "text-accent-text";
 
   return (
     <div className="mb-12 flex flex-wrap items-end justify-between gap-6">
@@ -66,7 +66,7 @@ export function SectionHeading({
         <Link
           href={action.href}
           className={`text-[13px] font-semibold ${
-            tone === "light" ? "text-brand" : "text-accent-text"
+            tone === "light" ? "text-brand-on-dark" : "text-accent-text"
           }`}
         >
           {action.label}

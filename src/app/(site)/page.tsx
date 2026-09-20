@@ -172,7 +172,7 @@ export default async function HomePage() {
         <ul className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
           {STUDIO_VALUES.map((value) => (
             <li key={value.n} className="flex flex-col gap-3">
-              <span className="font-display text-[28px] text-brand">
+              <span className="font-display text-[28px] text-brand-on-dark">
                 {value.n}
               </span>
               <h3 className="text-lg text-white">{value.title}</h3>

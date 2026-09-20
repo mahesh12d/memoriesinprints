@@ -4,7 +4,7 @@ export type PillTone = "good" | "pending" | "alert" | "neutral";
 
 const TONES: Record<PillTone, string> = {
   good: "bg-good-tint text-good-deep",
-  pending: "bg-brand-tint text-accent-text",
+  pending: "bg-pending-tint text-pending-deep",
   alert: "bg-alert-tint text-alert",
   neutral: "bg-surface-grey text-ink-muted",
 };

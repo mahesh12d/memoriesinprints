@@ -42,6 +42,21 @@ review tool, the studio work queue, and the admin CRUD screens.
 Fonts (EB Garamond, Work Sans) are self-hosted through Fontsource rather than
 loaded from Google Fonts, so no visitor data leaves the site to a third party.
 
+## Colour
+
+The brand palette — green `#2DBC9A`, blue `#465862`, grey `#F8F8F8`, muted
+`#A8AAAB` — lives in the `@theme` block at the top of `src/app/globals.css`.
+Components reference tokens, never raw hexes, so the whole site restyles from
+that one file.
+
+Two of the supplied pairings fall below the 4.5:1 contrast floor for body text:
+the muted grey on the grey footer (2.20:1) and white on the green (2.39:1). The
+`VARIANT` block at the top of that file holds the three values that differ
+between using the hexes literally and using darker shades of the same hues for
+small text. It currently uses the accessible variant. A handful of derived
+tokens exist for the same reason — `brand-on-dark` and `on-blue-muted` are the
+versions that survive the blue band and sidebar.
+
 ## Getting started
 
 You'll need Node 20+ and a PostgreSQL 14+ database.

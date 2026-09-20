@@ -24,7 +24,7 @@ export function AuthCard({
         <Link
           href="/"
           className={`font-display text-lg font-semibold ${
-            dark ? "text-ink-quiet" : "text-blue"
+            dark ? "text-on-blue-muted" : "text-blue"
           }`}
         >
           Memories in Prints
@@ -54,7 +54,7 @@ export function AuthCard({
       {footer && (
         <div
           className={`px-16 pb-10 text-center text-[13px] ${
-            dark ? "text-ink-quiet" : "text-ink-muted"
+            dark ? "text-on-blue-muted" : "text-ink-muted"
           }`}
         >
           {footer}

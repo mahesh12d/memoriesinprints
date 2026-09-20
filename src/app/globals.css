@@ -34,6 +34,8 @@
   --color-brand-deep: #20846c;
   --color-brand-tint: #eaf8f4;
   --color-brand-line: #bce7dc;
+  /* Green is too dark to read on the blue band; this one clears 4.5:1 there. */
+  --color-brand-on-dark: #70ddc3;
 
   --color-blue: #465862;
   --color-blue-deep: #35444c;
@@ -49,6 +51,8 @@
   --color-ink-muted: #5d6e77;
   --color-ink-quiet: var(--color-muted-text);
   --color-ink-pale: #a8aaab;
+  /* On the blue sidebar, where dark greys vanish (4.51:1 there). */
+  --color-on-blue-muted: #c3cbd0;
 
   /* Lines and fields */
   --color-line: #e4e6e7;
@@ -61,7 +65,7 @@
   --color-good: #2dbc9a;
   --color-good-tint: #eaf8f4;
   --color-good-deep: #1b6e59;
-  --color-alert: #b4554a;
+  --color-alert: #ad5247;
   --color-alert-tint: #fbeeec;
   --color-pending-tint: #fdf4e6;
   --color-pending-deep: #8a6b3d;

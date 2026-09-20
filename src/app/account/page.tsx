@@ -13,14 +13,14 @@ export default async function AccountDashboardPage() {
       <PortalBody>
         <div className="flex flex-col gap-6">
           {!verified && (
-            <div className="flex items-center justify-between gap-6 rounded-md border border-brand/30 bg-brand-tint px-5 py-4">
+            <div className="flex items-center justify-between gap-6 rounded-md border border-pending-deep/25 bg-pending-tint px-5 py-4">
               <p className="text-sm text-ink-soft">
                 Please confirm your email address so we can send you proofs and
                 order updates.
               </p>
               <Link
                 href="/verify-email"
-                className="shrink-0 text-[13px] font-semibold text-accent-text"
+                className="shrink-0 text-[13px] font-semibold text-pending-deep"
               >
                 Confirm now →
               </Link>
