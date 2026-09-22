@@ -24,8 +24,8 @@ export function PricingTabs() {
             aria-current={active ? "page" : undefined}
             className={`rounded-full px-5 py-2.5 text-[13px] font-semibold transition-colors ${
               active
-                ? "bg-blue text-white"
-                : "border border-line bg-white text-ink-soft hover:border-brand"
+                ? "bg-band text-white"
+                : "border border-line bg-card text-ink-soft hover:border-brand"
             }`}
           >
             {tab.label}

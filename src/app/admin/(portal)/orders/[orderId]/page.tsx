@@ -22,6 +22,7 @@ import { formatMoney, QUOTED_INDIVIDUALLY } from "@/lib/pricing/money";
 import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
 import { StatusPill } from "@/components/portal/status-pill";
 import { OrderDetailForm, RecordPaymentForm } from "./order-forms";
+import { isUuid } from "@/lib/utils";
 
 const dateTimeFormat = new Intl.DateTimeFormat("en-GB", {
   day: "numeric",
@@ -38,6 +39,7 @@ export default async function AdminOrderDetailPage({
 }) {
   await requireAdmin();
   const { orderId } = await params;
+  if (!isUuid(orderId)) notFound();
 
   const [order] = await db
     .select({
@@ -142,7 +144,7 @@ export default async function AdminOrderDetailPage({
       <PortalBody>
         <div className="grid gap-7 lg:grid-cols-[1.5fr_1fr]">
           <div className="flex flex-col gap-6">
-            <section className="rounded-md border border-line bg-white p-7">
+            <section className="rounded-md border border-line bg-card p-7">
               <div className="mb-5 flex flex-wrap items-center gap-2">
                 <StatusPill tone={status.tone}>{status.label}</StatusPill>
                 <StatusPill tone={payment.tone}>{payment.label}</StatusPill>
@@ -163,7 +165,7 @@ export default async function AdminOrderDetailPage({
               />
             </section>
 
-            <section className="overflow-hidden rounded-md border border-line bg-white">
+            <section className="overflow-hidden rounded-md border border-line bg-card">
               <div className="border-b border-line-soft px-6 py-4">
                 <h2 className="font-display text-lg">
                   What was ordered ({lines.length})
@@ -203,7 +205,7 @@ export default async function AdminOrderDetailPage({
             </section>
 
             {order.paymentStatus !== "paid" && (
-              <section className="rounded-md border border-line bg-white p-7">
+              <section className="rounded-md border border-line bg-card p-7">
                 <h2 className="font-display text-lg">
                   Record a payment taken elsewhere
                 </h2>
@@ -220,7 +222,7 @@ export default async function AdminOrderDetailPage({
             )}
 
             {paymentRows.length > 0 && (
-              <section className="overflow-hidden rounded-md border border-line bg-white">
+              <section className="overflow-hidden rounded-md border border-line bg-card">
                 <div className="border-b border-line-soft px-6 py-4">
                   <h2 className="font-display text-lg">Payments</h2>
                   {order.paymentStatus === "paid" && (
@@ -258,7 +260,7 @@ export default async function AdminOrderDetailPage({
           </div>
 
           <aside className="flex h-fit flex-col gap-6">
-            <section className="rounded-md border border-line bg-white p-6">
+            <section className="rounded-md border border-line bg-card p-6">
               <h2 className="font-display text-lg">Customer</h2>
               <dl className="mt-3 flex flex-col gap-2.5 text-[13px]">
                 <div className="flex justify-between gap-4">
@@ -295,7 +297,7 @@ export default async function AdminOrderDetailPage({
               </dl>
             </section>
 
-            <section className="rounded-md border border-line bg-white p-6">
+            <section className="rounded-md border border-line bg-card p-6">
               <h2 className="font-display text-lg">
                 Proofs ({proofs.length})
               </h2>
@@ -322,7 +324,7 @@ export default async function AdminOrderDetailPage({
             </section>
 
             {activity.length > 0 && (
-              <section className="rounded-md border border-line bg-white p-6">
+              <section className="rounded-md border border-line bg-card p-6">
                 <h2 className="font-display text-lg">History</h2>
                 <ul className="mt-3 flex flex-col gap-3">
                   {activity.map((event) => (

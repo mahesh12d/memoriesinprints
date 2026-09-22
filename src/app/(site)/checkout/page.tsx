@@ -47,7 +47,7 @@ export default async function CheckoutPage() {
           <CheckoutForm providers={providers} />
         </div>
 
-        <aside className="flex h-fit flex-col gap-5 rounded-md border border-line bg-white p-7">
+        <aside className="flex h-fit flex-col gap-5 rounded-md border border-line bg-card p-7">
           <h2 className="font-display text-lg">Your order</h2>
 
           <ul className="flex flex-col divide-y divide-line-soft border-y border-line-soft">

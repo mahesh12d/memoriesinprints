@@ -94,7 +94,7 @@ export default async function CartPage() {
           ))}
         </ul>
 
-        <aside className="flex h-fit flex-col gap-5 rounded-md border border-line bg-white p-7">
+        <aside className="flex h-fit flex-col gap-5 rounded-md border border-line bg-card p-7">
           <h2 className="font-display text-lg">Summary</h2>
 
           <dl className="flex flex-col gap-3">

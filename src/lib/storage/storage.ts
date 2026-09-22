@@ -3,15 +3,16 @@ import "server-only";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
+  CopyObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { buildStorageKey, localUploadPath } from "./keys";
+import { buildArchiveKey, buildStorageKey, localUploadPath } from "./keys";
 
-export { buildStorageKey };
+export { buildArchiveKey, buildStorageKey };
 
 /**
  * Proof artwork lives in Cloudflare R2, which speaks the S3 API.
@@ -103,6 +104,33 @@ export async function putObject(
 }
 
 /**
+ * A short-lived link the browser can PUT one file to.
+ *
+ * The file goes straight from the family's computer to the bucket rather than
+ * through this server, so a large scan of an order of service never occupies
+ * a request handler.
+ *
+ * Returns null when R2 isn't configured, which is the signal to fall back to
+ * the local upload route in development.
+ */
+export async function signedUploadUrl(
+  storageKey: string,
+  mimeType: string,
+): Promise<string | null> {
+  if (!isRemoteStorageConfigured()) return null;
+
+  return getSignedUrl(
+    s3(),
+    new PutObjectCommand({
+      Bucket: config().bucket,
+      Key: storageKey,
+      ContentType: mimeType,
+    }),
+    { expiresIn: SIGNED_URL_TTL_SECONDS },
+  );
+}
+
+/**
  * A short-lived link to read one object. In development this points at the
  * route that serves from disk instead.
  */
@@ -134,6 +162,43 @@ export async function readObject(storageKey: string): Promise<Buffer> {
   if (!bytes) throw new Error(`No body returned for ${storageKey}`);
 
   return Buffer.from(bytes);
+}
+
+/**
+ * Copies an object within the bucket, server side.
+ *
+ * Archiving a finished proof moves bytes that are already in R2, so there is
+ * no reason to pull a 25MB PDF down and push it back up again — and no window
+ * where the copy exists only in this process's memory.
+ */
+export async function copyObject(
+  fromKey: string,
+  toKey: string,
+): Promise<void> {
+  if (!isRemoteStorageConfigured()) {
+    if (!localUploadsAllowed()) {
+      throw new Error(
+        "R2 is not configured. Refusing to archive to local disk in production.",
+      );
+    }
+
+    const target = localUploadPath(toKey);
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(target, await readFile(localUploadPath(fromKey)));
+    return;
+  }
+
+  const { bucket } = config();
+
+  await s3().send(
+    new CopyObjectCommand({
+      Bucket: bucket,
+      // CopySource is bucket-qualified and must be URI-encoded, or any key
+      // with a space or a hash in it fails with a 404 that names the wrong key.
+      CopySource: encodeURI(`${bucket}/${fromKey}`),
+      Key: toKey,
+    }),
+  );
 }
 
 export async function deleteObject(storageKey: string): Promise<void> {

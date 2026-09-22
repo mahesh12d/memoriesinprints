@@ -11,9 +11,19 @@ import {
   proofVersions,
   users,
 } from "@/db/schema";
-import { isStaff, requireStaff, requireUser } from "@/lib/auth/guards";
+import {
+  canSeeAllOrders,
+  canUploadProofs,
+  isStaff,
+  requireStaff,
+  requireUser,
+} from "@/lib/auth/guards";
 import { getSession } from "@/lib/auth/session";
-import { buildStorageKey, putObject } from "@/lib/storage/storage";
+import {
+  buildStorageKey,
+  deleteObject,
+  putObject,
+} from "@/lib/storage/storage";
 import { checkUpload } from "@/lib/storage/uploads";
 import { fail, type FormState } from "@/lib/auth/form-state";
 import { clampPin } from "./pins";
@@ -23,15 +33,26 @@ import { clampPin } from "./pins";
 /* -------------------------------------------------------------------------- */
 
 /**
- * Every upload is a new version. Nothing is ever overwritten, so the history
- * of what was sent and when survives — which matters when a family disputes
- * what they approved.
+ * An order carries two proofs at a time: the one the customer last saw, and
+ * the one replacing it. Uploading a third drops the oldest, file and all, so
+ * there is always exactly one "before" to compare the current artwork against.
+ *
+ * Version numbers still climb, so "version 7" means the seventh proof drawn
+ * even though only six and seven are still on the shelf.
  */
+// A "use server" module may only export async functions, so this stays local.
+const PROOF_VERSIONS_KEPT = 2;
+
 export async function uploadProofAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
   const session = await requireStaff();
+
+  // Proofreaders check artwork; they never replace it.
+  if (!canUploadProofs(session.user.role)) {
+    return fail("Only the assigned designer can upload a proof.");
+  }
 
   const orderId = String(formData.get("orderId") ?? "");
   const file = formData.get("file");
@@ -43,12 +64,26 @@ export async function uploadProofAction(
   if (!check.ok) return fail(check.reason);
 
   const [order] = await db
-    .select({ id: orders.id, reference: orders.reference, userId: orders.userId })
+    .select({
+      id: orders.id,
+      reference: orders.reference,
+      userId: orders.userId,
+      assignedDesignerId: orders.assignedDesignerId,
+    })
     .from(orders)
     .where(eq(orders.id, orderId))
     .limit(1);
 
   if (!order) return fail("That order no longer exists.");
+
+  // A designer may only upload against their own job. Checked here and not
+  // only on the page, because the action is reachable on its own.
+  if (
+    !canSeeAllOrders(session.user.role) &&
+    order.assignedDesignerId !== session.user.id
+  ) {
+    return fail("That order is assigned to another designer.");
+  }
 
   const storageKey = buildStorageKey(`proofs/${order.reference}`, file.name);
   const bytes = Buffer.from(await file.arrayBuffer());
@@ -81,6 +116,8 @@ export async function uploadProofAction(
     status: "awaiting_proofreading",
   });
 
+  await pruneOldVersions(orderId);
+
   await db
     .update(orders)
     .set({ status: "in_production", updatedAt: new Date() })
@@ -98,6 +135,42 @@ export async function uploadProofAction(
   revalidatePath("/staff/queue");
 
   return { ok: true, message: "Proof uploaded and sent for proofreading." };
+}
+
+/**
+ * Keeps the newest two versions of an order's proof and removes the rest,
+ * object storage included.
+ *
+ * An archived version is never dropped: once an order has been completed its
+ * final artwork is kept for the record, whatever else happens afterwards.
+ * Storage deletions are best-effort — a file left behind in the bucket is a
+ * tidiness problem, but a half-deleted database row is a correctness one, so
+ * the row only goes once the object has.
+ */
+async function pruneOldVersions(orderId: string): Promise<void> {
+  const stale = await db
+    .select({
+      id: proofVersions.id,
+      storageKey: proofVersions.storageKey,
+      archivedStorageKey: proofVersions.archivedStorageKey,
+    })
+    .from(proofVersions)
+    .where(eq(proofVersions.orderId, orderId))
+    .orderBy(desc(proofVersions.versionNumber))
+    .offset(PROOF_VERSIONS_KEPT);
+
+  for (const version of stale) {
+    if (version.archivedStorageKey) continue;
+
+    try {
+      await deleteObject(version.storageKey);
+    } catch (error) {
+      console.error("[proofs] could not remove superseded file", error);
+      continue;
+    }
+
+    await db.delete(proofVersions).where(eq(proofVersions.id, version.id));
+  }
 }
 
 /* -------------------------------------------------------------------------- */

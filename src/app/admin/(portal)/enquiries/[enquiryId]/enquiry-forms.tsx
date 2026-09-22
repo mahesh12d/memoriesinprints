@@ -78,7 +78,7 @@ export function QuoteForm({
             defaultValue={
               currentAmount === null ? "" : (currentAmount / 100).toFixed(2)
             }
-            className="w-40 rounded-[3px] border border-field-line bg-white px-3 py-2.5 text-sm"
+            className="w-40 rounded-[3px] border border-field-line bg-card px-3 py-2.5 text-sm"
           />
         </div>
       </label>
@@ -92,7 +92,7 @@ export function QuoteForm({
           rows={3}
           defaultValue={currentNotes ?? ""}
           placeholder="100 order of service booklets on 170gsm silk, folded and stitched, one proof included."
-          className="w-full rounded-[3px] border border-field-line bg-white px-3 py-2.5 font-sans text-sm"
+          className="w-full rounded-[3px] border border-field-line bg-card px-3 py-2.5 font-sans text-sm"
         />
         <span className="text-[12px] text-ink-quiet">
           The customer sees this, so write it for them.

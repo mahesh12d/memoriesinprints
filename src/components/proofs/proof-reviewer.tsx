@@ -80,7 +80,7 @@ export function ProofReviewer({
       />
 
       <aside className="flex h-fit flex-col gap-5">
-        <div className="flex flex-col gap-2 rounded-md border border-line bg-white p-6">
+        <div className="flex flex-col gap-2 rounded-md border border-line bg-card p-6">
           <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-text">
             Version {versionNumber}
           </span>
@@ -120,7 +120,7 @@ export function ProofReviewer({
               rows={3}
               autoFocus
               placeholder="The middle initial should be J, not T."
-              className="w-full rounded-[3px] border border-field-line bg-white px-3 py-2.5 font-sans text-sm"
+              className="w-full rounded-[3px] border border-field-line bg-card px-3 py-2.5 font-sans text-sm"
             />
             <div className="flex gap-2">
               <button
@@ -146,7 +146,7 @@ export function ProofReviewer({
         )}
 
         {/* The comments so far */}
-        <div className="overflow-hidden rounded-md border border-line bg-white">
+        <div className="overflow-hidden rounded-md border border-line bg-card">
           <div className="border-b border-line-soft px-5 py-4">
             <h3 className="font-display text-[15px]">
               Comments ({comments.length})
@@ -211,7 +211,7 @@ export function ProofReviewer({
 
         {/* The decision */}
         {!decided && (
-          <div className="flex flex-col gap-3 rounded-md border border-line bg-white p-6">
+          <div className="flex flex-col gap-3 rounded-md border border-line bg-card p-6">
             <h3 className="font-display text-[15px]">Ready to decide?</h3>
             <p className="text-[13px] leading-relaxed text-ink-muted">
               Nothing is printed until you approve. If something isn&rsquo;t

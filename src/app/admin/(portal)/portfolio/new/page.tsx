@@ -22,7 +22,7 @@ export default async function NewPortfolioItemPage() {
       />
 
       <PortalBody>
-        <div className="max-w-3xl rounded-md border border-line bg-white p-7">
+        <div className="max-w-3xl rounded-md border border-line bg-card p-7">
           <p className="mb-6 max-w-[62ch] text-[13px] leading-relaxed text-ink-muted">
             Anything published here appears on the public portfolio. If you are
             showing a family&rsquo;s stationery, make sure you have their
@@ -36,6 +36,9 @@ export default async function NewPortfolioItemPage() {
               title: "",
               category: "funeral",
               description: null,
+              templateNumber: null,
+              style: null,
+              isPopular: false,
               sortOrder: 0,
               isPublished: false,
             }}

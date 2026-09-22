@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { pinFromClick, type Pin } from "@/lib/proofs/pins";
+import { renderPdfFirstPage } from "@/lib/proofs/render-pdf";
 
 export type ProofComment = {
   id: string;
@@ -53,40 +54,14 @@ export function ProofCanvas({
 
     (async () => {
       try {
-        // Must run before pdf.js is evaluated — it reaches for these on load.
-        const { installMapUpsertPolyfill } = await import(
-          "@/lib/proofs/map-upsert-polyfill"
-        );
-        installMapUpsertPolyfill();
-
-        const pdfjs = await import("pdfjs-dist");
-
-        pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-          "pdfjs-dist/build/pdf.worker.min.mjs",
-          import.meta.url,
-        ).toString();
-
-        const document = await pdfjs.getDocument({ url: fileUrl }).promise;
-        const page = await document.getPage(1);
-
-        if (cancelled) return;
-
         const canvas = canvasRef.current;
         if (!canvas) return;
 
-        // Render at twice the display width so the artwork stays sharp when
-        // someone leans in to check a date or a spelling.
-        const target = (surfaceRef.current?.clientWidth ?? 900) * 2;
-        const base = page.getViewport({ scale: 1 });
-        const viewport = page.getViewport({ scale: target / base.width });
-
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-
-        const context = canvas.getContext("2d");
-        if (!context) return;
-
-        await page.render({ canvas, canvasContext: context, viewport }).promise;
+        await renderPdfFirstPage(
+          fileUrl,
+          canvas,
+          surfaceRef.current?.clientWidth ?? 900,
+        );
 
         if (!cancelled) setLoaded(true);
       } catch (error) {
@@ -124,7 +99,7 @@ export function ProofCanvas({
       <div
         ref={surfaceRef}
         onClick={handleClick}
-        className={`relative overflow-hidden rounded-md border border-line bg-white ${
+        className={`relative overflow-hidden rounded-md border border-line bg-card ${
           readOnly ? "" : "cursor-crosshair"
         }`}
       >
@@ -165,7 +140,7 @@ export function ProofCanvas({
             aria-label={`Comment ${comment.pinNumber}: ${comment.body}`}
             className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white text-[12px] font-bold shadow-sm transition-transform ${
               activeCommentId === comment.id
-                ? "z-20 scale-110 bg-blue text-white"
+                ? "z-20 scale-110 bg-band text-white"
                 : "z-10 bg-brand text-on-accent hover:scale-110"
             } flex size-7 items-center justify-center`}
           >
@@ -177,7 +152,7 @@ export function ProofCanvas({
         {pending && (
           <span
             style={{ left: `${pending.xPct}%`, top: `${pending.yPct}%` }}
-            className="absolute z-20 flex size-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-blue text-[12px] font-bold text-white shadow-sm"
+            className="absolute z-20 flex size-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-band text-[12px] font-bold text-white shadow-sm"
           >
             +
           </span>

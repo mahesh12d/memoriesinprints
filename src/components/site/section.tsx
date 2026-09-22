@@ -14,8 +14,8 @@ export function Section({
 }) {
   const tones = {
     surface: "bg-surface",
-    white: "bg-white",
-    blue: "bg-blue text-white",
+    white: "bg-card",
+    blue: "bg-band text-white",
     grey: "bg-surface-grey",
   };
 
@@ -122,7 +122,7 @@ export function CtaBand({
         <div className="mt-2 flex flex-wrap justify-center gap-3">
           <Link
             href={primary.href}
-            className="rounded-[2px] bg-surface px-7 py-3.5 text-sm font-semibold text-blue hover:bg-white"
+            className="rounded-[2px] bg-surface px-7 py-3.5 text-sm font-semibold text-blue hover:bg-card"
           >
             {primary.label}
           </Link>

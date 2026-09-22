@@ -10,7 +10,7 @@ import { ORDER_STATUS } from "@/lib/admin/labels";
 import { FormMessage, SelectField, SubmitButton } from "@/components/ui/form";
 
 const fieldClass =
-  "w-full rounded-[3px] border border-field-line bg-white px-3 py-2.5 text-sm";
+  "w-full rounded-[3px] border border-field-line bg-card px-3 py-2.5 text-sm";
 
 export type OrderFormValues = {
   status: string;
@@ -168,7 +168,7 @@ export function RecordPaymentForm({
             defaultValue={
               suggestedAmount === null ? "" : (suggestedAmount / 100).toFixed(2)
             }
-            className="w-40 rounded-[3px] border border-field-line bg-white px-3 py-2.5 text-sm"
+            className="w-40 rounded-[3px] border border-field-line bg-card px-3 py-2.5 text-sm"
           />
         </div>
       </label>

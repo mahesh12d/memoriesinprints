@@ -1,5 +1,5 @@
 import "server-only";
-import { eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
 import { savedItems } from "@/db/schema";
 import { getSession } from "@/lib/auth/session";
@@ -12,13 +12,27 @@ import { getSession } from "@/lib/auth/session";
  * sends them to sign in and back again.
  */
 export async function loadSavedProductIds(): Promise<Set<string>> {
+  return loadSavedIds("product");
+}
+
+/** The same, for portfolio designs saved from the portfolio pages. */
+export async function loadSavedTemplateIds(): Promise<Set<string>> {
+  return loadSavedIds("template");
+}
+
+async function loadSavedIds(kind: "product" | "template"): Promise<Set<string>> {
   const session = await getSession("site");
   if (!session) return new Set();
 
-  const rows = await db
-    .select({ productId: savedItems.productId })
-    .from(savedItems)
-    .where(eq(savedItems.userId, session.user.id));
+  const column =
+    kind === "product" ? savedItems.productId : savedItems.portfolioItemId;
 
-  return new Set(rows.map((row) => row.productId));
+  const rows = await db
+    .select({ id: column })
+    .from(savedItems)
+    .where(and(eq(savedItems.userId, session.user.id), isNotNull(column)));
+
+  // The column is nullable on the table but never null in these rows, which
+  // the filter above guarantees and the check constraint backs up.
+  return new Set(rows.flatMap((row) => (row.id ? [row.id] : [])));
 }

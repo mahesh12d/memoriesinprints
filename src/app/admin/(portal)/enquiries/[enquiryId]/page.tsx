@@ -98,7 +98,7 @@ export default async function AdminEnquiryDetailPage({
       <PortalBody>
         <div className="grid gap-7 lg:grid-cols-[1.5fr_1fr]">
           <div className="flex flex-col gap-6">
-            <section className="rounded-md border border-line bg-white p-7">
+            <section className="rounded-md border border-line bg-card p-7">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="flex flex-col gap-1">
                   <h2 className="font-display text-lg">{enquiry.subject}</h2>
@@ -132,7 +132,7 @@ export default async function AdminEnquiryDetailPage({
               </dl>
             </section>
 
-            <section className="rounded-md border border-line bg-white p-7">
+            <section className="rounded-md border border-line bg-card p-7">
               <h2 className="font-display text-lg">Quote</h2>
               <p className="mb-5 mt-1 text-[13px] text-ink-muted">
                 {enquiry.quotedAt
@@ -146,7 +146,7 @@ export default async function AdminEnquiryDetailPage({
               />
             </section>
 
-            <section className="rounded-md border border-line bg-white p-7">
+            <section className="rounded-md border border-line bg-card p-7">
               <h2 className="font-display text-lg">Turn this into an order</h2>
               <p className="mb-5 mt-1 max-w-[58ch] text-[13px] leading-relaxed text-ink-muted">
                 The quoted figure becomes the order total, and the customer can
@@ -190,7 +190,7 @@ export default async function AdminEnquiryDetailPage({
           </div>
 
           <aside className="flex h-fit flex-col gap-6">
-            <section className="rounded-md border border-line bg-white p-6">
+            <section className="rounded-md border border-line bg-card p-6">
               <h2 className="font-display text-lg">Who sent it</h2>
               <dl className="mt-3 flex flex-col gap-2.5 text-[13px]">
                 <div className="flex justify-between gap-4">
@@ -227,7 +227,7 @@ export default async function AdminEnquiryDetailPage({
               </dl>
             </section>
 
-            <section className="rounded-md border border-line bg-white p-6">
+            <section className="rounded-md border border-line bg-card p-6">
               <h2 className="font-display text-lg">Move it along</h2>
               <div className="mt-4">
                 <StatusForm enquiryId={enquiry.id} current={enquiry.status} />

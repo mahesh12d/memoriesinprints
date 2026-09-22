@@ -46,7 +46,7 @@ export function CheckoutForm({
             className={`flex cursor-pointer items-center justify-between gap-4 rounded-md border px-5 py-4 transition-colors ${
               provider === option.name
                 ? "border-brand bg-brand-tint"
-                : "border-line bg-white hover:border-field-line"
+                : "border-line bg-card hover:border-field-line"
             }`}
           >
             <span className="flex items-center gap-3">

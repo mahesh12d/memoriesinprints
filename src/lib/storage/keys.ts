@@ -20,6 +20,27 @@ export function buildStorageKey(prefix: string, fileName: string): string {
   return `${prefix}/${Date.now().toString(36)}-${randomBytes(8).toString("hex")}-${safeName}`;
 }
 
+/** Where a completed order's final artwork is kept, separate from working files. */
+export const ARCHIVE_PREFIX = "archive";
+
+/**
+ * The archive key for a finished proof.
+ *
+ * Grouped by order reference and stamped with the version, so the bucket
+ * reads as a filing cabinet rather than a pile: archive/MIP-1042/v3-....pdf
+ */
+export function buildArchiveKey(
+  reference: string,
+  versionNumber: number,
+  fileName: string | null,
+): string {
+  const safeReference = reference.toLowerCase().replace(/[^a-z0-9-]+/g, "-");
+  return buildStorageKey(
+    `${ARCHIVE_PREFIX}/${safeReference}`,
+    `v${versionNumber}-${fileName ?? "proof"}`,
+  );
+}
+
 /**
  * Resolves a key under the local upload directory.
  *

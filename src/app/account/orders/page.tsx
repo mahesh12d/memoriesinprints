@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, proofVersions } from "@/db/schema";
 import { requireUser } from "@/lib/auth/guards";
 import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
 import { StatusPill, type PillTone } from "@/components/portal/status-pill";
+import { FilterTabs } from "@/components/admin/filter-tabs";
+import { OrderSearch } from "@/components/portal/order-search";
 import { formatMoney, QUOTED_INDIVIDUALLY } from "@/lib/pricing/money";
 import { loadOrdersWithLines, repriceOrders } from "@/lib/pricing/reprice";
 
@@ -30,8 +32,27 @@ const dateFormat = new Intl.DateTimeFormat("en-GB", {
   year: "numeric",
 });
 
-export default async function AccountOrdersPage() {
+export default async function AccountOrdersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string; q?: string }>;
+}) {
   const session = await requireUser();
+  const { status = "all", q } = await searchParams;
+
+  const known = status in STATUS ? status : "all";
+  const query = q?.trim() ?? "";
+
+  // Counts come from the unfiltered set, so the tabs still say how many of
+  // each there are while you're looking at one of them.
+  const counts = await db
+    .select({ status: orders.status, value: sql<number>`count(*)::int` })
+    .from(orders)
+    .where(eq(orders.userId, session.user.id))
+    .groupBy(orders.status);
+
+  const byStatus = new Map(counts.map((row) => [row.status as string, row.value]));
+  const total = counts.reduce((sum, row) => sum + row.value, 0);
 
   const rows = await db
     .select({
@@ -44,7 +65,15 @@ export default async function AccountOrdersPage() {
       createdAt: orders.createdAt,
     })
     .from(orders)
-    .where(eq(orders.userId, session.user.id))
+    .where(
+      and(
+        eq(orders.userId, session.user.id),
+        known === "all"
+          ? undefined
+          : eq(orders.status, known as (typeof orders.status.enumValues)[number]),
+        query ? ilike(orders.reference, `%${query}%`) : undefined,
+      ),
+    )
     .orderBy(desc(orders.createdAt));
 
   /**
@@ -109,8 +138,8 @@ export default async function AccountOrdersPage() {
       <PortalHeader title="Orders" />
 
       <PortalBody>
-        {rows.length === 0 ? (
-          <div className="rounded-md border border-line bg-white p-10 text-center">
+        {total === 0 ? (
+          <div className="rounded-md border border-line bg-card p-10 text-center">
             <h2 className="font-display text-lg">No orders yet</h2>
             <p className="mx-auto mt-2 max-w-[46ch] text-sm leading-relaxed text-ink-muted">
               Anything you order appears here, and you&rsquo;ll be able to
@@ -125,14 +154,38 @@ export default async function AccountOrdersPage() {
           </div>
         ) : (
           <div className="flex flex-col gap-6">
+            {/* Past a handful of orders, scrolling stops being a way to find one. */}
+            <OrderSearch
+              basePath="/account/orders"
+              query={query}
+              placeholder="Order reference"
+              keep={{ status: known === "all" ? undefined : known }}
+            />
+
+            <FilterTabs
+              basePath="/account/orders"
+              current={known}
+              extraParams={{ q: query || undefined }}
+              options={[
+                { value: "all", label: "All", count: total },
+                ...Object.entries(STATUS)
+                  .filter(([value]) => (byStatus.get(value) ?? 0) > 0)
+                  .map(([value, label]) => ({
+                    value,
+                    label: label.label,
+                    count: byStatus.get(value) ?? 0,
+                  })),
+              ]}
+            />
+
             <div className="flex gap-[18px]">
-              <div className="flex flex-col gap-1.5 rounded-md border border-line bg-white p-5">
+              <div className="flex flex-col gap-1.5 rounded-md border border-line bg-card p-5">
                 <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-quiet">
                   Orders
                 </span>
                 <span className="font-display text-[27px]">{rows.length}</span>
               </div>
-              <div className="flex flex-col gap-1.5 rounded-md border border-line bg-white p-5">
+              <div className="flex flex-col gap-1.5 rounded-md border border-line bg-card p-5">
                 <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-quiet">
                   Total spend
                 </span>
@@ -142,7 +195,17 @@ export default async function AccountOrdersPage() {
               </div>
             </div>
 
-            <div className="overflow-hidden rounded-md border border-line bg-white">
+            {rows.length === 0 ? (
+              <div className="rounded-md border border-line bg-card p-10 text-center">
+                <h2 className="font-display text-lg">Nothing here</h2>
+                <p className="mx-auto mt-2 max-w-[48ch] text-sm leading-relaxed text-ink-muted">
+                  {query
+                    ? `No order of yours matches “${query}”. Check the reference, or clear the search to see them all.`
+                    : "You have no orders at this stage. Pick another filter to see the rest."}
+                </p>
+              </div>
+            ) : (
+            <div className="overflow-hidden rounded-md border border-line bg-card">
               <ul>
                 {rows.map((row) => {
                   const current = priced.get(row.id);
@@ -205,6 +268,7 @@ export default async function AccountOrdersPage() {
                 })}
               </ul>
             </div>
+            )}
           </div>
         )}
       </PortalBody>

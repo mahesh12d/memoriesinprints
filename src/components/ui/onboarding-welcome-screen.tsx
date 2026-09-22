@@ -61,7 +61,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   return (
     <div
       className={cn(
-        "flex w-full flex-col items-center bg-white",
+        "flex w-full flex-col items-center bg-card",
         className
       )}
     >
@@ -113,7 +113,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
           <button
             type="button"
             onClick={onButtonClick}
-            className="w-full rounded-full bg-blue-deep py-3.5 text-[14px] font-semibold text-white transition-colors hover:bg-blue"
+            className="w-full rounded-full bg-band-deep py-3.5 text-[14px] font-semibold text-white transition-colors hover:bg-band"
           >
             {buttonText}
           </button>
@@ -149,12 +149,14 @@ interface AuthWelcomeModalProps {
  * A modal that wraps the WelcomeScreen, presenting it as a popup overlay.
  * Uses AnimatePresence for smooth mount/unmount transitions.
  */
-export function AuthWelcomeModal({ open, onClose }: AuthWelcomeModalProps) {
-  const [mounted, setMounted] = React.useState(false);
+const emptySubscribe = () => () => {};
 
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
+export function AuthWelcomeModal({ open, onClose }: AuthWelcomeModalProps) {
+  const mounted = React.useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  );
 
   // Close on Escape key
   React.useEffect(() => {
@@ -198,7 +200,7 @@ export function AuthWelcomeModal({ open, onClose }: AuthWelcomeModalProps) {
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pointer-events-none">
             {/* Modal panel */}
             <motion.div
-              className="pointer-events-auto relative w-full max-w-[360px] overflow-hidden rounded-3xl border border-line bg-white shadow-2xl"
+              className="pointer-events-auto relative w-full max-w-[360px] overflow-hidden rounded-3xl border border-line bg-card shadow-2xl"
               initial={{ scale: 0.92, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.92, opacity: 0 }}

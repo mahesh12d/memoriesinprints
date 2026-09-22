@@ -35,7 +35,7 @@ export function Field({
           name={name}
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
-          className={`w-full rounded-[3px] border bg-white px-[15px] py-[13px] text-sm text-blue placeholder:text-placeholder ${
+          className={`w-full rounded-[3px] border bg-card px-[15px] py-[13px] text-sm text-blue placeholder:text-placeholder ${
             error ? "border-alert" : "border-field-line"
           }`}
           {...props}
@@ -147,7 +147,7 @@ export function SelectField({
         name={name}
         defaultValue={defaultValue}
         required={required}
-        className="w-full rounded-[3px] border border-field-line bg-white px-3 py-2.5 text-sm"
+        className="w-full rounded-[3px] border border-field-line bg-card px-3 py-2.5 text-sm"
       >
         {children}
       </select>

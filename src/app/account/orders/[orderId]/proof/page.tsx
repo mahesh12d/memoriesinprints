@@ -9,6 +9,7 @@ import { signedReadUrl } from "@/lib/storage/storage";
 import { isPdf } from "@/lib/storage/uploads";
 import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
 import { ProofReviewer } from "@/components/proofs/proof-reviewer";
+import { isUuid } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Review your proof",
@@ -22,6 +23,7 @@ export default async function ProofReviewPage({
 }) {
   const session = await requireUser();
   const { orderId } = await params;
+  if (!isUuid(orderId)) notFound();
 
   const [order] = await db
     .select({ id: orders.id, reference: orders.reference })
@@ -49,7 +51,7 @@ export default async function ProofReviewPage({
       <>
         <PortalHeader title={`Proof — ${order.reference}`} />
         <PortalBody>
-          <div className="rounded-md border border-line bg-white p-10 text-center">
+          <div className="rounded-md border border-line bg-card p-10 text-center">
             <h2 className="font-display text-lg">No proof yet</h2>
             <p className="mx-auto mt-2 max-w-[46ch] text-sm leading-relaxed text-ink-muted">
               The studio is working on it. We&rsquo;ll email you the moment

@@ -46,14 +46,14 @@ export default async function QuoteThankYouPage({
           {session ? (
             <Link
               href="/account/quotes"
-              className="rounded-[2px] bg-brand px-7 py-3.5 text-sm font-semibold text-on-accent hover:bg-blue-deep"
+              className="rounded-[2px] bg-brand px-7 py-3.5 text-sm font-semibold text-on-accent hover:bg-band-deep"
             >
               See it in my account
             </Link>
           ) : (
             <Link
               href="/signup"
-              className="rounded-[2px] bg-brand px-7 py-3.5 text-sm font-semibold text-on-accent hover:bg-blue-deep"
+              className="rounded-[2px] bg-brand px-7 py-3.5 text-sm font-semibold text-on-accent hover:bg-band-deep"
             >
               Create an account to track it
             </Link>
@@ -62,7 +62,7 @@ export default async function QuoteThankYouPage({
             href="/portfolio"
             className="rounded-[2px] border border-field-line px-7 py-3.5 text-sm font-semibold text-ink-soft hover:bg-surface-grey"
           >
-            Browse our work
+            Browse the portfolio
           </Link>
         </div>
       </div>

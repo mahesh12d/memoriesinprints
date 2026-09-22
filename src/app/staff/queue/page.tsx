@@ -22,7 +22,7 @@ function waitedFor(since: Date): string {
 
 export default async function StaffQueuePage() {
   const session = await requireStaff();
-  const items = await loadQueue();
+  const items = await loadQueue(session.user);
 
   const groups = sortQueue(
     items.map((item) => ({ ...item, waitingSince: item.waitingSince })),
@@ -34,7 +34,7 @@ export default async function StaffQueuePage() {
       <PortalHeader title="Work queue" />
       <PortalBody>
         {groups.length === 0 ? (
-          <div className="rounded-md border border-line bg-white p-10 text-center">
+          <div className="rounded-md border border-line bg-card p-10 text-center">
             <h2 className="font-display text-lg">Nothing in the queue</h2>
             <p className="mt-2 text-sm text-ink-muted">
               Every order is either delivered or cancelled.
@@ -48,7 +48,7 @@ export default async function StaffQueuePage() {
                   {GROUP_LABEL[group.group]} ({group.items.length})
                 </h2>
 
-                <div className="overflow-hidden rounded-md border border-line bg-white">
+                <div className="overflow-hidden rounded-md border border-line bg-card">
                   <ul>
                     {group.items.map((item) => {
                       const proof = item.proofStatus

@@ -1,12 +1,7 @@
 import type { Metadata } from "next";
 import { STUDIO_VALUES } from "@/content/home";
 import { STUDIO } from "@/lib/studio";
-import {
-  Breadcrumb,
-  CtaBand,
-  Section,
-  SectionHeading,
-} from "@/components/site/section";
+import { Breadcrumb, Section, SectionHeading } from "@/components/site/section";
 import { ImagePlaceholder } from "@/components/site/image-placeholder";
 
 export const metadata: Metadata = {
@@ -54,6 +49,7 @@ export default function AboutPage() {
           </div>
           <ImagePlaceholder
             caption="[Photograph — founder reviewing a printed proof at the workbench]"
+            fileName="about-founder-proof.webp"
             className="h-[340px] w-full rounded-md"
           />
         </div>
@@ -63,6 +59,7 @@ export default function AboutPage() {
         <div className="grid items-center gap-12 lg:grid-cols-2">
           <ImagePlaceholder
             caption="[Photograph — the studio's founder at the workbench, folding a printed booklet]"
+            fileName="about-founder-folding.webp"
             className="order-last h-[340px] w-full rounded-md lg:order-first"
           />
           <div className="flex flex-col gap-5">
@@ -117,13 +114,6 @@ export default function AboutPage() {
           </p>
         </div>
       </Section>
-
-      <CtaBand
-        title="Ready to work together?"
-        body="Tell us about your project and we'll get back to you within one working day."
-        primary={{ href: "/quote", label: "Request a quote" }}
-        secondary={{ href: "/portfolio", label: "Browse our work" }}
-      />
     </>
   );
 }

@@ -8,17 +8,24 @@ import { HeartIcon } from "@/components/portal/icons";
  */
 export function SaveButton({
   productId,
+  portfolioItemId,
   productName,
   isSaved,
   returnTo,
   variant = "overlay",
+  savedLabel,
+  unsavedLabel,
 }: {
-  productId: string;
+  /** One or the other: a product to buy, or a portfolio design to keep. */
+  productId?: string;
+  portfolioItemId?: string;
   productName: string;
   isSaved: boolean;
   /** Where to come back to after signing in. */
   returnTo: string;
   variant?: "overlay" | "inline";
+  savedLabel?: string;
+  unsavedLabel?: string;
 }) {
   const label = isSaved
     ? `Remove ${productName} from your saved items`
@@ -27,7 +34,16 @@ export function SaveButton({
   if (variant === "inline") {
     return (
       <form action={toggleSavedItemAction}>
-        <input type="hidden" name="productId" value={productId} />
+        {productId && (
+          <input type="hidden" name="productId" value={productId} />
+        )}
+        {portfolioItemId && (
+          <input
+            type="hidden"
+            name="portfolioItemId"
+            value={portfolioItemId}
+          />
+        )}
         <input type="hidden" name="returnTo" value={returnTo} />
         <button
           type="submit"
@@ -39,7 +55,7 @@ export function SaveButton({
           }`}
         >
           <HeartIcon />
-          {isSaved ? "Saved" : "Save this"}
+          {isSaved ? (savedLabel ?? "Saved") : (unsavedLabel ?? "Save this")}
         </button>
       </form>
     );
@@ -47,7 +63,10 @@ export function SaveButton({
 
   return (
     <form action={toggleSavedItemAction} className="absolute right-3 top-3 z-10">
-      <input type="hidden" name="productId" value={productId} />
+      {productId && <input type="hidden" name="productId" value={productId} />}
+      {portfolioItemId && (
+        <input type="hidden" name="portfolioItemId" value={portfolioItemId} />
+      )}
       <input type="hidden" name="returnTo" value={returnTo} />
       <button
         type="submit"
@@ -56,7 +75,7 @@ export function SaveButton({
         className={`flex size-9 items-center justify-center rounded-full border shadow-sm transition-colors ${
           isSaved
             ? "border-brand-deep bg-brand text-on-accent"
-            : "border-line bg-white text-ink-muted hover:text-blue"
+            : "border-line bg-card text-ink-muted hover:text-blue"
         }`}
       >
         <HeartIcon />

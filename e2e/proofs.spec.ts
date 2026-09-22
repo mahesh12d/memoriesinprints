@@ -73,6 +73,35 @@ test.describe("A proof from the studio to the customer", () => {
     await expect(page.getByText("Needs proofreading").first()).toBeVisible();
   });
 
+  test("an order keeps only the current proof and the one before it", async ({
+    page,
+  }) => {
+    await signIn(page, "designer@example.com");
+    await openOrder(page, "MP-1042");
+
+    // MP-1042 arrives with v1. Two more uploads take it past the limit.
+    await uploadProof(page, "invitation-v2.pdf");
+    await expect(page.getByText("Version history (2)")).toBeVisible();
+
+    await uploadProof(page, "invitation-v3.pdf");
+
+    // Still two, and the oldest is the one that went.
+    await expect(page.getByText("Version history (2)")).toBeVisible();
+    await expect(page.getByText(/Version 3/).first()).toBeVisible();
+    await expect(page.getByText(/Version 1/)).toHaveCount(0);
+
+    // Which leaves exactly one "before" to compare the current artwork with.
+    await expect(page.getByText("What changed since version 2")).toBeVisible();
+  });
+
+  test("a proofreader cannot upload artwork", async ({ page }) => {
+    await signIn(page, "proofreader@example.com");
+    await openOrder(page, "MP-1042");
+
+    await expect(page.getByRole("heading", { name: "Upload a proof" })).toHaveCount(0);
+    await expect(page.locator('input[type="file"]')).toHaveCount(0);
+  });
+
   test("a designer cannot send a proof to the customer", async ({ page }) => {
     await signIn(page, "designer@example.com");
     await openOrder(page, "MP-1042");

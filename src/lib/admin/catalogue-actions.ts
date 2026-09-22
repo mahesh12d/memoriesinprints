@@ -233,19 +233,44 @@ const portfolioSchema = z.object({
   title: z.string().trim().min(2, "Give the piece a title."),
   category: z.enum(CATEGORIES),
   description: z.string().trim().max(4000).optional(),
+  templateNumber: z.coerce
+    .number()
+    .int()
+    .positive("A template number is a whole number above zero.")
+    .nullable(),
+  style: z.string().trim().max(60).nullable(),
+  isPopular: z.boolean(),
   sortOrder: z.coerce.number().int().default(0),
   isPublished: z.boolean(),
 });
 
 function readPortfolioForm(formData: FormData) {
+  const templateNumber = String(formData.get("templateNumber") ?? "").trim();
+
   return portfolioSchema.safeParse({
     title: formData.get("title"),
     category: formData.get("category"),
     description: formData.get("description") || undefined,
+    templateNumber: templateNumber === "" ? null : templateNumber,
+    style: String(formData.get("style") ?? "").trim() || null,
+    isPopular: formData.get("isPopular") === "on",
     sortOrder: formData.get("sortOrder") || 0,
     isPublished: formData.get("isPublished") === "on",
   });
 }
+
+/** Postgres unique-violation, which here can only be the template number. */
+function isTemplateClash(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "23505"
+  );
+}
+
+const TEMPLATE_TAKEN =
+  "Another piece already uses that template number. Give this one a number of its own.";
 
 export async function createPortfolioItemAction(
   _prev: FormState,
@@ -270,18 +295,30 @@ export async function createPortfolioItemAction(
     existing.map((row) => row.slug),
   );
 
-  const [created] = await db
-    .insert(portfolioItems)
-    .values({
+  let created: { id: string } | undefined;
+
+  try {
+    [created] = await db
+      .insert(portfolioItems)
+      .values({
       slug,
       title: parsed.data.title,
       category: parsed.data.category,
       description: parsed.data.description ?? null,
+      templateNumber: parsed.data.templateNumber,
+      style: parsed.data.style,
+      isPopular: parsed.data.isPopular,
       sortOrder: parsed.data.sortOrder,
       isPublished: parsed.data.isPublished,
-      imageUrl: image?.url ?? null,
-    })
-    .returning({ id: portfolioItems.id });
+        imageUrl: image?.url ?? null,
+      })
+      .returning({ id: portfolioItems.id });
+  } catch (error) {
+    if (isTemplateClash(error)) return fail(TEMPLATE_TAKEN);
+    throw error;
+  }
+
+  if (!created) return fail("That didn't save.");
 
   revalidatePath("/admin/portfolio");
   revalidatePath("/portfolio");
@@ -308,18 +345,26 @@ export async function updatePortfolioItemAction(
   const image = await storeImage(formData.get("image") as File | null, "portfolio");
   if (image && "error" in image) return fail(image.error);
 
-  await db
-    .update(portfolioItems)
-    .set({
-      title: parsed.data.title,
+  try {
+    await db
+      .update(portfolioItems)
+      .set({
+        title: parsed.data.title,
       category: parsed.data.category,
       description: parsed.data.description ?? null,
+      templateNumber: parsed.data.templateNumber,
+      style: parsed.data.style,
+      isPopular: parsed.data.isPopular,
       sortOrder: parsed.data.sortOrder,
       isPublished: parsed.data.isPublished,
-      ...(image ? { imageUrl: image.url } : {}),
-      updatedAt: new Date(),
-    })
-    .where(eq(portfolioItems.id, itemId));
+        ...(image ? { imageUrl: image.url } : {}),
+        updatedAt: new Date(),
+      })
+      .where(eq(portfolioItems.id, itemId));
+  } catch (error) {
+    if (isTemplateClash(error)) return fail(TEMPLATE_TAKEN);
+    throw error;
+  }
 
   revalidatePath("/admin/portfolio");
   revalidatePath(`/admin/portfolio/${itemId}`);

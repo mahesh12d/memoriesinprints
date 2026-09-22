@@ -9,6 +9,7 @@ import { requireAdmin } from "@/lib/auth/guards";
 import { fail, type FormState } from "@/lib/auth/form-state";
 import { formatMoney, majorToMinor } from "@/lib/pricing/money";
 import { ORDER_STATUS } from "@/lib/admin/labels";
+import { archiveFinalProof } from "@/lib/proofs/archive";
 
 const ORDER_STATUSES = [
   "awaiting_price",
@@ -83,6 +84,8 @@ export async function updateOrderAction(
     .set({ status, ...rest, updatedAt: new Date() })
     .where(eq(orders.id, orderId));
 
+  let archiveWarning = "";
+
   if (before.status !== status) {
     await db.insert(activityEvents).values({
       orderId,
@@ -90,6 +93,7 @@ export async function updateOrderAction(
       type: "order_status",
       summary: `${before.reference} moved to ${ORDER_STATUS[status]?.label ?? status}`,
     });
+
 
     if (status === "shipped" || status === "delivered") {
       await db.insert(notifications).values({
@@ -108,11 +112,32 @@ export async function updateOrderAction(
     }
   }
 
+  /**
+   * Delivered is where an order is finished with, so this is where the artwork
+   * is filed for the record.
+   *
+   * Keyed on the status being delivered rather than on it having just changed:
+   * archiving is idempotent, so re-saving a delivered order retries one that
+   * failed, and picks up orders that were completed before there was an
+   * archive to put them in.
+   */
+  if (status === "delivered") {
+    const result = await archiveFinalProof(
+      orderId,
+      before.reference,
+      session.user.id,
+    );
+    if (!result.archived && result.reason === "storage") {
+      archiveWarning =
+        " The artwork couldn't be archived just now — save the order again to retry.";
+    }
+  }
+
   revalidatePath("/admin/orders");
   revalidatePath(`/admin/orders/${orderId}`);
   revalidatePath("/staff/queue");
 
-  return { ok: true, message: "Order saved." };
+  return { ok: true, message: `Order saved.${archiveWarning}` };
 }
 
 const paymentSchema = z.object({

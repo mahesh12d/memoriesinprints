@@ -7,19 +7,26 @@ import {
   TESTIMONIALS,
   TRUSTED_BY,
 } from "@/content/home";
-import { CtaBand, Section, SectionHeading } from "@/components/site/section";
+import { Section, SectionHeading } from "@/components/site/section";
 import { ImagePlaceholder } from "@/components/site/image-placeholder";
 import { ImageAutoSlider } from "@/components/ui/image-auto-slider";
+import { DiscoverButton } from "@/components/ui/discover-button";
 
 export default async function HomePage() {
-
   return (
     <>
       {/* HERO */}
-      <section className="relative">
+      {/* Pulled up under the sticky header so the banner runs to the very top
+          of the page; the scrim keeps the white nav type readable over it. */}
+      <section className="relative -mt-[72px]">
         <ImagePlaceholder
           caption="[Photograph — full-width banner: printed order of service booklets and a wedding invitation suite, styled flat lay]"
-          className="h-[340px] w-full sm:h-[420px]"
+          fileName="hero-banner.webp"
+          className="h-[412px] w-full sm:h-[492px]"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-[180px] bg-gradient-to-b from-black/55 via-black/25 to-transparent"
         />
 
         <div className="mx-auto max-w-[1200px] px-6 py-16 sm:px-10">
@@ -37,8 +44,8 @@ export default async function HomePage() {
             </p>
             <div className="mt-2 flex flex-wrap gap-3">
               <Link
-                href="/quote"
-                className="rounded-[2px] bg-brand px-7 py-3.5 text-sm font-semibold text-on-accent hover:bg-blue-deep"
+                href="/contact"
+                className="rounded-[2px] bg-brand px-7 py-3.5 text-sm font-semibold text-on-accent hover:bg-band-deep"
               >
                 Request a quote
               </Link>
@@ -46,7 +53,7 @@ export default async function HomePage() {
                 href="/portfolio"
                 className="rounded-[2px] border border-field-line px-7 py-3.5 text-sm font-semibold text-ink-soft hover:bg-surface-grey"
               >
-                View our work
+                View the portfolio
               </Link>
             </div>
           </div>
@@ -70,27 +77,9 @@ export default async function HomePage() {
           </div>
           <ImagePlaceholder
             caption="[Photograph — a member of the studio team proofing a printed piece by hand]"
+            fileName="studio-proofing.webp"
             className="h-[320px] w-full rounded-md"
           />
-        </div>
-      </Section>
-
-      {/* QUICK LINKS */}
-      <Section tone="grey" className="!py-0">
-        <div className="flex flex-col gap-6 py-14">
-          <h2 className="text-[22px]">Jump to what you need</h2>
-          <ul className="flex flex-wrap gap-3">
-            {QUICK_LINKS.map((link) => (
-              <li key={link.label}>
-                <Link
-                  href={link.href}
-                  className="inline-flex rounded-full border border-line bg-white px-5 py-2.5 text-[13px] font-medium text-ink-soft hover:border-brand hover:text-blue"
-                >
-                  {link.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
         </div>
       </Section>
 
@@ -101,6 +90,8 @@ export default async function HomePage() {
           intro="We offer a wide range of personalised services and printed materials to help you honour, remember and celebrate meaningful moments."
           action={{ href: "/portfolio", label: "View full portfolio →" }}
         />
+
+        <DiscoverButton groups={QUICK_LINKS} className="mb-10" />
 
         <ImageAutoSlider />
       </Section>
@@ -118,6 +109,7 @@ export default async function HomePage() {
             <li key={step.label} className="flex flex-col gap-4">
               <ImagePlaceholder
                 caption={step.caption}
+                fileName={step.file}
                 className="aspect-[4/3] w-full rounded-md"
               />
               <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-text">
@@ -179,10 +171,10 @@ export default async function HomePage() {
       {/* TESTIMONIALS */}
       <Section>
         <ul className="grid gap-8 lg:grid-cols-3">
-          {TESTIMONIALS.map((quote) => (
+          {TESTIMONIALS.map((quote, idx) => (
             <li
-              key={quote.attribution}
-              className="flex flex-col gap-5 rounded-md border border-line bg-white p-8"
+              key={`${quote.attribution}-${idx}`}
+              className="flex flex-col gap-5 rounded-md border border-line bg-card p-8"
             >
               <blockquote className="font-display text-[19px] leading-[1.5]">
                 “{quote.text}”
@@ -203,19 +195,21 @@ export default async function HomePage() {
               Wherever you are, we can reach you
             </h2>
             <p className="max-w-[54ch] text-[15px] leading-relaxed text-ink-muted">
-              Alongside our studio clients, we design, print and ship funeral and
-              wedding stationery internationally — proofs are shared and approved
-              online, so distance is never a reason to compromise on the details.
+              Alongside our studio clients, we design, print and ship funeral
+              and wedding stationery internationally — proofs are shared and
+              approved online, so distance is never a reason to compromise on
+              the details.
             </p>
             <Link
-              href="/quote"
-              className="mt-2 w-fit rounded-[2px] bg-brand px-7 py-3.5 text-sm font-semibold text-on-accent hover:bg-blue-deep"
+              href="/contact"
+              className="mt-2 w-fit rounded-[2px] bg-brand px-7 py-3.5 text-sm font-semibold text-on-accent hover:bg-band-deep"
             >
               Get a quote, wherever you are
             </Link>
           </div>
           <ImagePlaceholder
             caption="[Illustration — world map with pins marking where orders have shipped]"
+            fileName="shipping-map.svg"
             className="h-[300px] w-full rounded-md"
           />
         </div>
@@ -225,12 +219,15 @@ export default async function HomePage() {
       <Section>
         <SectionHeading
           title="Common questions"
-          action={{ href: "/faq", label: "View full FAQ →" }}
+          action={{ href: "/guide#faq", label: "View full FAQ →" }}
         />
 
         <dl className="divide-y divide-line border-y border-line">
           {FAQS.slice(0, 4).map((faq) => (
-            <div key={faq.q} className="grid gap-3 py-7 lg:grid-cols-[1fr_1.4fr]">
+            <div
+              key={faq.q}
+              className="grid gap-3 py-7 lg:grid-cols-[1fr_1.4fr]"
+            >
               <dt className="font-display text-lg">{faq.q}</dt>
               <dd className="text-[15px] leading-relaxed text-ink-muted">
                 {faq.a}
@@ -239,13 +236,6 @@ export default async function HomePage() {
           ))}
         </dl>
       </Section>
-
-      <CtaBand
-        title="Tell us what you're planning"
-        body="Every project starts as a conversation. Send us the details and we'll come back to you within one working day."
-        primary={{ href: "/quote", label: "Request a quote" }}
-        secondary={{ href: "/portfolio", label: "Browse our work" }}
-      />
     </>
   );
 }

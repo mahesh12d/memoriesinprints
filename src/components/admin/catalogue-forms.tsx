@@ -6,10 +6,10 @@ import { CATEGORY } from "@/lib/admin/labels";
 import { FormMessage, SelectField, SubmitButton } from "@/components/ui/form";
 
 const fieldClass =
-  "w-full rounded-[3px] border border-field-line bg-white px-3 py-2.5 text-sm";
+  "w-full rounded-[3px] border border-field-line bg-card px-3 py-2.5 text-sm";
 
 const fileClass =
-  "rounded-[3px] border border-field-line bg-white px-3 py-2.5 text-sm file:mr-3 file:rounded-[2px] file:border-0 file:bg-surface-grey file:px-3 file:py-1.5 file:text-[13px] file:font-semibold";
+  "rounded-[3px] border border-field-line bg-card px-3 py-2.5 text-sm file:mr-3 file:rounded-[2px] file:border-0 file:bg-surface-grey file:px-3 file:py-1.5 file:text-[13px] file:font-semibold";
 
 export type ProductValues = {
   id?: string;
@@ -159,6 +159,9 @@ export type PortfolioValues = {
   title: string;
   category: string;
   description: string | null;
+  templateNumber: number | null;
+  style: string | null;
+  isPopular: boolean;
   sortOrder: number;
   isPublished: boolean;
 };
@@ -206,6 +209,24 @@ export function PortfolioForm({
 
         <label className="flex flex-col gap-2">
           <span className="text-[13px] font-semibold text-ink-soft">
+            Template number
+          </span>
+          <input
+            name="templateNumber"
+            type="number"
+            min="1"
+            defaultValue={values.templateNumber ?? ""}
+            placeholder="e.g. 104"
+            className={fieldClass}
+          />
+          <span className="text-[12px] text-ink-quiet">
+            The studio&rsquo;s own number for this design. No two pieces share
+            one.
+          </span>
+        </label>
+
+        <label className="flex flex-col gap-2">
+          <span className="text-[13px] font-semibold text-ink-soft">
             Where it sits in the list
           </span>
           <input
@@ -214,6 +235,28 @@ export function PortfolioForm({
             defaultValue={values.sortOrder}
             className={fieldClass}
           />
+        </label>
+
+        <label className="flex flex-col gap-2">
+          <span className="text-[13px] font-semibold text-ink-soft">Style</span>
+          <input
+            name="style"
+            list="portfolio-styles"
+            defaultValue={values.style ?? ""}
+            placeholder="Classic"
+            className={fieldClass}
+          />
+          <datalist id="portfolio-styles">
+            {["Classic", "Floral", "Landscape", "Playful", "Religious"].map(
+              (option) => (
+                <option key={option} value={option} />
+              ),
+            )}
+          </datalist>
+          <span className="text-[12px] text-ink-quiet">
+            One word. It becomes a filter chip on the portfolio page, and a
+            word nobody has used yet makes a new chip.
+          </span>
         </label>
 
         <label className="flex flex-col gap-2 sm:col-span-2">
@@ -240,6 +283,18 @@ export function PortfolioForm({
           </span>
         </label>
       </div>
+
+      <label className="flex items-center gap-2.5">
+        <input
+          type="checkbox"
+          name="isPopular"
+          defaultChecked={values.isPopular}
+          className="size-4"
+        />
+        <span className="text-[13px] text-ink-soft">
+          Show under the Popular filter
+        </span>
+      </label>
 
       <label className="flex items-center gap-2.5">
         <input

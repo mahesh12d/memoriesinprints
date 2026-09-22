@@ -11,7 +11,7 @@ import { ROLE } from "@/lib/admin/labels";
 import { FormMessage, SubmitButton } from "@/components/ui/form";
 
 const fieldClass =
-  "rounded-[3px] border border-field-line bg-white px-3 py-2.5 text-sm";
+  "rounded-[3px] border border-field-line bg-card px-3 py-2.5 text-sm";
 
 /**
  * Role and suspension share one message area per row, so an explanation —

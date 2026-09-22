@@ -174,7 +174,7 @@ export default async function ProductDetailPage({
             returnTo={`/products/${product.slug}`}
           />
 
-          <div className="rounded-md border border-line bg-white p-6">
+          <div className="rounded-md border border-line bg-card p-6">
             <h2 className="font-display text-lg">Before anything is printed</h2>
             <p className="mt-2 text-[14px] leading-relaxed text-ink-muted">
               A proof comes to you for approval first, whichever way you order.

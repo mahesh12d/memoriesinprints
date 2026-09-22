@@ -46,7 +46,7 @@ export function PriceTable({
     <div className="flex flex-col gap-6">
       <form
         action={formAction}
-        className="flex flex-col gap-4 rounded-md border border-line bg-white p-6"
+        className="flex flex-col gap-4 rounded-md border border-line bg-card p-6"
       >
         <FormMessage state={state} />
 
@@ -59,7 +59,7 @@ export function PriceTable({
               <select
                 name="userId"
                 required
-                className="rounded-[3px] border border-field-line bg-white px-3 py-2.5 text-sm"
+                className="rounded-[3px] border border-field-line bg-card px-3 py-2.5 text-sm"
               >
                 <option value="">Choose…</option>
                 {customerOptions.map((option) => (
@@ -78,7 +78,7 @@ export function PriceTable({
             <select
               name={itemName}
               required
-              className="rounded-[3px] border border-field-line bg-white px-3 py-2.5 text-sm"
+              className="rounded-[3px] border border-field-line bg-card px-3 py-2.5 text-sm"
             >
               <option value="">Choose…</option>
               {itemOptions.map((option) => (
@@ -100,7 +100,7 @@ export function PriceTable({
               min="0"
               required
               placeholder="1.85"
-              className="rounded-[3px] border border-field-line bg-white px-3 py-2.5 text-sm"
+              className="rounded-[3px] border border-field-line bg-card px-3 py-2.5 text-sm"
             />
           </label>
 
@@ -113,7 +113,7 @@ export function PriceTable({
               defaultValue="GBP"
               maxLength={3}
               required
-              className="w-[92px] rounded-[3px] border border-field-line bg-white px-3 py-2.5 text-sm uppercase"
+              className="w-[92px] rounded-[3px] border border-field-line bg-card px-3 py-2.5 text-sm uppercase"
             />
           </label>
         </div>
@@ -126,7 +126,7 @@ export function PriceTable({
             <input
               name="note"
               placeholder="Why this rate was agreed"
-              className="rounded-[3px] border border-field-line bg-white px-3 py-2.5 text-sm"
+              className="rounded-[3px] border border-field-line bg-card px-3 py-2.5 text-sm"
             />
           </label>
         )}
@@ -136,7 +136,7 @@ export function PriceTable({
         </SubmitButton>
       </form>
 
-      <div className="overflow-hidden rounded-md border border-line bg-white">
+      <div className="overflow-hidden rounded-md border border-line bg-card">
         {rows.length === 0 ? (
           <p className="p-8 text-center text-sm text-ink-muted">
             {emptyMessage}

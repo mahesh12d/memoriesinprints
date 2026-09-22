@@ -136,7 +136,7 @@ export default async function AdminUsersPage({
 
       <PortalBody>
         <div className="flex flex-col gap-6">
-          <section className="rounded-md border border-line bg-white p-6">
+          <section className="rounded-md border border-line bg-card p-6">
             <h2 className="font-display text-lg">Invite someone</h2>
             <p className="mb-5 mt-1 max-w-[64ch] text-[13px] leading-relaxed text-ink-muted">
               They get an email with a link to set their own password. Nobody

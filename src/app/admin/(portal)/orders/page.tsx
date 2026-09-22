@@ -1,4 +1,5 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import Link from "next/link";
+import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { orders, users } from "@/db/schema";
@@ -8,6 +9,7 @@ import { formatMoney, QUOTED_INDIVIDUALLY } from "@/lib/pricing/money";
 import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
 import { StatusPill } from "@/components/portal/status-pill";
 import { FilterTabs } from "@/components/admin/filter-tabs";
+import { OrderSearch } from "@/components/portal/order-search";
 import { RecordTable, type Column } from "@/components/admin/record-table";
 
 const dateFormat = new Intl.DateTimeFormat("en-GB", {
@@ -35,10 +37,11 @@ type PaymentStatusValue = keyof typeof PAYMENT_STATUS;
 export default async function AdminOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; payment?: string }>;
+  searchParams: Promise<{ status?: string; payment?: string; q?: string }>;
 }) {
   await requireAdmin();
-  const { status = "all", payment = "all" } = await searchParams;
+  const { status = "all", payment = "all", q } = await searchParams;
+  const query = q?.trim() ?? "";
 
   const knownStatus = status in ORDER_STATUS ? status : "all";
   const knownPayment = payment in PAYMENT_STATUS ? payment : "all";
@@ -74,6 +77,13 @@ export default async function AdminOrdersPage({
     knownPayment === "all"
       ? undefined
       : eq(orders.paymentStatus, knownPayment as PaymentStatusValue),
+    query
+      ? or(
+          ilike(orders.reference, `%${query}%`),
+          ilike(users.name, `%${query}%`),
+          ilike(users.email, `%${query}%`),
+        )
+      : undefined,
   ].filter(Boolean);
 
   const rows: Row[] = await db
@@ -144,15 +154,36 @@ export default async function AdminOrdersPage({
 
   return (
     <>
-      <PortalHeader title="Orders" />
+      <PortalHeader
+        title="Orders"
+        actions={
+          <Link
+            href="/admin/orders/new"
+            className="rounded-[2px] bg-brand px-5 py-2.5 text-[13px] font-semibold text-on-accent"
+          >
+            Raise an order
+          </Link>
+        }
+      />
 
       <PortalBody>
         <div className="flex flex-col gap-5">
+          <OrderSearch
+            basePath="/admin/orders"
+            query={query}
+            placeholder="Reference, customer or email"
+            keep={{
+              status: knownStatus === "all" ? undefined : knownStatus,
+              payment: knownPayment === "all" ? undefined : knownPayment,
+            }}
+          />
+
           <FilterTabs
             basePath="/admin/orders"
             current={knownStatus}
             extraParams={{
               payment: knownPayment === "all" ? undefined : knownPayment,
+              q: query || undefined,
             }}
             options={[
               { value: "all", label: "All", count: total },
@@ -170,6 +201,7 @@ export default async function AdminOrdersPage({
             current={knownPayment}
             extraParams={{
               status: knownStatus === "all" ? undefined : knownStatus,
+              q: query || undefined,
             }}
             options={[
               { value: "all", label: "Any payment" },
@@ -189,7 +221,9 @@ export default async function AdminOrdersPage({
               <>
                 <h2 className="font-display text-lg">No orders here</h2>
                 <p className="mt-2 text-sm text-ink-muted">
-                  Nothing matches those filters.
+                  {query
+                    ? `Nothing matches “${query}”. Try a reference, a name or an email address.`
+                    : "Nothing matches those filters."}
                 </p>
               </>
             }

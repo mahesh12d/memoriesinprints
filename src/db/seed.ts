@@ -459,16 +459,30 @@ async function main() {
     { productId: bySlug["anniversary-keepsake-print"], label: "A4", widthMm: 210, heightMm: 297, sortOrder: 1 },
   ]);
 
+  /**
+   * Template numbers are the studio's own catalogue numbers and are unique
+   * across the whole portfolio, funeral and wedding alike. `style` drives the
+   * filter chips: the values in use here are the chips that appear.
+   */
   await db.insert(portfolioItems).values([
-    { slug: "willow-order-of-service", title: "Willow Order of Service", category: "funeral", description: "Hand-drawn willow motif, foiled on a 300gsm cover.", sortOrder: 1 },
-    { slug: "autumn-memorial-cards", title: "Autumn Memorial Cards", category: "funeral", description: "A warm palette drawn from the family's own photographs.", sortOrder: 2 },
-    { slug: "eleanor-and-james-wedding-suite", title: "Eleanor & James, Wedding Suite", category: "wedding", description: "Letterpress invitation with a hand-lined envelope.", sortOrder: 3 },
-    { slug: "save-the-date-botanical", title: "Save the Date, Botanical", category: "wedding", description: "Pressed-flower illustration, printed on recycled stock.", sortOrder: 4 },
-    { slug: "acknowledgement-cards-linen", title: "Acknowledgement Cards, Linen", category: "funeral", description: "A linen-textured stock, kept deliberately plain.", sortOrder: 5 },
-    { slug: "order-of-the-day-coastal", title: "Order of the Day, Coastal", category: "wedding", description: "Muted blues for a clifftop ceremony.", sortOrder: 6 },
-    { slug: "memorial-candle-labels", title: "Memorial Candle Labels", category: "funeral", description: "Small-format labels to match the service stationery.", sortOrder: 7 },
-    { slug: "rosie-christening-set", title: "Rosie's Christening Set", category: "celebration", description: "Invitations and thank-you cards as one gentle set.", sortOrder: 8 },
-    { slug: "golden-anniversary-print", title: "Golden Anniversary Print", category: "celebration", description: "Fifty years, set in gold foil on heavyweight stock.", sortOrder: 9 },
+    { slug: "willow-order-of-service", title: "Willow Order of Service", category: "funeral", description: "Hand-drawn willow motif, foiled on a 300gsm cover.", sortOrder: 1,
+      templateNumber: 101, style: "Floral", isPopular: true },
+    { slug: "autumn-memorial-cards", title: "Autumn Memorial Cards", category: "funeral", description: "A warm palette drawn from the family's own photographs.", sortOrder: 2,
+      templateNumber: 102, style: "Landscape", isPopular: false },
+    { slug: "eleanor-and-james-wedding-suite", title: "Eleanor & James, Wedding Suite", category: "wedding", description: "Letterpress invitation with a hand-lined envelope.", sortOrder: 3,
+      templateNumber: 201, style: "Classic", isPopular: true },
+    { slug: "save-the-date-botanical", title: "Save the Date, Botanical", category: "wedding", description: "Pressed-flower illustration, printed on recycled stock.", sortOrder: 4,
+      templateNumber: 202, style: "Floral", isPopular: false },
+    { slug: "acknowledgement-cards-linen", title: "Acknowledgement Cards, Linen", category: "funeral", description: "A linen-textured stock, kept deliberately plain.", sortOrder: 5,
+      templateNumber: 103, style: "Classic", isPopular: false },
+    { slug: "order-of-the-day-coastal", title: "Order of the Day, Coastal", category: "wedding", description: "Muted blues for a clifftop ceremony.", sortOrder: 6,
+      templateNumber: 203, style: "Landscape", isPopular: true },
+    { slug: "memorial-candle-labels", title: "Memorial Candle Labels", category: "funeral", description: "Small-format labels to match the service stationery.", sortOrder: 7,
+      templateNumber: 104, style: "Religious", isPopular: false },
+    { slug: "rosie-christening-set", title: "Rosie's Christening Set", category: "celebration", description: "Invitations and thank-you cards as one gentle set.", sortOrder: 8,
+      templateNumber: 301, style: "Playful", isPopular: true },
+    { slug: "golden-anniversary-print", title: "Golden Anniversary Print", category: "celebration", description: "Fifty years, set in gold foil on heavyweight stock.", sortOrder: 9,
+      templateNumber: 302, style: "Classic", isPopular: false },
   ]);
 
   const [enquiry] = await db

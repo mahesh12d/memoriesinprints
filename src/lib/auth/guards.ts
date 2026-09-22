@@ -4,6 +4,13 @@ import { redirect } from "next/navigation";
 import { getSession, type ActiveSession } from "./session";
 import type { UserRole } from "@/db/schema";
 
+// Re-exported so a page can reach for one guard import rather than two.
+export {
+  canSeeAllOrders,
+  canSeeMoney,
+  canUploadProofs,
+} from "./capabilities";
+
 export const STAFF_ROLES: UserRole[] = ["designer", "proofreader"];
 
 export function isStaff(role: UserRole): boolean {

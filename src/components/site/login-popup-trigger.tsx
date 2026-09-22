@@ -8,7 +8,13 @@ import { AuthWelcomeModal } from "@/components/ui/onboarding-welcome-screen";
  * the welcome-screen modal popup. When the user is already logged in,
  * the parent simply renders a normal <Link> instead of this component.
  */
-export function LoginPopupTrigger({ label }: { label: string }) {
+export function LoginPopupTrigger({
+  label,
+  className = "text-sm font-semibold text-ink-soft hover:text-blue",
+}: {
+  label: string;
+  className?: string;
+}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -16,7 +22,7 @@ export function LoginPopupTrigger({ label }: { label: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-sm font-semibold text-ink-soft hover:text-blue"
+        className={className}
       >
         {label}
       </button>

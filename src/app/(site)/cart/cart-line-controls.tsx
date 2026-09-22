@@ -29,7 +29,7 @@ export function CartLineControls({
           min={1}
           defaultValue={quantity}
           disabled={pending}
-          className="w-[84px] rounded-[3px] border border-field-line bg-white px-3 py-2 text-sm"
+          className="w-[84px] rounded-[3px] border border-field-line bg-card px-3 py-2 text-sm"
         />
         <button
           type="submit"

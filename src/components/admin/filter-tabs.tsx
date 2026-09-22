@@ -50,7 +50,7 @@ export function FilterTabs({
             aria-current={active ? "page" : undefined}
             className={`rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
               active
-                ? "bg-blue text-white"
+                ? "bg-band text-white"
                 : "border border-line text-ink-muted hover:bg-surface-grey"
             }`}
           >

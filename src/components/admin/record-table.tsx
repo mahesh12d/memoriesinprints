@@ -37,14 +37,14 @@ export function RecordTable<Row extends { id: string }>({
 }) {
   if (rows.length === 0) {
     return (
-      <div className="rounded-md border border-line bg-white px-6 py-12 text-center">
+      <div className="rounded-md border border-line bg-card px-6 py-12 text-center">
         {empty}
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto rounded-md border border-line bg-white">
+    <div className="overflow-x-auto rounded-md border border-line bg-card">
       <table className="w-full border-collapse text-left">
         <thead>
           <tr className="border-b border-line-soft">

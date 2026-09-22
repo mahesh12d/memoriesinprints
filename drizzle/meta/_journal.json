@@ -8,6 +8,48 @@
       "when": 1789891778689,
       "tag": "0000_initial_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789919725909,
+      "tag": "0001_sad_quasimodo",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789929560758,
+      "tag": "0002_colorful_tana_nile",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789933621406,
+      "tag": "0003_hesitant_xavin",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789933631674,
+      "tag": "0004_unusual_sabretooth",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789936150580,
+      "tag": "0005_strange_preak",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789937328850,
+      "tag": "0006_stale_grey_gargoyle",
+      "breakpoints": true
     }
   ]
 }

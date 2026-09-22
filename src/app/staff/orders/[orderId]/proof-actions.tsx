@@ -28,7 +28,7 @@ export function UploadProofForm({ orderId }: { orderId: string }) {
           name="file"
           accept={ACCEPT_ATTRIBUTE}
           required
-          className="rounded-[3px] border border-field-line bg-white px-3 py-2.5 text-sm file:mr-3 file:rounded-[2px] file:border-0 file:bg-surface-grey file:px-3 file:py-1.5 file:text-[13px] file:font-semibold"
+          className="rounded-[3px] border border-field-line bg-card px-3 py-2.5 text-sm file:mr-3 file:rounded-[2px] file:border-0 file:bg-surface-grey file:px-3 file:py-1.5 file:text-[13px] file:font-semibold"
         />
         <span className="text-[12px] text-ink-quiet">
           PDF, JPEG, PNG or WebP, up to{" "}
@@ -80,7 +80,7 @@ export function ProofreaderActions({ orderId }: { orderId: string }) {
             rows={3}
             required
             placeholder="The date on page 2 reads 14th, it should be 4th."
-            className="w-full rounded-[3px] border border-field-line bg-white px-3 py-2.5 font-sans text-sm"
+            className="w-full rounded-[3px] border border-field-line bg-card px-3 py-2.5 font-sans text-sm"
           />
         </label>
 
@@ -120,7 +120,7 @@ export function AssignDesignerForm({
         <select
           name="designerId"
           defaultValue={currentDesignerId ?? ""}
-          className="rounded-[3px] border border-field-line bg-white px-3 py-2.5 text-sm"
+          className="rounded-[3px] border border-field-line bg-card px-3 py-2.5 text-sm"
         >
           <option value="">Unassigned</option>
           {designers.map((designer) => (

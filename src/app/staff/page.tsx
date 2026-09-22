@@ -56,7 +56,7 @@ export default async function StaffDashboardPage() {
 
   const [items, workload, activity, approvedThisMonth, turnaround] =
     await Promise.all([
-      loadQueue(),
+      loadQueue(session.user),
       db
         .select({
           designerId: users.id,
@@ -149,7 +149,7 @@ export default async function StaffDashboardPage() {
             {tiles.map((tile) => (
               <div
                 key={tile.label}
-                className="flex flex-col gap-1.5 rounded-md border border-line bg-white p-5"
+                className="flex flex-col gap-1.5 rounded-md border border-line bg-card p-5"
               >
                 <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-quiet">
                   {tile.label}
@@ -160,11 +160,11 @@ export default async function StaffDashboardPage() {
           </div>
 
           <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-            <section className="rounded-md border border-line bg-white p-6">
+            <section className="rounded-md border border-line bg-card p-6">
               <TurnaroundSparkline points={turnaround} />
             </section>
 
-            <section className="rounded-md border border-line bg-white p-6">
+            <section className="rounded-md border border-line bg-card p-6">
               <h2 className="font-display text-[15px]">Designer workload</h2>
               <ul className="mt-4 flex flex-col gap-3.5">
                 {workload.map((row) => (
@@ -190,7 +190,7 @@ export default async function StaffDashboardPage() {
             </section>
           </div>
 
-          <section className="overflow-hidden rounded-md border border-line bg-white">
+          <section className="overflow-hidden rounded-md border border-line bg-card">
             <div className="border-b border-line-soft px-6 py-4">
               <h2 className="font-display text-[15px]">Recent activity</h2>
             </div>

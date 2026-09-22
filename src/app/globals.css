@@ -37,13 +37,24 @@
   /* Green is too dark to read on the blue band; this one clears 4.5:1 there. */
   --color-brand-on-dark: #70ddc3;
 
+  /* Blue is the INK role — it flips light in dark mode. */
   --color-blue: #465862;
   --color-blue-deep: #35444c;
   --color-blue-tint: #eceef0;
 
+  /* Band is the SURFACE role — the dark CTA band, the portal chrome and the
+     filled pills. It stays dark in both themes, which is why it can't just be
+     `blue`: that one has to flip. */
+  --color-band: #465862;
+  --color-band-deep: #35444c;
+
   /* Surfaces */
   --color-surface: #ffffff;
   --color-surface-grey: #f8f8f8;
+  --color-footer: #4d745f;
+  /* Cards and pills raised off the page. Identical to surface in the light
+     theme; in the dark one it lifts away from the page behind it. */
+  --color-card: #ffffff;
 
   /* Ink */
   --color-ink: #465862;
@@ -90,15 +101,97 @@
   --color-input: #d6d9da;
 }
 
+/* Class-based dark mode: the inline script in the root layout sets `.dark` on
+   <html> before first paint, so there's no flash and no hydration dance. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Every token above, restated for the dark theme. Nothing else in the app
+   changes — the utilities all resolve through these variables.
+
+   Measured in the browser against the real surfaces: h1 14.0:1, body copy
+   8.5:1, eyebrow 10.1:1, footer link 7.8:1, CTA band body 6.3:1, quiet
+   captions 4.8:1 on a card — all clear of 4.5:1.
+   Deep slate rather than black: this is a bereavement site, and pure black
+   with white type is a harsh place to read a funeral price list. */
+.dark {
+  --color-accent-text: #5fd9ba;
+  --color-muted-text: #9aa7ad;
+  --color-on-accent: #0f3d32;
+
+  --color-brand: #2dbc9a;
+  --color-brand-deep: #23997d;
+  --color-brand-tint: #17312c;
+  --color-brand-line: #2a4b43;
+  --color-brand-on-dark: #70ddc3;
+
+  --color-blue: #dfe7ea;
+  --color-blue-deep: #f1f5f6;
+  --color-blue-tint: #232c31;
+
+  /* The band stays dark, just lifted enough to read against the page. */
+  --color-band: #2b363c;
+  --color-band-deep: #222b30;
+
+  --color-surface: #141a1e;
+  --color-surface-grey: #1a2126;
+  --color-card: #1f272c;
+
+  --color-ink: #dfe7ea;
+  --color-ink-soft: #cdd7db;
+  --color-ink-muted: #a9b6bc;
+  --color-ink-quiet: var(--color-muted-text);
+  --color-ink-pale: #86939a;
+  --color-on-blue-muted: #c3cbd0;
+
+  --color-line: #2c363c;
+  --color-line-soft: #232c31;
+  --color-field-line: #3b474e;
+  --color-placeholder: #86939a;
+
+  --color-good: #2dbc9a;
+  --color-good-tint: #17312c;
+  --color-good-deep: #5fd9ba;
+  --color-alert: #e08a7e;
+  --color-alert-tint: #3a2523;
+  --color-pending-tint: #332a1b;
+  --color-pending-deep: #e0bd84;
+
+  --color-background: #141a1e;
+  --color-foreground: #dfe7ea;
+  --color-primary: #2dbc9a;
+  --color-primary-foreground: #0f3d32;
+  --color-secondary: #1a2126;
+  --color-secondary-foreground: #dfe7ea;
+  --color-muted: #1a2126;
+  --color-muted-foreground: #a9b6bc;
+  --color-accent: #17312c;
+  --color-accent-foreground: #dfe7ea;
+  --color-destructive: #e08a7e;
+  --color-destructive-foreground: #141a1e;
+  --color-ring: #2dbc9a;
+  --color-input: #3b474e;
+}
+
 @layer base {
   html {
     background: var(--color-surface);
+    /* Keep in-page anchors clear of the 72px sticky header. */
+    scroll-padding-top: 88px;
   }
 
   body {
     background: var(--color-surface);
     color: var(--color-ink);
     font-family: var(--font-sans);
+    transition:
+      background-color 200ms ease,
+      color 200ms ease;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    body {
+      transition: none;
+    }
   }
 
   h1,
@@ -108,6 +201,29 @@
     font-family: var(--font-display);
     font-weight: 500;
     color: var(--color-blue);
+  }
+
+  /*
+   * The proof comparison divider. The track is invisible — the seam is drawn
+   * by the component — leaving only a grab handle on the line itself.
+   */
+  .proof-wipe::-webkit-slider-thumb {
+    appearance: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 9999px;
+    border: 2px solid var(--color-brand);
+    background: var(--color-card);
+    cursor: ew-resize;
+  }
+
+  .proof-wipe::-moz-range-thumb {
+    width: 28px;
+    height: 28px;
+    border-radius: 9999px;
+    border: 2px solid var(--color-brand);
+    background: var(--color-card);
+    cursor: ew-resize;
   }
 
   /* Visible focus for keyboard users, invisible for mouse users. */

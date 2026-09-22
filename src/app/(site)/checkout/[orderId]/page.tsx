@@ -7,6 +7,7 @@ import { orders, payments } from "@/db/schema";
 import { requireUser } from "@/lib/auth/guards";
 import { formatMoney } from "@/lib/pricing/money";
 import { Section } from "@/components/site/section";
+import { isUuid } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Payment",
@@ -22,6 +23,7 @@ export default async function CheckoutOrderPage({
 }) {
   const session = await requireUser();
   const { orderId } = await params;
+  if (!isUuid(orderId)) notFound();
   const { provider, stub } = await searchParams;
 
   const [order] = await db
@@ -88,7 +90,7 @@ export default async function CheckoutOrderPage({
         )}
 
         {attempt && (
-          <dl className="rounded-md border border-line bg-white p-6 text-[13px]">
+          <dl className="rounded-md border border-line bg-card p-6 text-[13px]">
             <div className="flex justify-between gap-4 py-1.5">
               <dt className="text-ink-muted">Method</dt>
               <dd className="font-semibold">{attempt.provider}</dd>

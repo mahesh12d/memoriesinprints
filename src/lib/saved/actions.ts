@@ -16,9 +16,13 @@ import { getSession } from "@/lib/auth/session";
  */
 export async function toggleSavedItemAction(formData: FormData): Promise<void> {
   const productId = String(formData.get("productId") ?? "");
+  const templateId = String(formData.get("portfolioItemId") ?? "");
   const returnTo = String(formData.get("returnTo") ?? "/products");
 
-  if (!z.string().uuid().safeParse(productId).success) return;
+  const isTemplate = templateId !== "";
+  const targetId = isTemplate ? templateId : productId;
+
+  if (!z.string().uuid().safeParse(targetId).success) return;
 
   const session = await getSession("site");
 
@@ -26,10 +30,11 @@ export async function toggleSavedItemAction(formData: FormData): Promise<void> {
     redirect(`/login?next=${encodeURIComponent(returnTo)}`);
   }
 
-  const where = and(
-    eq(savedItems.userId, session.user.id),
-    eq(savedItems.productId, productId),
-  );
+  // Exactly one of the two columns carries the id; the other stays null, which
+  // is what the table's check constraint requires.
+  const column = isTemplate ? savedItems.portfolioItemId : savedItems.productId;
+
+  const where = and(eq(savedItems.userId, session.user.id), eq(column, targetId));
 
   const [existing] = await db
     .select({ id: savedItems.id })
@@ -45,7 +50,11 @@ export async function toggleSavedItemAction(formData: FormData): Promise<void> {
     // second insert a no-op rather than an error page.
     await db
       .insert(savedItems)
-      .values({ userId: session.user.id, productId })
+      .values({
+        userId: session.user.id,
+        productId: isTemplate ? null : targetId,
+        portfolioItemId: isTemplate ? targetId : null,
+      })
       .onConflictDoNothing();
   }
 

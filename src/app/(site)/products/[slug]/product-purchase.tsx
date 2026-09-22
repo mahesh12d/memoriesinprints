@@ -124,7 +124,7 @@ export function ProductPurchase({
               setSizeLabel(event.target.value);
               setAdded(false);
             }}
-            className="w-full max-w-[320px] rounded-[3px] border border-field-line bg-white px-[15px] py-[13px] text-sm"
+            className="w-full max-w-[320px] rounded-[3px] border border-field-line bg-card px-[15px] py-[13px] text-sm"
           >
             {sizes.map((size) => (
               <option key={size.id} value={size.label}>
@@ -152,7 +152,7 @@ export function ProductPurchase({
             setQuantity(Math.max(1, Number(event.target.value) || 1));
             setAdded(false);
           }}
-          className="w-[140px] rounded-[3px] border border-field-line bg-white px-[15px] py-[13px] text-sm"
+          className="w-[140px] rounded-[3px] border border-field-line bg-card px-[15px] py-[13px] text-sm"
         />
         <p className="text-[12px] text-ink-quiet">
           Minimum order {minimumQuantity}.

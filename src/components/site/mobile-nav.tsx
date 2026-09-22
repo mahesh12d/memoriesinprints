@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 export function MobileNav({
   links,
   accountHref,
   accountLabel,
 }: {
-  links: { href: string; label: string }[];
+  links: { href: string; label: string; items?: { href: string; label: string }[] }[];
   accountHref: string;
   accountLabel: string;
 }) {
@@ -25,7 +26,7 @@ export function MobileNav({
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-controls="mobile-nav"
-        className="flex size-11 items-center justify-center rounded text-blue"
+        className="flex size-11 items-center justify-center rounded text-blue group-data-[overlay=true]/nav:text-white"
       >
         <span className="sr-only">{open ? "Close menu" : "Open menu"}</span>
         <svg
@@ -60,31 +61,43 @@ export function MobileNav({
         >
           <nav className="flex flex-col">
             {links.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={close}
-                className="border-b border-line-soft py-4 text-[15px] font-medium text-ink-soft"
-              >
-                {link.label}
-              </Link>
+              <div key={link.href} className="border-b border-line-soft">
+                <Link
+                  href={link.href}
+                  onClick={close}
+                  className="block py-4 text-[15px] font-medium text-ink-soft"
+                >
+                  {link.label}
+                </Link>
+                {link.items && (
+                  <ul className="-mt-1 flex flex-col pb-3 pl-4">
+                    {link.items.map((item) => (
+                      <li key={item.href}>
+                        <Link
+                          href={item.href}
+                          onClick={close}
+                          className="block py-2.5 text-[14px] text-ink-muted"
+                        >
+                          {item.label}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             ))}
             <Link
               href={accountHref}
               onClick={close}
-              className="border-b border-line-soft py-4 text-[15px] font-medium text-ink-soft"
+              className="block border-b border-line-soft py-4 text-[15px] font-medium text-ink-soft"
             >
               {accountLabel}
             </Link>
           </nav>
 
-          <Link
-            href="/quote"
-            onClick={close}
-            className="mt-5 block rounded-[2px] bg-brand px-5 py-3.5 text-center text-sm font-semibold text-on-accent"
-          >
-            Request a Quote
-          </Link>
+          <div className="mt-5 flex items-center justify-end">
+            <ThemeToggle />
+          </div>
         </div>
       )}
     </div>

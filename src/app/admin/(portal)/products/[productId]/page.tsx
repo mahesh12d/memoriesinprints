@@ -72,7 +72,7 @@ export default async function AdminProductDetailPage({
 
       <PortalBody>
         <div className="grid gap-7 lg:grid-cols-[1.6fr_1fr]">
-          <section className="rounded-md border border-line bg-white p-7">
+          <section className="rounded-md border border-line bg-card p-7">
             <ProductForm
               action={updateProductAction}
               submitLabel="Save the product"
@@ -90,7 +90,7 @@ export default async function AdminProductDetailPage({
           </section>
 
           <aside className="flex h-fit flex-col gap-6">
-            <section className="overflow-hidden rounded-md border border-line bg-white">
+            <section className="overflow-hidden rounded-md border border-line bg-card">
               <div className="border-b border-line-soft px-6 py-4">
                 <h2 className="font-display text-lg">Current photograph</h2>
               </div>
@@ -108,7 +108,7 @@ export default async function AdminProductDetailPage({
               )}
             </section>
 
-            <section className="rounded-md border border-line bg-white p-6">
+            <section className="rounded-md border border-line bg-card p-6">
               <h2 className="font-display text-lg">Address on the site</h2>
               <p className="mt-2 break-all text-[13px] text-ink-muted">
                 /products/{product.slug}
@@ -120,7 +120,7 @@ export default async function AdminProductDetailPage({
             </section>
           </aside>
 
-          <section className="overflow-hidden rounded-md border border-line bg-white lg:col-span-2">
+          <section className="overflow-hidden rounded-md border border-line bg-card lg:col-span-2">
             <div className="border-b border-line-soft px-6 py-4">
               <h2 className="font-display text-lg">
                 Sizes it comes in ({sizes.length})

@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execSync } from "node:child_process";
 
 /**
  * Reseeds before every run.
@@ -9,7 +9,9 @@ import { execFileSync } from "node:child_process";
  * anything.
  */
 export default function globalSetup(): void {
-  execFileSync("npm", ["run", "db:seed"], {
+  // Through a shell, because Node refuses to spawn npm's .cmd shim directly on
+  // Windows. The command is a literal, so there is nothing to interpolate.
+  execSync("npm run db:seed", {
     stdio: process.env.CI ? "inherit" : "ignore",
   });
 }

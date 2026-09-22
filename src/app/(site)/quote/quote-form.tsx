@@ -37,8 +37,8 @@ export function QuoteForm({
               key={value}
               className={`cursor-pointer rounded-full border px-5 py-2.5 text-[13px] font-semibold transition-colors ${
                 category === value
-                  ? "border-blue bg-blue text-white"
-                  : "border-line bg-white text-ink-soft hover:border-brand"
+                  ? "border-band bg-band text-white"
+                  : "border-line bg-card text-ink-soft hover:border-brand"
               }`}
             >
               <input
@@ -121,7 +121,7 @@ export function QuoteForm({
           required
           aria-invalid={state.errors?.message ? true : undefined}
           placeholder="Tell us about the service or occasion, any wording or photographs you'd like included, and the date you're working towards."
-          className={`w-full rounded-[3px] border bg-white px-[15px] py-[13px] font-sans text-sm text-blue placeholder:text-placeholder ${
+          className={`w-full rounded-[3px] border bg-card px-[15px] py-[13px] font-sans text-sm text-blue placeholder:text-placeholder ${
             state.errors?.message ? "border-alert" : "border-field-line"
           }`}
         />

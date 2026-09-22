@@ -1,14 +1,20 @@
 import "server-only";
 
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, proofVersions, users } from "@/db/schema";
+import { canSeeAllOrders } from "@/lib/auth/guards";
+import type { UserRole } from "@/db/schema";
 
 /**
  * One query for the whole queue: every order with the state of its newest
  * proof, rather than a lookup per row.
+ *
+ * Scoped to the viewer. A designer's queue is their own assigned work; the
+ * filter is applied in SQL rather than after the fetch, so another designer's
+ * orders are never loaded in the first place.
  */
-export async function loadQueue() {
+export async function loadQueue(viewer: { id: string; role: UserRole }) {
   const latest = db
     .select({
       orderId: proofVersions.orderId,
@@ -46,7 +52,14 @@ export async function loadQueue() {
     .from(orders)
     .leftJoin(latest, sql`${latest.orderId} = ${orders.id} and ${latest.rank} = 1`)
     .leftJoin(users, eq(users.id, orders.assignedDesignerId))
-    .where(sql`${orders.status} not in ('cancelled', 'delivered', 'shipped')`)
+    .where(
+      and(
+        sql`${orders.status} not in ('cancelled', 'delivered', 'shipped')`,
+        canSeeAllOrders(viewer.role)
+          ? undefined
+          : eq(orders.assignedDesignerId, viewer.id),
+      ),
+    )
     .orderBy(desc(orders.createdAt));
 
   return rows.map((row) => ({

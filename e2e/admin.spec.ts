@@ -137,6 +137,27 @@ test.describe("Enquiries", () => {
 });
 
 test.describe("Orders", () => {
+  test("finds an order by reference, name or email from any portal", async ({
+    page,
+  }) => {
+    await signInAsAdmin(page);
+    await page.goto("/admin/orders");
+
+    await page.getByRole("searchbox").fill("1039");
+    await page.getByRole("button", { name: "Search", exact: true }).click();
+
+    await expect(page).toHaveURL(/q=1039/);
+    await expect(page.getByRole("link", { name: "MP-1039" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "MP-1041" })).toHaveCount(0);
+
+    // The status filters carry the search with them rather than dropping it.
+    await page.getByRole("link", { name: /^All/ }).click();
+    await expect(page).toHaveURL(/q=1039/);
+
+    await page.getByRole("link", { name: "Clear" }).click();
+    await expect(page.getByRole("link", { name: "MP-1041" })).toBeVisible();
+  });
+
   test("records a payment taken outside the website", async ({ page }) => {
     await signInAsAdmin(page);
     await page.goto("/admin/orders?payment=unpaid");
@@ -171,6 +192,24 @@ test.describe("Orders", () => {
     await page.getByLabel("Status").selectOption("shipped");
     await page.getByRole("button", { name: /Save the order/ }).click();
     await expect(page.getByText("Order saved.")).toBeVisible();
+  });
+
+  test("completing an order files its artwork in the archive", async ({
+    page,
+  }) => {
+    await signInAsAdmin(page);
+    await page.goto("/admin/orders");
+    await page.getByRole("link", { name: "MP-1039" }).click();
+
+    await page.getByLabel("Status").selectOption("delivered");
+    await page.getByRole("button", { name: /Save the order/ }).click();
+
+    // A storage failure appends a warning to this message, so the bare
+    // "Order saved." is itself the assertion that the copy went through.
+    await expect(page.getByText("Order saved.", { exact: true })).toBeVisible();
+    await expect(
+      page.getByText(/was archived/).first(),
+    ).toBeVisible();
   });
 });
 
@@ -313,16 +352,11 @@ test.describe("Users", () => {
 });
 
 test.describe("The studio's own order screens", () => {
-  test("raises an order that never came through the website", async ({
+  test("the office raises an order that never came through the website", async ({
     page,
   }) => {
-    await page.goto("/login");
-    await page.getByLabel("Email").fill("designer@example.com");
-    await page.getByLabel("Password").fill(DEMO_PASSWORD);
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"));
-
-    await page.goto("/staff/orders/new");
+    await signInAsAdmin(page);
+    await page.goto("/admin/orders/new");
 
     await page.getByLabel(/Who it.s for/).selectOption({ index: 1 });
     await page
@@ -332,14 +366,30 @@ test.describe("The studio's own order screens", () => {
     await page.getByLabel("Agreed price").fill("310.00");
     await page.getByRole("button", { name: /Raise the order/ }).click();
 
-    await page.waitForURL(/\/staff\/orders\/[0-9a-f-]+$/);
-    await expect(page.getByText("£310.00")).toBeVisible();
-    await expect(
-      page.getByRole("heading", { name: "Upload a proof" }),
-    ).toBeVisible();
+    await page.waitForURL(/\/admin\/orders\/[0-9a-f-]+$/);
+    await expect(page.getByText("£310.00").first()).toBeVisible();
   });
 
-  test("filters the order list down to a designer's own work", async ({
+  test("the studio floor has no way to raise one", async ({ page }) => {
+    for (const email of ["designer@example.com", "proofreader@example.com"]) {
+      await page.goto("/login");
+      await page.getByLabel("Email").fill(email);
+      await page.getByLabel("Password").fill(DEMO_PASSWORD);
+      await page.getByRole("button", { name: "Sign in" }).click();
+      await page.waitForURL((url) => !url.pathname.startsWith("/login"));
+
+      await page.goto("/staff/orders");
+      await expect(
+        page.getByRole("link", { name: "Raise an order" }),
+      ).toHaveCount(0);
+
+      // And not by typing the old address either: the route is gone.
+      const response = await page.goto("/staff/orders/new");
+      expect(response?.status()).toBe(404);
+    }
+  });
+
+  test("a designer's order list is only ever their own work", async ({
     page,
   }) => {
     await page.goto("/login");
@@ -349,9 +399,10 @@ test.describe("The studio's own order screens", () => {
     await page.waitForURL((url) => !url.pathname.startsWith("/login"));
 
     await page.goto("/staff/orders");
-    await page.getByRole("link", { name: "Assigned to me" }).click();
 
-    await expect(page).toHaveURL(/mine=1/);
+    // Nothing to filter by: there is no one else's work in the list to hide.
+    await expect(page.getByRole("link", { name: "Assigned to me" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Everyone’s" })).toHaveCount(0);
     await expect(page.getByRole("link", { name: /^MP-/ }).first()).toBeVisible();
   });
 });

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray, or } from "drizzle-orm";
 import { db } from "@/db";
 import { productSizes, products } from "@/db/schema";
 import {
@@ -10,7 +10,7 @@ import {
   isCategory,
   type Category,
 } from "@/lib/catalogue";
-import { Breadcrumb, CtaBand, Section } from "@/components/site/section";
+import { Breadcrumb, Section } from "@/components/site/section";
 import { ImagePlaceholder } from "@/components/site/image-placeholder";
 import { SaveButton } from "@/components/site/save-button";
 import { resolveImageUrls } from "@/lib/storage/image-url";
@@ -25,12 +25,13 @@ export const metadata: Metadata = {
 export default async function ProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ category?: string }>;
+  searchParams: Promise<{ category?: string; q?: string }>;
 }) {
-  const { category } = await searchParams;
+  const { category, q } = await searchParams;
   const active: Category | undefined = isCategory(category)
     ? category
     : undefined;
+  const query = q?.trim() ?? "";
 
   const rows = await db
     .select({
@@ -44,9 +45,16 @@ export default async function ProductsPage({
     })
     .from(products)
     .where(
-      active
-        ? and(eq(products.isActive, true), eq(products.category, active))
-        : eq(products.isActive, true),
+      and(
+        eq(products.isActive, true),
+        active ? eq(products.category, active) : undefined,
+        query
+          ? or(
+              ilike(products.name, `%${query}%`),
+              ilike(products.summary, `%${query}%`),
+            )
+          : undefined,
+      ),
     )
     .orderBy(asc(products.sortOrder));
 
@@ -81,13 +89,17 @@ export default async function ProductsPage({
     sizesByProduct.set(size.productId, list);
   }
 
-  const heading = active
-    ? `${CATEGORY_LABEL[active]} stationery`
-    : "Our stationery";
+  const heading = query
+    ? `Results for “${query}”`
+    : active
+      ? `${CATEGORY_LABEL[active]} stationery`
+      : "Our stationery";
 
-  const blurb = active
-    ? CATEGORY_BLURB[active]
-    : "Everything the studio prints, across funerals, weddings and the occasions in between. Each piece is proofed with you before anything goes to press.";
+  const blurb = query
+    ? `${rows.length} ${rows.length === 1 ? "piece" : "pieces"} matched your search. Browse the categories below to see everything we print.`
+    : active
+      ? CATEGORY_BLURB[active]
+      : "Everything the studio prints, across funerals, weddings and the occasions in between. Each piece is proofed with you before anything goes to press.";
 
   return (
     <>
@@ -117,8 +129,8 @@ export default async function ProductsPage({
                 aria-current={!active ? "true" : undefined}
                 className={`inline-flex rounded-full px-5 py-2.5 text-[13px] font-semibold ${
                   !active
-                    ? "bg-blue text-white"
-                    : "border border-line bg-white text-ink-soft hover:border-brand"
+                    ? "bg-band text-white"
+                    : "border border-line bg-card text-ink-soft hover:border-brand"
                 }`}
               >
                 Everything
@@ -131,8 +143,8 @@ export default async function ProductsPage({
                   aria-current={active === value ? "true" : undefined}
                   className={`inline-flex rounded-full px-5 py-2.5 text-[13px] font-semibold ${
                     active === value
-                      ? "bg-blue text-white"
-                      : "border border-line bg-white text-ink-soft hover:border-brand"
+                      ? "bg-band text-white"
+                      : "border border-line bg-card text-ink-soft hover:border-brand"
                   }`}
                 >
                   {CATEGORY_LABEL[value]}
@@ -142,11 +154,23 @@ export default async function ProductsPage({
           </ul>
         </nav>
 
+        {rows.length === 0 && (
+          <p className="max-w-[62ch] text-[15px] leading-relaxed text-ink-muted">
+            Nothing matched{query ? ` “${query}”` : " that"}. Try a
+            broader word such as &ldquo;order of service&rdquo; or
+            &ldquo;invitation&rdquo;, pick a category above, or{" "}
+            <Link href="/quote" className="font-semibold text-accent-text">
+              tell us what you need
+            </Link>{" "}
+            and we&rsquo;ll suggest the right pieces.
+          </p>
+        )}
+
         <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {rows.map((product, index) => (
             <li
               key={product.id}
-              className="relative flex flex-col overflow-hidden rounded-md border border-line bg-white"
+              className="relative flex flex-col overflow-hidden rounded-md border border-line bg-card"
             >
               <SaveButton
                 productId={product.id}
@@ -184,12 +208,6 @@ export default async function ProductsPage({
           ))}
         </ul>
       </Section>
-
-      <CtaBand
-        title="Not sure what you need?"
-        body="Tell us about the service and we'll recommend the right pieces — no pressure, and nothing prints until you approve it."
-        primary={{ href: "/quote", label: "Request a custom quote" }}
-      />
     </>
   );
 }

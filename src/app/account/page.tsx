@@ -79,7 +79,7 @@ export default async function AccountDashboardPage() {
 
           {/* The one thing that might actually be waiting on them. */}
           {proof ? (
-            <div className="rounded-md border border-line bg-white p-8">
+            <div className="rounded-md border border-line bg-card p-8">
               <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-text">
                 Waiting for you
               </span>
@@ -99,7 +99,7 @@ export default async function AccountDashboardPage() {
               </Link>
             </div>
           ) : (
-            <div className="rounded-md border border-line bg-white p-8">
+            <div className="rounded-md border border-line bg-card p-8">
               <h2 className="text-lg">Nothing needs you right now</h2>
               <p className="mt-2 max-w-[62ch] text-sm leading-relaxed text-ink-muted">
                 We&rsquo;ll email you and put a note here the moment a proof is
@@ -127,7 +127,7 @@ export default async function AccountDashboardPage() {
               <Link
                 key={tile.label}
                 href={tile.href}
-                className="flex flex-col gap-1.5 rounded-md border border-line bg-white p-6 transition-colors hover:border-brand-deep/40"
+                className="flex flex-col gap-1.5 rounded-md border border-line bg-card p-6 transition-colors hover:border-brand-deep/40"
               >
                 <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-quiet">
                   {tile.label}

@@ -25,7 +25,7 @@ export function ProfileForm({ profile }: { profile: Profile }) {
   return (
     <form
       action={formAction}
-      className="flex max-w-[760px] flex-col gap-[22px] rounded-md border border-line bg-white p-9"
+      className="flex max-w-[760px] flex-col gap-[22px] rounded-md border border-line bg-card p-9"
     >
       <FormMessage state={state} />
 

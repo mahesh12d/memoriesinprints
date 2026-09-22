@@ -9,12 +9,19 @@ import {
   proofVersions,
   users,
 } from "@/db/schema";
-import { requireStaff } from "@/lib/auth/guards";
+import {
+  canSeeAllOrders,
+  canSeeMoney,
+  canUploadProofs,
+  requireStaff,
+} from "@/lib/auth/guards";
 import { loadDesigners } from "@/lib/proofs/staff-queries";
 import { signedReadUrl } from "@/lib/storage/storage";
 import { formatMoney } from "@/lib/pricing/money";
 import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
 import { StatusPill, type PillTone } from "@/components/portal/status-pill";
+import { ProofCompare } from "@/components/proofs/proof-compare";
+import { isUuid } from "@/lib/utils";
 import {
   AssignDesignerForm,
   ProofreaderActions,
@@ -49,6 +56,7 @@ export default async function StaffOrderDetailPage({
 }) {
   const session = await requireStaff();
   const { orderId } = await params;
+  if (!isUuid(orderId)) notFound();
 
   const [order] = await db
     .select({
@@ -69,6 +77,18 @@ export default async function StaffOrderDetailPage({
 
   if (!order) notFound();
 
+  // Not a redirect: a designer shouldn't be able to learn that an order exists
+  // by watching where they get sent.
+  if (
+    !canSeeAllOrders(session.user.role) &&
+    order.assignedDesignerId !== session.user.id
+  ) {
+    notFound();
+  }
+
+  const showMoney = canSeeMoney(session.user.role);
+  const canUpload = canUploadProofs(session.user.role);
+
   const [versions, designers, activity] = await Promise.all([
     db
       .select({
@@ -77,6 +97,7 @@ export default async function StaffOrderDetailPage({
         status: proofVersions.status,
         storageKey: proofVersions.storageKey,
         fileName: proofVersions.fileName,
+        mimeType: proofVersions.mimeType,
         createdAt: proofVersions.createdAt,
         proofreaderNotes: proofVersions.proofreaderNotes,
         uploadedBy: users.name,
@@ -123,7 +144,14 @@ export default async function StaffOrderDetailPage({
         .orderBy(asc(proofComments.pinNumber))
     : [];
 
-  const currentFileUrl = current ? await signedReadUrl(current.storageKey) : null;
+  const previous = versions[1] ?? null;
+
+  const [currentFileUrl, previousFileUrl] = await Promise.all([
+    current ? signedReadUrl(current.storageKey) : null,
+    previous ? signedReadUrl(previous.storageKey) : null,
+  ]);
+
+  const isPdf = (mimeType: string | null) => mimeType === "application/pdf";
 
   const canProofread =
     session.user.role === "proofreader" || session.user.role === "admin";
@@ -145,16 +173,43 @@ export default async function StaffOrderDetailPage({
       <PortalBody>
         <div className="grid gap-8 lg:grid-cols-[1.5fr_1fr]">
           <div className="flex flex-col gap-6">
-            <section className="rounded-md border border-line bg-white p-6">
-              <h2 className="font-display text-lg">Upload a proof</h2>
-              <p className="mb-5 mt-1 text-[13px] text-ink-muted">
-                Each upload becomes a new version. Nothing is overwritten.
-              </p>
-              <UploadProofForm orderId={order.id} />
-            </section>
+            {canUpload && (
+              <section className="rounded-md border border-line bg-card p-6">
+                <h2 className="font-display text-lg">Upload a proof</h2>
+                <p className="mb-5 mt-1 text-[13px] text-ink-muted">
+                  The order keeps the current proof and the one before it.
+                  Uploading replaces the older of the two.
+                </p>
+                <UploadProofForm orderId={order.id} />
+              </section>
+            )}
+
+            {current && previous && currentFileUrl && previousFileUrl && (
+              <section className="rounded-md border border-line bg-card p-6">
+                <h2 className="font-display text-lg">
+                  What changed since version {previous.versionNumber}
+                </h2>
+                <div className="mt-4">
+                  <ProofCompare
+                    previous={{
+                      versionNumber: previous.versionNumber,
+                      fileUrl: previousFileUrl,
+                      isPdf: isPdf(previous.mimeType),
+                      fileName: previous.fileName,
+                    }}
+                    current={{
+                      versionNumber: current.versionNumber,
+                      fileUrl: currentFileUrl,
+                      isPdf: isPdf(current.mimeType),
+                      fileName: current.fileName,
+                    }}
+                  />
+                </div>
+              </section>
+            )}
 
             {current && canProofread && current.status === "awaiting_proofreading" && (
-              <section className="rounded-md border border-line bg-white p-6">
+              <section className="rounded-md border border-line bg-card p-6">
                 <h2 className="font-display text-lg">Proofread version {current.versionNumber}</h2>
                 <p className="mb-5 mt-1 text-[13px] text-ink-muted">
                   Check it, then either send it on or return it.
@@ -164,7 +219,7 @@ export default async function StaffOrderDetailPage({
             )}
 
             {comments.length > 0 && (
-              <section className="overflow-hidden rounded-md border border-line bg-white">
+              <section className="overflow-hidden rounded-md border border-line bg-card">
                 <div className="border-b border-line-soft px-6 py-4">
                   <h2 className="font-display text-lg">
                     What the customer marked on version{" "}
@@ -194,7 +249,7 @@ export default async function StaffOrderDetailPage({
               </section>
             )}
 
-            <section className="overflow-hidden rounded-md border border-line bg-white">
+            <section className="overflow-hidden rounded-md border border-line bg-card">
               <div className="border-b border-line-soft px-6 py-4">
                 <h2 className="font-display text-lg">
                   Version history ({versions.length})
@@ -241,7 +296,7 @@ export default async function StaffOrderDetailPage({
           </div>
 
           <aside className="flex h-fit flex-col gap-6">
-            <section className="rounded-md border border-line bg-white p-6">
+            <section className="rounded-md border border-line bg-card p-6">
               <h2 className="font-display text-lg">Order</h2>
               <dl className="mt-3 flex flex-col gap-2 text-[13px]">
                 <div className="flex justify-between gap-4">
@@ -250,14 +305,16 @@ export default async function StaffOrderDetailPage({
                     {order.customerName}
                   </dd>
                 </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-ink-muted">Total</dt>
-                  <dd className="font-semibold">
-                    {order.totalMinor !== null
-                      ? formatMoney(order.totalMinor, order.currency)
-                      : "—"}
-                  </dd>
-                </div>
+                {showMoney && (
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-ink-muted">Total</dt>
+                    <dd className="font-semibold">
+                      {order.totalMinor !== null
+                        ? formatMoney(order.totalMinor, order.currency)
+                        : "—"}
+                    </dd>
+                  </div>
+                )}
                 <div className="flex justify-between gap-4">
                   <dt className="text-ink-muted">Payment</dt>
                   <dd>
@@ -281,7 +338,7 @@ export default async function StaffOrderDetailPage({
               )}
             </section>
 
-            <section className="rounded-md border border-line bg-white p-6">
+            <section className="rounded-md border border-line bg-card p-6">
               <h2 className="font-display text-lg">Assignment</h2>
               <div className="mt-4">
                 {canProofread ? (
@@ -301,7 +358,7 @@ export default async function StaffOrderDetailPage({
             </section>
 
             {activity.length > 0 && (
-              <section className="rounded-md border border-line bg-white p-6">
+              <section className="rounded-md border border-line bg-card p-6">
                 <h2 className="font-display text-lg">Recent activity</h2>
                 <ul className="mt-3 flex flex-col gap-3">
                   {activity.map((event) => (

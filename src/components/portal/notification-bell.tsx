@@ -100,7 +100,7 @@ export function NotificationBell({
         <div
           role="dialog"
           aria-label="Notifications"
-          className="absolute left-0 top-full z-30 mt-1.5 w-[290px] overflow-hidden rounded-md border border-line bg-white shadow-lg"
+          className="absolute left-0 top-full z-30 mt-1.5 w-[290px] overflow-hidden rounded-md border border-line bg-card shadow-lg"
         >
           {items.length === 0 ? (
             <p className="px-4 py-5 text-[13px] text-ink-muted">

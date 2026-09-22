@@ -64,7 +64,7 @@ export default async function AdminPortfolioDetailPage({
 
       <PortalBody>
         <div className="grid gap-7 lg:grid-cols-[1.6fr_1fr]">
-          <section className="rounded-md border border-line bg-white p-7">
+          <section className="rounded-md border border-line bg-card p-7">
             <PortfolioForm
               action={updatePortfolioItemAction}
               submitLabel="Save the piece"
@@ -73,6 +73,9 @@ export default async function AdminPortfolioDetailPage({
                 title: item.title,
                 category: item.category,
                 description: item.description,
+                templateNumber: item.templateNumber,
+                style: item.style,
+                isPopular: item.isPopular,
                 sortOrder: item.sortOrder,
                 isPublished: item.isPublished,
               }}
@@ -80,7 +83,7 @@ export default async function AdminPortfolioDetailPage({
           </section>
 
           <aside className="flex h-fit flex-col gap-6">
-            <section className="overflow-hidden rounded-md border border-line bg-white">
+            <section className="overflow-hidden rounded-md border border-line bg-card">
               <div className="border-b border-line-soft px-6 py-4">
                 <h2 className="font-display text-lg">Current photograph</h2>
               </div>
@@ -94,7 +97,7 @@ export default async function AdminPortfolioDetailPage({
               )}
             </section>
 
-            <section className="rounded-md border border-line bg-white p-6">
+            <section className="rounded-md border border-line bg-card p-6">
               <h2 className="font-display text-lg">Price</h2>
               <p className="mt-2 text-[15px] font-semibold">
                 {price
@@ -109,7 +112,7 @@ export default async function AdminPortfolioDetailPage({
               </Link>
             </section>
 
-            <section className="rounded-md border border-alert/30 bg-white p-6">
+            <section className="rounded-md border border-alert/30 bg-card p-6">
               <h2 className="font-display text-lg">Remove this piece</h2>
               <p className="mb-4 mt-1 text-[13px] leading-relaxed text-ink-muted">
                 This deletes it outright. If you only want it off the website,

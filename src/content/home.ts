@@ -5,13 +5,26 @@
  * without touching layout — and so it's one file to hand to a copywriter.
  */
 
+/** Grouped so the discover bar can show one occasion at a time. */
 export const QUICK_LINKS = [
-  { label: "Order of Service", href: "/products?category=funeral" },
-  { label: "Memorial Cards", href: "/products?category=funeral" },
-  { label: "Memory Boxes", href: "/products?category=funeral" },
-  { label: "Attendance Cards", href: "/products?category=funeral" },
-  { label: "Save the Dates", href: "/products?category=wedding" },
-  { label: "Wedding Invitations", href: "/products?category=wedding" },
+  {
+    id: "funeral",
+    label: "Funeral",
+    links: [
+      { label: "Order of Service", href: "/products?category=funeral" },
+      { label: "Memorial Cards", href: "/products?category=funeral" },
+      { label: "Memory Boxes", href: "/products?category=funeral" },
+      { label: "Attendance Cards", href: "/products?category=funeral" },
+    ],
+  },
+  {
+    id: "wedding",
+    label: "Wedding",
+    links: [
+      { label: "Save the Dates", href: "/products?category=wedding" },
+      { label: "Wedding Invitations", href: "/products?category=wedding" },
+    ],
+  },
 ];
 
 export const CASE_STUDY_STEPS = [
@@ -20,17 +33,20 @@ export const CASE_STUDY_STEPS = [
     body: "A family shares photographs, an order of service and a reading they'd like included.",
     caption:
       "[Photograph — consultation notes and reference photographs on a desk]",
+    file: "case-study-1.webp",
   },
   {
     label: "02 · The proof",
     body: "A full design proof is sent within days, ready for comments or changes.",
     caption:
       "[Photograph — design proof on screen alongside a printed test sheet]",
+    file: "case-study-2.webp",
   },
   {
     label: "03 · The finished piece",
     body: "Approved, printed on 170gsm silk paper and folded by hand in the studio.",
     caption: "[Photograph — finished order of service booklets, stacked]",
+    file: "case-study-3.webp",
   },
 ];
 
@@ -85,26 +101,31 @@ export const FINISHES = [
     label: "170gsm Silk",
     body: "Our standard stock — smooth, substantial, never flimsy.",
     caption: "[Swatch — silk paper]",
+    file: "finish-silk.webp",
   },
   {
     label: "300gsm Cover",
     body: "A heavier board for covers and keepsake pieces.",
     caption: "[Swatch — cover stock]",
+    file: "finish-cover.webp",
   },
   {
     label: "Foil Detailing",
     body: "A pressed metallic accent for titles or borders.",
     caption: "[Swatch — gold foil detail]",
+    file: "finish-foil.webp",
   },
   {
     label: "Letterpress",
     body: "Deep, tactile impressions for a classic finish.",
     caption: "[Swatch — letterpress texture]",
+    file: "finish-letterpress.webp",
   },
   {
     label: "Recycled Stock",
     body: "A matt, sustainably sourced paper option.",
     caption: "[Swatch — recycled paper]",
+    file: "finish-recycled.webp",
   },
 ];
 
@@ -148,21 +169,25 @@ export const ORDER_PROCESS = [
     label: "01 · Browse or enquire",
     body: "Start from a product you like, or tell us what you have in mind and we'll suggest the right pieces.",
     caption: "[Screenshot — product listing page]",
+    file: "process-1.webp",
   },
   {
     label: "02 · Receive your quote",
     body: "We confirm the details and send a written quote within one working day. Nothing is charged yet.",
     caption: "[Screenshot — quote confirmation email]",
+    file: "process-2.webp",
   },
   {
     label: "03 · Approve your proof",
     body: "A full design proof arrives in your account. Comment anywhere on it, or approve it as it stands.",
     caption: "[Screenshot — proof review screen]",
+    file: "process-3.webp",
   },
   {
     label: "04 · Printed and delivered",
     body: "Once approved, we print, finish by hand and ship to your date. You can follow progress in your account.",
     caption: "[Screenshot — order status in the customer account]",
+    file: "process-4.webp",
   },
 ];
 
@@ -175,6 +200,7 @@ export const ARTICLES = [
       "Why weight matters more than brightness, and how the fold changes what a booklet feels like in the hand.",
     date: "August 2026",
     caption: "[Photograph — paper samples fanned across a workbench]",
+    file: "article-1.webp",
   },
   {
     slug: "what-to-include-in-a-funeral-booklet",
@@ -184,6 +210,7 @@ export const ARTICLES = [
       "A gentle checklist for families: the readings, the photographs, and the details people most often forget.",
     date: "July 2026",
     caption: "[Photograph — an open order of service booklet]",
+    file: "article-2.webp",
   },
   {
     slug: "how-long-wedding-stationery-really-takes",
@@ -193,5 +220,6 @@ export const ARTICLES = [
       "Working backwards from the date, so save the dates and invitations land when they should.",
     date: "June 2026",
     caption: "[Photograph — a wedding suite laid out with envelopes]",
+    file: "article-3.webp",
   },
 ];

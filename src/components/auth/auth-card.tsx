@@ -18,7 +18,7 @@ export function AuthCard({
 }) {
   return (
     <main
-      className={`flex min-h-screen flex-col ${dark ? "bg-blue-deep" : "bg-surface"}`}
+      className={`flex min-h-screen flex-col ${dark ? "bg-band-deep" : "bg-surface"}`}
     >
       <div className="px-16 py-8">
         <Link
@@ -34,7 +34,7 @@ export function AuthCard({
       <div className="flex flex-1 items-center justify-center px-16 pb-12">
         <div
           className={`flex w-[420px] flex-col gap-[22px] rounded-lg p-11 ${
-            dark ? "bg-surface" : "border border-line bg-white"
+            dark ? "bg-surface" : "border border-line bg-card"
           }`}
         >
           <div className="flex flex-col items-center gap-1.5 text-center">

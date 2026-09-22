@@ -6,7 +6,7 @@ import { emptyFormState } from "@/lib/auth/form-state";
 import { FormMessage, SelectField, SubmitButton } from "@/components/ui/form";
 
 const fieldClass =
-  "w-full rounded-[3px] border border-field-line bg-white px-3 py-2.5 text-sm";
+  "w-full rounded-[3px] border border-field-line bg-card px-3 py-2.5 text-sm";
 
 export function ProductionOrderForm({
   customers,

@@ -1,5 +1,7 @@
 import {
   boolean,
+  check,
+  date,
   doublePrecision,
   index,
   integer,
@@ -10,8 +12,9 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
+  varchar,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 /* -------------------------------------------------------------------------- */
 /* Enums                                                                      */
@@ -67,6 +70,20 @@ export const paymentStatus = pgEnum("payment_status", [
   "paid",
   "refunded",
 ]);
+
+export const orderFormStatus = pgEnum("order_form_status", [
+  "draft",
+  "submitted",
+]);
+
+export const photoOption = pgEnum("photo_option", ["none", "colour", "bw"]);
+
+export const insidePagesStyle = pgEnum("inside_pages_style", [
+  "bw",
+  "match_cover",
+]);
+
+export const photoSuppliedVia = pgEnum("photo_supplied_via", ["email", "post"]);
 
 export const proofStatus = pgEnum("proof_status", [
   "awaiting_proofreading",
@@ -232,6 +249,21 @@ export const portfolioItems = pgTable(
     category: productCategory("category").notNull(),
     description: text("description"),
     imageUrl: text("image_url"),
+
+    /** The studio's own catalogue number for the design. One per piece. */
+    templateNumber: integer("template_number"),
+
+    /**
+     * What the design is — Classic, Floral, Landscape and so on.
+     *
+     * One word per piece, and the filter chips on /portfolio are built from
+     * the values actually in use, so a new one needs no code and no migration.
+     */
+    style: varchar("style", { length: 60 }),
+
+    /** Pinned by the studio as a design worth showing first. */
+    isPopular: boolean("is_popular").notNull().default(false),
+
     isPublished: boolean("is_published").notNull().default(true),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -241,9 +273,20 @@ export const portfolioItems = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [uniqueIndex("portfolio_items_slug_unique").on(t.slug)],
+  (t) => [
+    uniqueIndex("portfolio_items_slug_unique").on(t.slug),
+    uniqueIndex("portfolio_items_template_number_unique").on(t.templateNumber),
+  ],
 );
 
+/**
+ * One list per person, holding two kinds of thing: a product they mean to buy
+ * and a portfolio design they want to come back to.
+ *
+ * Both live here rather than in two tables so the saved page is one query and
+ * one list. Exactly one of the two ids is set on any row, which the check
+ * constraint enforces rather than trusting every future caller to.
+ */
 export const savedItems = pgTable(
   "saved_items",
   {
@@ -251,14 +294,25 @@ export const savedItems = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    productId: uuid("product_id")
-      .notNull()
-      .references(() => products.id, { onDelete: "cascade" }),
+    productId: uuid("product_id").references(() => products.id, {
+      onDelete: "cascade",
+    }),
+    portfolioItemId: uuid("portfolio_item_id").references(
+      () => portfolioItems.id,
+      { onDelete: "cascade" },
+    ),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
-  (t) => [uniqueIndex("saved_items_unique").on(t.userId, t.productId)],
+  (t) => [
+    uniqueIndex("saved_items_unique").on(t.userId, t.productId),
+    uniqueIndex("saved_items_template_unique").on(t.userId, t.portfolioItemId),
+    check(
+      "saved_items_one_target",
+      sql`(${t.productId} is null) <> (${t.portfolioItemId} is null)`,
+    ),
+  ],
 );
 
 /* -------------------------------------------------------------------------- */
@@ -296,6 +350,75 @@ export const enquiries = pgTable(
     index("enquiries_user_idx").on(t.userId),
     index("enquiries_status_idx").on(t.status),
   ],
+);
+
+/**
+ * What the design team needs to lay out an order of service.
+ *
+ * Filled in by the family rather than the studio, from a link they are sent
+ * once an enquiry becomes an order. The enquiry id in that link is the only
+ * credential — there is no account to make and no password to remember at
+ * the worst week of someone's life — so the ids are random v4 uuids and the
+ * page is kept out of search engines.
+ *
+ * Exactly one form per enquiry: the unique constraint below is what enforces
+ * that, and saving is always an upsert onto it.
+ */
+export const orderForms = pgTable(
+  "order_forms",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    enquiryId: uuid("enquiry_id")
+      .notNull()
+      .references(() => enquiries.id, { onDelete: "cascade" }),
+    status: orderFormStatus("status").notNull().default("draft"),
+
+    /* Deceased details */
+    deceasedName: varchar("deceased_name", { length: 200 }),
+    dateOfBirth: date("date_of_birth"),
+    dateOfDeath: date("date_of_death"),
+    ageOfDeceased: varchar("age_of_deceased", { length: 60 }),
+
+    /* Service details */
+    funeralDate: date("funeral_date"),
+    funeralTime: varchar("funeral_time", { length: 60 }),
+    venueName: varchar("venue_name", { length: 300 }),
+
+    /* Design */
+    photoOption: photoOption("photo_option"),
+    numberOfPages: integer("number_of_pages"),
+    insidePagesStyle: insidePagesStyle("inside_pages_style"),
+    quantity: integer("quantity"),
+    bespokeDesign: boolean("bespoke_design").notNull().default(false),
+    bespokeDetails: text("bespoke_details"),
+
+    /* Photographs */
+    photoQty: integer("photo_qty"),
+    photoSuppliedVia: photoSuppliedVia("photo_supplied_via"),
+    photoInstructions: text("photo_instructions"),
+    /** Object key in storage, never a public URL — reads go through a signed link. */
+    attachmentKey: text("attachment_key"),
+    attachmentName: text("attachment_name"),
+
+    /* Extras */
+    additionalProducts: jsonb("additional_products")
+      .$type<{ slug: string; title: string; size: string; quantity: number }[]>()
+      .notNull()
+      .default([]),
+    backpageInformation: text("backpage_information"),
+    additionalNotes: text("additional_notes"),
+    callbackRequested: boolean("callback_requested").notNull().default(false),
+    callbackPhone: varchar("callback_phone", { length: 60 }),
+
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [uniqueIndex("order_forms_enquiry_unique").on(t.enquiryId)],
 );
 
 export const orders = pgTable(
@@ -409,6 +532,14 @@ export const proofVersions = pgTable(
     }),
     proofreadAt: timestamp("proofread_at", { withTimezone: true }),
     proofreaderNotes: text("proofreader_notes"),
+
+    /**
+     * Where the finished artwork was copied when the order completed. Set
+     * once and never cleared: this is the copy that outlives the working
+     * file, so a completed job can always be reprinted.
+     */
+    archivedStorageKey: text("archived_storage_key"),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
 
     sentToCustomerAt: timestamp("sent_to_customer_at", { withTimezone: true }),
     customerDecisionAt: timestamp("customer_decision_at", {

@@ -6,7 +6,7 @@ import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { activityEvents, notifications, orderItems, orders, users } from "@/db/schema";
-import { requireStaff } from "@/lib/auth/guards";
+import { requireAdmin } from "@/lib/auth/guards";
 import { fail, type FormState } from "@/lib/auth/form-state";
 import { majorToMinor } from "@/lib/pricing/money";
 
@@ -49,7 +49,7 @@ export async function createProductionOrderAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const session = await requireStaff();
+  const session = await requireAdmin();
 
   const parsed = schema.safeParse({
     customerId: formData.get("customerId"),
@@ -78,6 +78,7 @@ export async function createProductionOrderAction(
 
   const totalMinor =
     data.amount === undefined ? null : majorToMinor(data.amount, "GBP");
+
 
   const reference = await nextOrderReference();
 
@@ -129,5 +130,6 @@ export async function createProductionOrderAction(
   revalidatePath("/staff/queue");
   revalidatePath("/admin/orders");
 
-  redirect(`/staff/orders/${order.id}`);
+  // Raised from the admin portal now, so that is where it lands.
+  redirect(`/admin/orders/${order.id}`);
 }

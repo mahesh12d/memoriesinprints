@@ -54,7 +54,7 @@ export default async function AccountQuotesPage() {
 
       <PortalBody>
         {rows.length === 0 ? (
-          <div className="rounded-md border border-line bg-white p-10 text-center">
+          <div className="rounded-md border border-line bg-card p-10 text-center">
             <h2 className="font-display text-lg">No quote requests yet</h2>
             <p className="mx-auto mt-2 max-w-[46ch] text-sm leading-relaxed text-ink-muted">
               When you ask us for a quote, it appears here so you can follow
@@ -68,7 +68,7 @@ export default async function AccountQuotesPage() {
             </Link>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-md border border-line bg-white">
+          <div className="overflow-hidden rounded-md border border-line bg-card">
             <ul>
               {rows.map((row) => {
                 const canCancel =

@@ -8,16 +8,17 @@ const COLUMNS = [
       { href: "/products?category=funeral", label: "Funeral stationery" },
       { href: "/products?category=wedding", label: "Wedding stationery" },
       { href: "/products?category=celebration", label: "Celebrations" },
-      { href: "/quote", label: "Get a Quote" },
+      { href: "/contact", label: "Request a Quote" },
     ],
   },
   {
     title: "Studio",
     links: [
-      { href: "/portfolio", label: "Our Work" },
-      { href: "/guide", label: "Process" },
+      { href: "/portfolio", label: "Portfolio" },
+      { href: "/guide", label: "Guide" },
+      { href: "/guide#faq", label: "FAQs" },
       { href: "/about", label: "About" },
-      { href: "/faq", label: "FAQ" },
+      { href: "/contact", label: "Contact Us" },
     ],
   },
   {
@@ -45,7 +46,7 @@ function SocialLink({
       aria-label={label}
       rel="noreferrer noopener"
       target="_blank"
-      className="flex size-9 items-center justify-center rounded-full border border-field-line text-ink-muted transition-colors hover:border-brand hover:text-brand-deep"
+      className="flex size-9 items-center justify-center rounded-full border border-white/25 text-white/80 transition-colors hover:border-white hover:bg-white/10 hover:text-white"
     >
       {children}
     </a>
@@ -54,17 +55,17 @@ function SocialLink({
 
 export function SiteFooter() {
   return (
-    <footer className="mt-auto border-t border-line bg-surface-grey">
+    <footer className="mt-auto border-t border-[#416351] bg-[#4D745F] text-white">
       <div className="mx-auto grid max-w-[1200px] gap-12 px-6 py-16 sm:px-10 lg:grid-cols-[1.4fr_repeat(3,1fr)]">
         <div className="flex flex-col gap-4">
-          <span className="font-display text-lg font-semibold text-blue">
+          <span className="font-display text-xl font-semibold text-white">
             Memories in Prints
           </span>
-          <p className="max-w-[38ch] text-[13px] leading-relaxed text-ink-quiet">
+          <p className="max-w-[38ch] text-[13px] leading-relaxed text-white/80">
             Bespoke funeral stationery, memorial keepsakes and wedding
             stationery, printed with care in {STUDIO.city}, UK.
           </p>
-          <p className="text-[13px] leading-relaxed text-ink-quiet">
+          <p className="text-[13px] leading-relaxed text-white/75">
             Proud member of the Funeral Service Association (FSA)
           </p>
 
@@ -93,7 +94,7 @@ export function SiteFooter() {
 
         {COLUMNS.map((column) => (
           <div key={column.title} className="flex flex-col gap-4">
-            <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-blue">
+            <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-white">
               {column.title}
             </span>
             <ul className="flex flex-col gap-2.5">
@@ -101,7 +102,7 @@ export function SiteFooter() {
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="text-[13px] text-ink-quiet hover:text-blue"
+                    className="text-[13px] text-white/75 transition-colors hover:text-white"
                   >
                     {link.label}
                   </Link>
@@ -112,8 +113,8 @@ export function SiteFooter() {
         ))}
       </div>
 
-      <div className="border-t border-line">
-        <div className="mx-auto flex max-w-[1200px] flex-col gap-2 px-6 py-6 text-[12px] text-ink-quiet sm:flex-row sm:items-center sm:justify-between sm:px-10">
+      <div className="border-t border-white/15">
+        <div className="mx-auto flex max-w-[1200px] flex-col gap-2 px-6 py-6 text-[12px] text-white/70 sm:flex-row sm:items-center sm:justify-between sm:px-10">
           <span>
             © {new Date().getFullYear()} Memories in Prints. All rights
             reserved.
