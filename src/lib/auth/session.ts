@@ -5,6 +5,7 @@ import { cookies, headers } from "next/headers";
 import { and, eq, gt, isNull, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { sessions, users, type User } from "@/db/schema";
+import { clientIp } from "@/lib/client-ip";
 
 export type SessionScope = "site" | "admin";
 
@@ -45,14 +46,13 @@ export async function createSession(
   const expiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 86_400_000);
 
   const headerList = await headers();
-  const forwardedFor = headerList.get("x-forwarded-for");
 
   await db.insert(sessions).values({
     userId,
     tokenHash: hashToken(token),
     scope,
     userAgent: headerList.get("user-agent")?.slice(0, 500) ?? null,
-    ipAddress: forwardedFor?.split(",")[0]?.trim() ?? null,
+    ipAddress: await clientIp(),
     expiresAt,
   });
 

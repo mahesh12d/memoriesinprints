@@ -26,6 +26,8 @@ import {
 } from "@/lib/storage/storage";
 import { checkUpload } from "@/lib/storage/uploads";
 import { fail, type FormState } from "@/lib/auth/form-state";
+import { sendMail } from "@/lib/mail/mailer";
+import { paymentRequestMail, proofReadyMail } from "@/lib/mail/templates";
 import { clampPin } from "./pins";
 
 /* -------------------------------------------------------------------------- */
@@ -118,10 +120,18 @@ export async function uploadProofAction(
 
   await pruneOldVersions(orderId);
 
-  await db
-    .update(orders)
-    .set({ status: "in_production", updatedAt: new Date() })
-    .where(eq(orders.id, orderId));
+  /**
+   * The order's own status deliberately does not move here.
+   *
+   * This used to set it to "in_production" the moment a designer uploaded a
+   * draft — before the proofreader had checked it and before the customer had
+   * seen it. The customer's order then read "In production" while the artwork
+   * was still being corrected, and it stayed that way even when they asked for
+   * changes, because nothing moved it back.
+   *
+   * Printing starts when the customer approves, and that is the only place
+   * that sets it.
+   */
 
   await db.insert(activityEvents).values({
     orderId,
@@ -207,8 +217,15 @@ export async function sendProofToCustomerAction(
   if (!version) return fail("There's no proof to send yet.");
 
   const [order] = await db
-    .select({ id: orders.id, reference: orders.reference, userId: orders.userId })
+    .select({
+      id: orders.id,
+      reference: orders.reference,
+      userId: orders.userId,
+      customerEmail: users.email,
+      customerName: users.name,
+    })
     .from(orders)
+    .innerJoin(users, eq(users.id, orders.userId))
     .where(eq(orders.id, orderId))
     .limit(1);
 
@@ -231,6 +248,28 @@ export async function sendProofToCustomerAction(
     body: "Have a look and either approve it or tell us what to change.",
     linkUrl: `/account/orders/${order.id}/proof`,
   });
+
+  /**
+   * And by email, because nobody sits in the portal waiting.
+   *
+   * Failing to send must not fail the action: the proofreader has done their
+   * part, the version is already marked as sent and the notification is
+   * recorded. Losing the email is recoverable — telling the proofreader it
+   * failed and leaving them to press the button again is not, because the
+   * second press would send the customer a duplicate.
+   */
+  try {
+    await sendMail(
+      proofReadyMail(
+        order.customerEmail,
+        order.customerName,
+        order.reference,
+        order.id,
+      ),
+    );
+  } catch (error) {
+    console.error("[proofs] could not email the customer", error);
+  }
 
   await db.insert(activityEvents).values({
     orderId,
@@ -357,9 +396,17 @@ async function proofForViewer(proofVersionId: string) {
       versionNumber: proofVersions.versionNumber,
       ownerId: orders.userId,
       reference: orders.reference,
+      // Needed when approving: whether there is still anything to pay, and
+      // what to ask for.
+      paymentStatus: orders.paymentStatus,
+      totalMinor: orders.totalMinor,
+      currency: orders.currency,
+      customerEmail: users.email,
+      customerName: users.name,
     })
     .from(proofVersions)
     .innerJoin(orders, eq(orders.id, proofVersions.orderId))
+    .innerJoin(users, eq(users.id, orders.userId))
     .where(eq(proofVersions.id, proofVersionId))
     .limit(1);
 
@@ -472,9 +519,20 @@ export async function decideProofAction(
       .set({ status: "approved", customerDecisionAt: new Date() })
       .where(eq(proofVersions.id, proofVersionId));
 
+    /**
+     * Approving is what creates the bill. Until the customer has seen the
+     * proof there is nothing to pay for, so the order only reaches
+     * awaiting_payment here.
+     *
+     * An order that somehow arrives already paid goes straight to printing
+     * rather than asking for the money twice.
+     */
     await db
       .update(orders)
-      .set({ status: "in_production", updatedAt: new Date() })
+      .set({
+        status: proof.paymentStatus === "paid" ? "in_production" : "awaiting_payment",
+        updatedAt: new Date(),
+      })
       .where(eq(orders.id, proof.orderId));
 
     await db.insert(activityEvents).values({
@@ -484,10 +542,34 @@ export async function decideProofAction(
       summary: `${session.user.name} approved version ${proof.versionNumber} of ${proof.reference}`,
     });
 
+    // Approving is what creates the bill, so the request goes out with it.
+    if (proof.paymentStatus !== "paid") {
+      try {
+        await sendMail(
+          paymentRequestMail(
+            proof.customerEmail,
+            proof.customerName,
+            proof.reference,
+            proof.orderId,
+            proof.totalMinor,
+            proof.currency,
+          ),
+        );
+      } catch (error) {
+        console.error("[proofs] could not email the payment request", error);
+      }
+    }
+
     revalidatePath(`/account/orders/${proof.orderId}/proof`);
     revalidatePath("/staff/queue");
 
-    return { ok: true, message: "Approved — thank you. We'll start printing." };
+    return {
+      ok: true,
+      message:
+        proof.paymentStatus === "paid"
+          ? "Approved — thank you. We'll start printing."
+          : "Approved — thank you. We've emailed you the payment details.",
+    };
   }
 
   if (decision === "changes") {

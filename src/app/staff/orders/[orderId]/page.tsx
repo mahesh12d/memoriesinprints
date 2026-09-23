@@ -20,6 +20,7 @@ import { signedReadUrl } from "@/lib/storage/storage";
 import { formatMoney } from "@/lib/pricing/money";
 import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
 import { StatusPill, type PillTone } from "@/components/portal/status-pill";
+import { StaffProgress } from "@/components/portal/staff-progress";
 import { ProofCompare } from "@/components/proofs/proof-compare";
 import { isUuid } from "@/lib/utils";
 import {
@@ -171,6 +172,20 @@ export default async function StaffOrderDetailPage({
       />
 
       <PortalBody>
+        {/*
+          Where this job stands, above everything else on the page: a designer
+          opening it wants to know whether it is back with them, and a
+          proofreader whether it is waiting on them.
+        */}
+        <section className="mb-8 rounded-md border border-line bg-card p-6">
+          <StaffProgress
+            status={order.status}
+            proofStatus={current?.status ?? null}
+            hasDesigner={Boolean(order.assignedDesignerId)}
+            hasProof={versions.length > 0}
+          />
+        </section>
+
         <div className="grid gap-8 lg:grid-cols-[1.5fr_1fr]">
           <div className="flex flex-col gap-6">
             {canUpload && (

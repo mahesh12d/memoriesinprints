@@ -1,12 +1,12 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { enquiries, notifications } from "@/db/schema";
 import { getSession } from "@/lib/auth/session";
 import { LIMITS, rateLimit } from "@/lib/rate-limit";
+import { clientIp } from "@/lib/client-ip";
 import { sendMail } from "@/lib/mail/mailer";
 import {
   enquiryReceivedMail,
@@ -66,11 +66,9 @@ export async function submitEnquiryAction(
     );
   }
 
-  const headerList = await headers();
-  const ip =
-    headerList.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = await clientIp();
 
-  const limit = rateLimit(`enquiry:${ip}`, LIMITS.enquiry(), 900);
+  const limit = await rateLimit(`enquiry:${ip}`, LIMITS.enquiry(), 900);
   if (!limit.ok) {
     return fail(
       "We've already received a few enquiries from you. Please give us a few minutes, or call the studio if it's urgent.",

@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { getCartContents } from "@/lib/cart/cart";
 import { getSession } from "@/lib/auth/session";
 import { formatMoney } from "@/lib/pricing/money";
-import { providerStatus } from "@/lib/payments/checkout";
 import { Section } from "@/components/site/section";
 import { CheckoutForm } from "./checkout-form";
 
@@ -29,7 +28,6 @@ export default async function CheckoutPage() {
   }
 
   const total = cart.totals[0];
-  const providers = await providerStatus();
 
   return (
     <Section>
@@ -44,7 +42,7 @@ export default async function CheckoutPage() {
             </p>
           </div>
 
-          <CheckoutForm providers={providers} />
+          <CheckoutForm />
         </div>
 
         <aside className="flex h-fit flex-col gap-5 rounded-md border border-line bg-card p-7">

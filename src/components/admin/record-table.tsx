@@ -28,12 +28,21 @@ export function RecordTable<Row extends { id: string }>({
   columns,
   hrefFor,
   empty,
+  listId,
+  searchText,
 }: {
   rows: Row[];
   columns: Column<Row>[];
   /** When given, the first cell becomes the link into the record. */
   hrefFor?: (row: Row) => string;
   empty: ReactNode;
+  /**
+   * id for the tbody, so OrderSearch can filter these rows as you type.
+   * Pair it with searchText; on its own it does nothing.
+   */
+  listId?: string;
+  /** The text a live search matches a row against. */
+  searchText?: (row: Row) => string;
 }) {
   if (rows.length === 0) {
     return (
@@ -62,10 +71,11 @@ export function RecordTable<Row extends { id: string }>({
           </tr>
         </thead>
 
-        <tbody>
+        <tbody id={listId}>
           {rows.map((row) => (
             <tr
               key={row.id}
+              data-search={searchText ? searchText(row) : undefined}
               className="border-b border-line-soft last:border-b-0 hover:bg-surface-grey/60"
             >
               {columns.map((column, index) => (

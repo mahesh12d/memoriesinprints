@@ -1,4 +1,5 @@
-import { appUrl, type Mail } from "./mailer";
+import { appUrl, type Mail } from "./types";
+import { formatMoney } from "@/lib/pricing/money";
 
 /** Plain, quiet styling — this is a bereavement-adjacent business. */
 function wrap(heading: string, bodyHtml: string): string {
@@ -139,5 +140,117 @@ export function studioEnquiryMail(
        ${button(appUrl("/admin/enquiries"), "Open in admin")}`,
     ),
     text: `New enquiry ${enquiry.reference}\n\nFrom: ${enquiry.name} <${enquiry.email}>\nPhone: ${enquiry.phone ?? "—"}\nSubject: ${enquiry.subject}\n\n${enquiry.message}`,
+  };
+}
+
+/**
+ * The proof is ready to look at.
+ *
+ * This is the one message in the set that asks the customer to do something
+ * time-sensitive: nothing is printed until they approve it, and for funeral
+ * stationery the date is usually days away. Until now it was an in-app
+ * notification only, which assumed they would think to log in and check.
+ */
+export function proofReadyMail(
+  to: string,
+  name: string,
+  reference: string,
+  orderId: string,
+): Mail {
+  const link = appUrl(`/account/orders/${encodeURIComponent(orderId)}/proof`);
+  return {
+    to,
+    subject: `Your proof for ${reference} is ready`,
+    html: wrap(
+      "Your proof is ready",
+      `<p style="font-size:15px;line-height:1.6;margin:0;">Hello ${esc(name)},</p>
+       <p style="font-size:15px;line-height:1.6;">Your proof for ${esc(reference)} is ready for you to look over. You can read it through, and click anywhere on it to point out anything you'd like changed.</p>
+       ${button(link, "Look over my proof")}
+       <p style="font-size:13px;line-height:1.6;color:#6b6560;">Nothing is printed until you've approved it, and there's no charge until then either. If anything isn't right, just tell us and we'll put it right.</p>`,
+    ),
+    text: `Hello ${name},
+
+Your proof for ${reference} is ready for you to look over:
+${link}
+
+Nothing is printed until you have approved it, and there is no charge until then. If anything is not right, tell us and we will put it right.`,
+  };
+}
+
+/**
+ * The proof has been approved, so now there is something to pay for.
+ *
+ * Sent at the moment of approval rather than as a reminder: under this flow
+ * approving is what creates the bill, and the customer has just done it, so
+ * the request should arrive while they still have the order in mind.
+ */
+export function paymentRequestMail(
+  to: string,
+  name: string,
+  reference: string,
+  orderId: string,
+  amountMinor: number | null,
+  currency: string,
+): Mail {
+  const link = appUrl(`/checkout/${encodeURIComponent(orderId)}`);
+  const amount =
+    amountMinor !== null ? formatMoney(amountMinor, currency) : "the agreed amount";
+
+  return {
+    to,
+    subject: `Payment for ${reference}`,
+    html: wrap(
+      "Thank you for approving your proof",
+      `<p style="font-size:15px;line-height:1.6;margin:0;">Hello ${esc(name)},</p>
+       <p style="font-size:15px;line-height:1.6;">Thank you for approving the proof for ${esc(reference)}. The last step is payment of <strong>${esc(amount)}</strong>, and then we go straight to print.</p>
+       ${button(link, "Pay for my order")}
+       <p style="font-size:13px;line-height:1.6;color:#6b6560;">If anything has changed or you would rather pay another way, reply to this email and we will sort it out with you.</p>`,
+    ),
+    text: `Hello ${name},
+
+Thank you for approving the proof for ${reference}. The last step is payment of ${amount}, and then we go straight to print.
+
+Pay here: ${link}
+
+If anything has changed or you would rather pay another way, reply to this email.`,
+  };
+}
+
+/**
+ * Payment received.
+ *
+ * Doubles as the receipt, so it names the amount and the order rather than
+ * just saying thank you — this is the message someone forwards to whoever is
+ * settling the account.
+ */
+export function paymentReceivedMail(
+  to: string,
+  name: string,
+  reference: string,
+  orderId: string,
+  amountMinor: number | null,
+  currency: string,
+): Mail {
+  const link = appUrl(`/account/orders`);
+  const amount =
+    amountMinor !== null ? formatMoney(amountMinor, currency) : "your payment";
+
+  return {
+    to,
+    subject: `Payment received for ${reference}`,
+    html: wrap(
+      "Payment received, thank you",
+      `<p style="font-size:15px;line-height:1.6;margin:0;">Hello ${esc(name)},</p>
+       <p style="font-size:15px;line-height:1.6;">We have received <strong>${esc(amount)}</strong> for ${esc(reference)}. Your order is now with our printers, and we will let you know the moment it is on its way.</p>
+       ${button(link, "See my order")}
+       <p style="font-size:13px;line-height:1.6;color:#6b6560;">Please keep this email as your receipt.</p>`,
+    ),
+    text: `Hello ${name},
+
+We have received ${amount} for ${reference}. Your order is now with our printers and we will let you know when it is on its way.
+
+See your order: ${link}
+
+Please keep this email as your receipt.`,
   };
 }

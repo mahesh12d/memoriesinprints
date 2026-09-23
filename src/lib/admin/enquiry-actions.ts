@@ -2,10 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { activityEvents, enquiries, notifications, orders } from "@/db/schema";
+import { nextOrderReference } from "@/lib/order-reference";
 import { requireAdmin } from "@/lib/auth/guards";
 import { fail, type FormState } from "@/lib/auth/form-state";
 import { majorToMinor } from "@/lib/pricing/money";
@@ -122,16 +123,6 @@ export async function quoteEnquiryAction(
   revalidatePath(`/admin/enquiries/${enquiryId}`);
 
   return { ok: true, message: "Quote recorded and the customer told." };
-}
-
-async function nextOrderReference(): Promise<string> {
-  const [row] = await db
-    .select({
-      next: sql<number>`coalesce(max(nullif(regexp_replace(${orders.reference}, '\\D', '', 'g'), '')::int), 1000) + 1`,
-    })
-    .from(orders);
-
-  return `MP-${row?.next ?? 1001}`;
 }
 
 /**

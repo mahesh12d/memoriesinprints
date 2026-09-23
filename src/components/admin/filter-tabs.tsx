@@ -17,6 +17,7 @@ export function FilterTabs({
   current,
   options,
   extraParams,
+  alwaysSetParam = false,
 }: {
   basePath: string;
   param?: string;
@@ -24,6 +25,13 @@ export function FilterTabs({
   options: FilterOption[];
   /** Other query parameters to preserve while switching this one. */
   extraParams?: Record<string, string | undefined>;
+  /**
+   * Normally "all" is the bare URL with no parameter. Where there is no "all"
+   * option — the customer's orders, which are always in exactly one group —
+   * the bare URL means "whichever group has something in it", so the chosen
+   * one has to be written out or the tabs would not hold.
+   */
+  alwaysSetParam?: boolean;
 }) {
   function hrefFor(value: string): string {
     const params = new URLSearchParams();
@@ -32,7 +40,7 @@ export function FilterTabs({
       if (item) params.set(key, item);
     }
 
-    if (value !== "all") params.set(param, value);
+    if (alwaysSetParam || value !== "all") params.set(param, value);
 
     const query = params.toString();
     return query ? `${basePath}?${query}` : basePath;

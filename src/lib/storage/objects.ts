@@ -1,4 +1,16 @@
-import "server-only";
+/**
+ * The storage implementation.
+ *
+ * Split out of storage.ts so the seed can use the real upload path. The
+ * guard in storage.ts cannot be imported outside Next — "server-only" is an
+ * alias the bundler provides, not an installed package — and a seed that
+ * writes files a different way from the app is a seed that produces proofs
+ * the app cannot open, which is exactly what happened.
+ *
+ * Application code imports storage.ts, never this. That keeps the guard on
+ * the path everything actually uses, so R2 credentials still cannot be
+ * pulled into a client bundle.
+ */
 
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";

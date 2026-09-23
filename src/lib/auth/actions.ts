@@ -1,6 +1,5 @@
 "use server";
 
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
@@ -23,6 +22,7 @@ import {
   verifyEmailMail,
 } from "@/lib/mail/templates";
 import { fakeVerifyDelay, hashPassword, verifyPassword } from "./password";
+import { BREACHED_MESSAGE, isBreachedPassword } from "./breached";
 import { consumeToken, issueToken } from "./tokens";
 import {
   createSession,
@@ -35,15 +35,9 @@ import {
 import { isStaff } from "./guards";
 import { mergeGuestCart } from "@/lib/cart/cart";
 import { fail, type FormState } from "./form-state";
+import { clientIp as clientKey } from "@/lib/client-ip";
 
-async function clientKey(): Promise<string> {
-  const headerList = await headers();
-  return (
-    headerList.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    headerList.get("x-real-ip") ??
-    "unknown"
-  );
-}
+
 
 /** Where a person lands after signing in, based on what they are. */
 function homeForRole(role: string): string {
@@ -70,7 +64,7 @@ export async function signupAction(
     return fail("Please check the form.", fieldErrors(parsed.error));
   }
 
-  const limit = rateLimit(`signup:${await clientKey()}`, LIMITS.signup(), 900);
+  const limit = await rateLimit(`signup:${await clientKey()}`, LIMITS.signup(), 900);
   if (!limit.ok) {
     return fail("Too many attempts. Please try again in a few minutes.");
   }
@@ -88,6 +82,10 @@ export async function signupAction(
     const token = await issueToken(existing[0].id, "email_verification");
     await sendMail(verifyEmailMail(email, name, token));
     redirect("/verify-email?sent=1");
+  }
+
+  if (await isBreachedPassword(password)) {
+    return fail(BREACHED_MESSAGE, { password: BREACHED_MESSAGE });
   }
 
   const passwordHash = await hashPassword(password);
@@ -124,7 +122,7 @@ export async function loginAction(
 
   const { email, password } = parsed.data;
 
-  const limit = rateLimit(`login:${email}:${await clientKey()}`, LIMITS.login(), 900);
+  const limit = await rateLimit(`login:${email}:${await clientKey()}`, LIMITS.login(), 900);
   if (!limit.ok) {
     return fail(
       `Too many sign-in attempts. Please try again in ${Math.ceil(limit.retryAfterSeconds / 60)} minutes.`,
@@ -149,14 +147,31 @@ export async function loginAction(
     return fail("That email and password don't match an account.");
   }
 
+  // An account created through Google has no password. Burning the same time
+  // as a real check keeps it indistinguishable from a wrong password, so this
+  // can't be used to discover which accounts use Google.
+  if (!user.passwordHash) {
+    await fakeVerifyDelay();
+    return fail("That email and password don't match an account.");
+  }
+
   const valid = await verifyPassword(user.passwordHash, password);
   if (!valid || user.isDisabled) {
     return fail("That email and password don't match an account.");
   }
 
-  // Admins sign in at /admin/login only — this keeps the two systems apart.
+  /**
+   * Admins sign in at /admin/login only — this keeps the two systems apart.
+   *
+   * The refusal reads exactly like a wrong password, deliberately. Naming the
+   * admin portal here announced its existence to anyone who reached this line
+   * and confirmed the address belonged to an administrator. Everything above
+   * goes to some trouble to keep failures indistinguishable — the fake verify
+   * delay exists for precisely that reason — and this was the one line giving
+   * it away.
+   */
   if (user.role === "admin") {
-    return fail("Administrators sign in through the admin portal.");
+    return fail("That email and password don't match an account.");
   }
 
   await db
@@ -195,7 +210,7 @@ export async function adminLoginAction(
 
   const { email, password } = parsed.data;
 
-  const limit = rateLimit(`admin-login:${email}:${await clientKey()}`, LIMITS.adminLogin(), 900);
+  const limit = await rateLimit(`admin-login:${email}:${await clientKey()}`, LIMITS.adminLogin(), 900);
   if (!limit.ok) {
     return fail("Too many sign-in attempts. Please try again shortly.");
   }
@@ -214,6 +229,11 @@ export async function adminLoginAction(
   const user = rows[0];
 
   if (!user) {
+    await fakeVerifyDelay();
+    return fail("Those details don't match an admin account.");
+  }
+
+  if (!user.passwordHash) {
     await fakeVerifyDelay();
     return fail("Those details don't match an admin account.");
   }
@@ -260,7 +280,7 @@ export async function resendVerificationAction(): Promise<FormState> {
     return { ok: true, message: "Your email address is already confirmed." };
   }
 
-  const limit = rateLimit(`verify-resend:${session.user.id}`, 3, 600);
+  const limit = await rateLimit(`verify-resend:${session.user.id}`, 3, 600);
   if (!limit.ok) {
     return fail("We've just sent one. Please check your inbox and spam folder.");
   }
@@ -287,7 +307,7 @@ export async function forgotPasswordAction(
     return fail("Please check the form.", fieldErrors(parsed.error));
   }
 
-  const limit = rateLimit(`forgot:${await clientKey()}`, LIMITS.forgotPassword(), 900);
+  const limit = await rateLimit(`forgot:${await clientKey()}`, LIMITS.forgotPassword(), 900);
   if (!limit.ok) {
     return fail("Too many requests. Please try again in a few minutes.");
   }
@@ -332,6 +352,10 @@ export async function resetPasswordAction(
     return fail(
       "That reset link has expired or has already been used. Please request a new one.",
     );
+  }
+
+  if (await isBreachedPassword(parsed.data.password)) {
+    return fail(BREACHED_MESSAGE, { password: BREACHED_MESSAGE });
   }
 
   const passwordHash = await hashPassword(parsed.data.password);
@@ -382,6 +406,10 @@ export async function changePasswordAction(
     return fail("Your current password isn't right.", {
       currentPassword: "Your current password isn't right",
     });
+  }
+
+  if (await isBreachedPassword(parsed.data.password)) {
+    return fail(BREACHED_MESSAGE, { password: BREACHED_MESSAGE });
   }
 
   const passwordHash = await hashPassword(parsed.data.password);

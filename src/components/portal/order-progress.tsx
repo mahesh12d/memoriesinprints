@@ -1,0 +1,116 @@
+import { ProgressSteps } from "./progress-steps";
+
+/**
+ * Where an order has got to, for the person who placed it.
+ *
+ * The steps are read from the order's own status rather than kept separately,
+ * so this cannot drift out of step with what the studio sees.
+ */
+
+type OrderStatus =
+  | "awaiting_price"
+  | "awaiting_payment"
+  | "awaiting_proof"
+  | "in_production"
+  | "shipped"
+  | "delivered"
+  | "cancelled";
+
+type ProofStatus =
+  | "awaiting_proofreading"
+  | "returned_to_designer"
+  | "awaiting_customer"
+  | "approved"
+  | "changes_requested";
+
+const STEPS = [
+  "Placed",
+  "Proof",
+  "Payment",
+  "Printing",
+  "Shipped",
+  "Delivered",
+] as const;
+
+/**
+ * Which step is in progress for a given status. "Placed" is index 0 and is
+ * always behind us — the order exists, so it happened.
+ *
+ * The proof comes before payment: a new order starts at awaiting_proof owing
+ * nothing, and only reaches awaiting_payment once the customer has approved
+ * what they are being asked to pay for.
+ */
+const CURRENT_STEP: Record<Exclude<OrderStatus, "cancelled">, number> = {
+  awaiting_price: 1,
+  awaiting_proof: 1,
+  awaiting_payment: 2,
+  in_production: 3,
+  shipped: 4,
+  // Past the last index, so every step reads as done.
+  delivered: STEPS.length,
+};
+
+/**
+ * One plain sentence about what is happening now, and whether anything is
+ * needed from the customer. For someone arranging a funeral this matters more
+ * than the diagram above it, so it is not optional decoration.
+ */
+function currentNote(
+  status: OrderStatus,
+  proofStatus?: ProofStatus | null,
+): string {
+  switch (status) {
+    case "awaiting_price":
+      return "We are preparing your price and will be in touch.";
+    case "awaiting_payment":
+      return "Approved — payment is all that's left before we print.";
+    case "awaiting_proof":
+      if (proofStatus === "awaiting_customer") {
+        return "Your proof is ready for you to look over.";
+      }
+      if (proofStatus === "changes_requested") {
+        return "We are making the changes you asked for.";
+      }
+      return "We are preparing your proof.";
+    case "in_production":
+      return "Approved and being printed.";
+    case "shipped":
+      return "On its way to you.";
+    case "delivered":
+      return "Delivered.";
+    case "cancelled":
+      return "This order was cancelled.";
+  }
+}
+
+
+export function OrderProgress({
+  status,
+  proofStatus,
+}: {
+  status: OrderStatus;
+  proofStatus?: ProofStatus | null;
+}) {
+  const note = currentNote(status, proofStatus);
+
+  /**
+   * A cancelled order has no position on this line — showing it part-way along
+   * would suggest it is still moving. It gets the sentence on its own.
+   */
+  if (status === "cancelled") {
+    return (
+      <p className="text-[13px] text-alert" role="status">
+        {note}
+      </p>
+    );
+  }
+
+  return (
+    <ProgressSteps
+      steps={STEPS}
+      current={CURRENT_STEP[status]}
+      note={note}
+      label="Order progress"
+    />
+  );
+}

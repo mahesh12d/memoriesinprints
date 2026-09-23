@@ -11,6 +11,10 @@ import { StatusPill } from "@/components/portal/status-pill";
 import { FilterTabs } from "@/components/admin/filter-tabs";
 import { OrderSearch } from "@/components/portal/order-search";
 import { RecordTable, type Column } from "@/components/admin/record-table";
+import { Pagination } from "@/components/portal/pagination";
+
+/** One screen of orders at a time; the whole book is longer than any scroll. */
+const PAGE_SIZE = 25;
 
 const dateFormat = new Intl.DateTimeFormat("en-GB", {
   day: "numeric",
@@ -21,6 +25,7 @@ const dateFormat = new Intl.DateTimeFormat("en-GB", {
 type Row = {
   id: string;
   reference: string;
+  orderedFor: string | null;
   customerName: string;
   customerEmail: string;
   status: string;
@@ -37,10 +42,21 @@ type PaymentStatusValue = keyof typeof PAYMENT_STATUS;
 export default async function AdminOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; payment?: string; q?: string }>;
+  searchParams: Promise<{
+    status?: string;
+    payment?: string;
+    q?: string;
+    page?: string;
+  }>;
 }) {
   await requireAdmin();
-  const { status = "all", payment = "all", q } = await searchParams;
+  const {
+    status = "all",
+    payment = "all",
+    q,
+    page: pageParam,
+  } = await searchParams;
+  const page = Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1);
   const query = q?.trim() ?? "";
 
   const knownStatus = status in ORDER_STATUS ? status : "all";
@@ -86,10 +102,24 @@ export default async function AdminOrdersPage({
       : undefined,
   ].filter(Boolean);
 
+  const where = filters.length ? and(...filters) : undefined;
+
+  /** How many match, so the pager knows how far it goes. */
+  const [matching] = await db
+    .select({ value: sql<number>`count(*)::int` })
+    .from(orders)
+    .innerJoin(users, eq(users.id, orders.userId))
+    .where(where);
+
+  const matchingCount = matching?.value ?? 0;
+  const pageCount = Math.max(1, Math.ceil(matchingCount / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+
   const rows: Row[] = await db
     .select({
       id: orders.id,
       reference: orders.reference,
+      orderedFor: orders.orderedFor,
       customerName: users.name,
       customerEmail: users.email,
       status: orders.status,
@@ -102,8 +132,10 @@ export default async function AdminOrdersPage({
     .from(orders)
     .innerJoin(users, eq(users.id, orders.userId))
     .leftJoin(designer, eq(designer.id, orders.assignedDesignerId))
-    .where(filters.length ? and(...filters) : undefined)
-    .orderBy(desc(orders.createdAt));
+    .where(where)
+    .orderBy(desc(orders.createdAt))
+    .limit(PAGE_SIZE)
+    .offset((currentPage - 1) * PAGE_SIZE);
 
   const columns: Column<Row>[] = [
     { header: "Reference", cell: (row) => row.reference },
@@ -176,6 +208,7 @@ export default async function AdminOrdersPage({
               status: knownStatus === "all" ? undefined : knownStatus,
               payment: knownPayment === "all" ? undefined : knownPayment,
             }}
+            liveTarget="admin-orders-list"
           />
 
           <FilterTabs
@@ -216,6 +249,11 @@ export default async function AdminOrdersPage({
           <RecordTable
             rows={rows}
             columns={columns}
+            listId="admin-orders-list"
+            // Reference and customer, which is what staff search by.
+            searchText={(row) =>
+              `${row.reference} ${row.customerName} ${row.orderedFor ?? ""}`
+            }
             hrefFor={(row) => `/admin/orders/${row.id}`}
             empty={
               <>
@@ -227,6 +265,17 @@ export default async function AdminOrdersPage({
                 </p>
               </>
             }
+          />
+
+          <Pagination
+            basePath="/admin/orders"
+            page={currentPage}
+            pageCount={pageCount}
+            params={{
+              status: knownStatus === "all" ? undefined : knownStatus,
+              payment: knownPayment === "all" ? undefined : knownPayment,
+              q: query || undefined,
+            }}
           />
         </div>
       </PortalBody>

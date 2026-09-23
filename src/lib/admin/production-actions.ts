@@ -2,10 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { activityEvents, notifications, orderItems, orders, users } from "@/db/schema";
+import { nextOrderReference } from "@/lib/order-reference";
 import { requireAdmin } from "@/lib/auth/guards";
 import { fail, type FormState } from "@/lib/auth/form-state";
 import { majorToMinor } from "@/lib/pricing/money";
@@ -24,16 +25,6 @@ const schema = z.object({
 function blankToNull(value: FormDataEntryValue | null): string | null {
   const text = String(value ?? "").trim();
   return text === "" ? null : text;
-}
-
-async function nextOrderReference(): Promise<string> {
-  const [row] = await db
-    .select({
-      next: sql<number>`coalesce(max(nullif(regexp_replace(${orders.reference}, '\\D', '', 'g'), '')::int), 1000) + 1`,
-    })
-    .from(orders);
-
-  return `MP-${row?.next ?? 1001}`;
 }
 
 /**

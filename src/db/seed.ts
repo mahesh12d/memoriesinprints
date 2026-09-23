@@ -1,7 +1,6 @@
 import "dotenv/config";
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
 import { hash } from "@node-rs/argon2";
+import { sql } from "drizzle-orm";
 import { db } from "./index";
 import {
   activityEvents,
@@ -26,7 +25,8 @@ import {
   users,
   verificationTokens,
 } from "./schema";
-import { buildStorageKey, localUploadPath } from "@/lib/storage/keys";
+import { buildStorageKey } from "@/lib/storage/keys";
+import { putObject } from "@/lib/storage/objects";
 import { samplePdf, samplePng } from "@/lib/storage/sample-proof";
 
 /**
@@ -60,17 +60,29 @@ async function seedProofs({
     delivered: SeedOrder;
     needsProofreading: SeedOrder;
     returned: SeedOrder;
+    approved: SeedOrder;
   };
   now: Date;
 }) {
+  /**
+   * Writes through the app's own upload path.
+   *
+   * This used to write straight to .uploads/ on disk. With R2 configured the
+   * app serves proofs from signed R2 links instead, so every seeded proof
+   * pointed at an object that was not there — the customer got "We couldn't
+   * display this proof here" on a file that existed, just not where the app
+   * was looking. putObject goes to R2 when it is configured and to disk when
+   * it is not, which is the only way the seed and the app can agree.
+   */
   async function store(
     fileName: string,
     body: Buffer,
   ): Promise<{ storageKey: string; sizeBytes: number }> {
     const storageKey = buildStorageKey("proofs", fileName);
-    const target = localUploadPath(storageKey);
-    await mkdir(path.dirname(target), { recursive: true });
-    await writeFile(target, body);
+    const mimeType = fileName.endsWith(".png") ? "image/png" : "application/pdf";
+
+    await putObject(storageKey, body, mimeType);
+
     return { storageKey, sizeBytes: body.length };
   }
 
@@ -151,6 +163,24 @@ async function seedProofs({
         proofreaderNotes:
           "The date reads 12th September but the enquiry says the 19th. Worth checking before this goes out.",
         createdAt: new Date(now.getTime() - 2 * 86_400_000),
+      },
+      {
+        /**
+         * Approved by the customer two days ago, which is what moved its order
+         * to awaiting_payment. Nothing is printed until that is settled.
+         */
+        orderId: seeded.approved.id,
+        versionNumber: 1,
+        ...wedding,
+        fileName: "invitation-approved-v1.pdf",
+        mimeType: "application/pdf",
+        uploadedById: designerId,
+        status: "approved",
+        proofreaderId,
+        proofreadAt: new Date(now.getTime() - 3 * 86_400_000),
+        sentToCustomerAt: new Date(now.getTime() - 3 * 86_400_000),
+        customerDecisionAt: new Date(now.getTime() - 2 * 86_400_000),
+        createdAt: new Date(now.getTime() - 3 * 86_400_000),
       },
       {
         orderId: seeded.delivered.id,
@@ -501,7 +531,8 @@ async function main() {
     })
     .returning({ id: enquiries.id });
 
-  const [awaitingCustomer, delivered, needsProofreading, returned] = await db
+  const [awaitingCustomer, delivered, needsProofreading, returned, approved] =
+    await db
     .insert(orders)
     .values([
       {
@@ -509,11 +540,18 @@ async function main() {
         userId: customer.id,
         enquiryId: enquiry.id,
         status: "awaiting_proof",
-        paymentStatus: "paid",
+        // Unpaid: the proof is still with the customer, and payment is only
+        // asked for once they have approved it.
+        paymentStatus: "unpaid",
         totalMinor: 18500,
         assignedDesignerId: designer.id,
         paperStock: "300gsm Cover",
         finish: "Foil detailing",
+        shippingName: "Jordan Ellis",
+        shippingLine1: "12 Chapel Row",
+        shippingCity: "Bristol",
+        shippingPostcode: "BS1 4XX",
+        shippingCountry: "United Kingdom",
         placedAt: now,
       },
       {
@@ -523,15 +561,26 @@ async function main() {
         paymentStatus: "paid",
         totalMinor: 9600,
         assignedDesignerId: designer.id,
+        shippingName: "Jordan Ellis",
+        shippingLine1: "12 Chapel Row",
+        shippingCity: "Bristol",
+        shippingPostcode: "BS1 4XX",
+        shippingCountry: "United Kingdom",
         placedAt: new Date(now.getTime() - 40 * 86_400_000),
       },
       {
         reference: "MP-1041",
         userId: customer.id,
         status: "awaiting_proof",
-        paymentStatus: "paid",
+        // Unpaid: the artwork has not even reached the customer yet.
+        paymentStatus: "unpaid",
         totalMinor: 14500,
         assignedDesignerId: designer.id,
+        shippingName: "Jordan Ellis",
+        shippingLine1: "12 Chapel Row",
+        shippingCity: "Bristol",
+        shippingPostcode: "BS1 4XX",
+        shippingCountry: "United Kingdom",
         placedAt: new Date(now.getTime() - 2 * 86_400_000),
       },
       {
@@ -541,7 +590,37 @@ async function main() {
         paymentStatus: "unpaid",
         totalMinor: 11000,
         assignedDesignerId: designer.id,
+        shippingName: "Jordan Ellis",
+        shippingLine1: "12 Chapel Row",
+        shippingCity: "Bristol",
+        shippingPostcode: "BS1 4XX",
+        shippingCountry: "United Kingdom",
         placedAt: new Date(now.getTime() - 4 * 86_400_000),
+      },
+      {
+        /**
+         * Approved, and now waiting to be paid for — the stage the flow gained
+         * when payment moved after proof approval. Without one of these there
+         * is nothing to click "Pay now" on, and the step is never exercised.
+         */
+        reference: "MP-1043",
+        userId: customer.id,
+        status: "awaiting_payment",
+        paymentStatus: "unpaid",
+        totalMinor: 22500,
+        assignedDesignerId: designer.id,
+        /**
+         * The same snapshot createOrderFromCart takes from the customer's
+         * profile. Without it these demo orders cannot be paid for, because
+         * the checkout refuses to take money for something it has nowhere to
+         * post.
+         */
+        shippingName: "Jordan Ellis",
+        shippingLine1: "12 Chapel Row",
+        shippingCity: "Bristol",
+        shippingPostcode: "BS1 4XX",
+        shippingCountry: "United Kingdom",
+        placedAt: new Date(now.getTime() - 3 * 86_400_000),
       },
     ])
     .returning({ id: orders.id, reference: orders.reference });
@@ -550,7 +629,7 @@ async function main() {
     customerId: customer.id,
     designerId: designer.id,
     proofreaderId: proofreader.id,
-    orders: { awaitingCustomer, delivered, needsProofreading, returned },
+    orders: { awaitingCustomer, delivered, needsProofreading, returned, approved },
     now,
   });
 
@@ -652,6 +731,23 @@ async function main() {
       note: "Negotiated for a repeat commission",
     });
   }
+
+  /**
+   * The app takes order references from order_reference_seq. Seeded orders are
+   * inserted with explicit references, which the sequence knows nothing about,
+   * so on a freshly migrated database it would start handing out MP-1001 and
+   * march straight into MP-1036 - and orders.reference is unique, so that is a
+   * failed checkout rather than a cosmetic oddity.
+   */
+  await db.execute(sql`
+    select setval(
+      'order_reference_seq',
+      greatest(
+        1000,
+        (select coalesce(max(nullif(regexp_replace(reference, '[^0-9]', '', 'g'), '')::bigint), 1000) from orders)
+      )
+    )
+  `);
 
   console.log("\nSeeded. Demo accounts (password: %s)", DEMO_PASSWORD);
   console.table([

@@ -23,17 +23,33 @@ without looking any better.
 
 | File | Pixels | Aspect | Max file | Displayed at |
 | --- | --- | --- | --- | --- |
-| `hero-banner.webp` | 2560 × 1200 | see note | 350 KB | full width × 492 high |
+| `hero-banner.webp` | 2560 × 1440 | 16:9 | 400 KB | the whole first screen |
 | `studio-proofing.webp` | 1100 × 660 | 5:3 | 90 KB | 536 × 320 |
 | `shipping-map.svg` | vector | — | 20 KB | 536 × 300 |
 | `case-study-1.webp` | 720 × 540 | 4:3 | 50 KB | 352 × 264 |
 | `case-study-2.webp` | 720 × 540 | 4:3 | 50 KB | 352 × 264 |
 | `case-study-3.webp` | 720 × 540 | 4:3 | 50 KB | 352 × 264 |
 
-**The hero is cropped differently on every screen.** It is full width with a
-fixed height, so a wide monitor sees roughly 2.9:1 and a phone sees roughly
-0.9:1 — almost square. Supply it at 2560 × 1200 with the subject centred and
-room to spare on all four sides, and let the crop fall where it may.
+### About the hero
+
+It fills the entire first screen, so it is cropped to whatever shape the
+visitor's window happens to be. At 2560 × 1440 a 16:9 monitor — most of them —
+shows the picture whole, with no crop at all.
+
+**Keep the subject in the right third.** The heading and buttons sit over the
+left of the picture and a dark gradient sits behind them, so anything on the
+left half is obscured by design. Measured across desktop widths the text
+always ends between 52% and 54% of the frame, so from **65% onward is safe**
+at every size.
+
+**A phone shows only the middle quarter.** A 390 × 844 screen is far taller
+than it is wide, so it crops to the centre 26% and the right third is not
+visible at all. That is fine as it stands: on phones the whole picture sits
+under a solid dark wash and acts as a texture behind the words, not as
+something to look at. Compose for the desktop crop.
+
+Leave a little headroom at the top — the navigation sits over the first 200px,
+under its own gradient.
 
 ## About
 

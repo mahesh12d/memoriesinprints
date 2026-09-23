@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AuthCard } from "@/components/auth/auth-card";
+import { AuthDivider, GoogleButton } from "@/components/auth/google-button";
 import { SignupForm } from "./signup-form";
 
 export const metadata: Metadata = {
@@ -21,6 +22,9 @@ export default function SignupPage() {
         </>
       }
     >
+      <GoogleButton label="Sign up with Google" />
+      <AuthDivider />
+
       <SignupForm />
     </AuthCard>
   );

@@ -10,7 +10,11 @@ import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
 import { StatusPill } from "@/components/portal/status-pill";
 import { FilterTabs } from "@/components/admin/filter-tabs";
 import { OrderSearch } from "@/components/portal/order-search";
+import { Pagination } from "@/components/portal/pagination";
 import { RecordTable, type Column } from "@/components/admin/record-table";
+
+/** One screen of work at a time; a busy month is longer than anyone scrolls. */
+const PAGE_SIZE = 25;
 
 const dateFormat = new Intl.DateTimeFormat("en-GB", {
   day: "numeric",
@@ -21,6 +25,7 @@ const dateFormat = new Intl.DateTimeFormat("en-GB", {
 type Row = {
   id: string;
   reference: string;
+  orderedFor: string | null;
   customerName: string;
   designerName: string | null;
   status: string;
@@ -32,11 +37,17 @@ type Row = {
 export default async function StaffOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; mine?: string; q?: string }>;
+  searchParams: Promise<{
+    status?: string;
+    mine?: string;
+    q?: string;
+    page?: string;
+  }>;
 }) {
   const session = await requireStaff();
-  const { status = "all", mine, q } = await searchParams;
+  const { status = "all", mine, q, page: pageParam } = await searchParams;
   const query = q?.trim() ?? "";
+  const page = Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1);
 
   const known = status in ORDER_STATUS ? status : "all";
   const onlyMine = mine === "1";
@@ -67,10 +78,28 @@ export default async function StaffOrdersPage({
       : undefined,
   ].filter(Boolean);
 
+  const where = filters.length ? and(...filters) : undefined;
+
+  /**
+   * How many match, before any page of them is fetched. A studio with a busy
+   * month has more orders than anyone wants in one page, and the count is
+   * what tells the pager how far it goes.
+   */
+  const [matching] = await db
+    .select({ value: sql<number>`count(*)::int` })
+    .from(orders)
+    .innerJoin(users, eq(users.id, orders.userId))
+    .where(where);
+
+  const matchingCount = matching?.value ?? 0;
+  const pageCount = Math.max(1, Math.ceil(matchingCount / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+
   const rows: Row[] = await db
     .select({
       id: orders.id,
       reference: orders.reference,
+      orderedFor: orders.orderedFor,
       customerName: users.name,
       designerName: designer.name,
       status: orders.status,
@@ -81,12 +110,27 @@ export default async function StaffOrdersPage({
     .from(orders)
     .innerJoin(users, eq(users.id, orders.userId))
     .leftJoin(designer, eq(designer.id, orders.assignedDesignerId))
-    .where(filters.length ? and(...filters) : undefined)
-    .orderBy(desc(orders.createdAt));
+    .where(where)
+    .orderBy(desc(orders.createdAt))
+    .limit(PAGE_SIZE)
+    .offset((currentPage - 1) * PAGE_SIZE);
 
   const columns: Column<Row>[] = [
     { header: "Reference", cell: (row) => row.reference },
-    { header: "Customer", cell: (row) => row.customerName },
+    {
+      header: "Customer",
+      cell: (row) => (
+        <span className="flex flex-col">
+          <span>{row.customerName}</span>
+          {/* Who the order is for, when the customer said. */}
+          {row.orderedFor && (
+            <span className="text-[12px] text-ink-quiet">
+              for {row.orderedFor}
+            </span>
+          )}
+        </span>
+      ),
+    },
     {
       header: "Designer",
       hideBelow: "md",
@@ -134,6 +178,7 @@ export default async function StaffOrdersPage({
               status: known === "all" ? undefined : known,
               mine: onlyMine ? "1" : undefined,
             }}
+            liveTarget="staff-orders-list"
           />
 
           <FilterTabs
@@ -190,6 +235,11 @@ export default async function StaffOrdersPage({
           <RecordTable
             rows={rows}
             columns={columns}
+            listId="staff-orders-list"
+            // Reference and customer, which is what staff search by.
+            searchText={(row) =>
+              `${row.reference} ${row.customerName} ${row.orderedFor ?? ""}`
+            }
             hrefFor={(row) => `/staff/orders/${row.id}`}
             empty={
               <>
@@ -201,6 +251,17 @@ export default async function StaffOrdersPage({
                 </p>
               </>
             }
+          />
+
+          <Pagination
+            basePath="/staff/orders"
+            page={currentPage}
+            pageCount={pageCount}
+            params={{
+              status: known === "all" ? undefined : known,
+              mine: onlyMine ? "1" : undefined,
+              q: query || undefined,
+            }}
           />
         </div>
       </PortalBody>

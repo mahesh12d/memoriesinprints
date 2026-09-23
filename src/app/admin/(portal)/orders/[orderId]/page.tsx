@@ -21,6 +21,7 @@ import {
 import { formatMoney, QUOTED_INDIVIDUALLY } from "@/lib/pricing/money";
 import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
 import { StatusPill } from "@/components/portal/status-pill";
+import { StaffProgress } from "@/components/portal/staff-progress";
 import { OrderDetailForm, RecordPaymentForm } from "./order-forms";
 import { isUuid } from "@/lib/utils";
 
@@ -142,6 +143,17 @@ export default async function AdminOrderDetailPage({
       />
 
       <PortalBody>
+        {/* The same job view the studio sees, so admin and staff never
+            disagree about where an order has got to. */}
+        <section className="mb-7 rounded-md border border-line bg-card p-7">
+          <StaffProgress
+            status={order.status}
+            proofStatus={proofs[0]?.status ?? null}
+            hasDesigner={Boolean(order.assignedDesignerId)}
+            hasProof={proofs.length > 0}
+          />
+        </section>
+
         <div className="grid gap-7 lg:grid-cols-[1.5fr_1fr]">
           <div className="flex flex-col gap-6">
             <section className="rounded-md border border-line bg-card p-7">

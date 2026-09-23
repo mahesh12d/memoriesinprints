@@ -123,7 +123,17 @@ export const users = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     /** Always stored lowercased and trimmed — see lib/auth/normalise.ts. */
     email: text("email").notNull(),
-    passwordHash: text("password_hash").notNull(),
+    /**
+     * Null for an account created through Google, which has no password to
+     * store. Password sign-in refuses those accounts rather than treating a
+     * missing hash as a match.
+     */
+    passwordHash: text("password_hash"),
+    /**
+     * Google's stable subject id for this person. Matched on before email,
+     * because someone can change the address on their Google account.
+     */
+    googleId: text("google_id"),
     name: text("name").notNull(),
     phone: text("phone"),
     role: userRole("role").notNull().default("customer"),
@@ -146,7 +156,10 @@ export const users = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [uniqueIndex("users_email_unique").on(t.email)],
+  (t) => [
+    uniqueIndex("users_email_unique").on(t.email),
+    uniqueIndex("users_google_id_unique").on(t.googleId),
+  ],
 );
 
 export const sessions = pgTable(
@@ -426,6 +439,16 @@ export const orders = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     reference: text("reference").notNull(),
+    /**
+     * Who the order is for, in the customer's own words.
+     *
+     * A funeral director places orders on behalf of a family, so their list is
+     * otherwise a column of reference numbers with nothing to tell them apart.
+     * Optional and free text: it is a label to recognise the job by, not a
+     * record about a person, so there is nothing here to keep accurate or to
+     * hold beyond the order itself.
+     */
+    orderedFor: varchar("ordered_for", { length: 200 }),
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
