@@ -33,6 +33,17 @@ export function ImagePlaceholder({
       <img
         src={src}
         alt={caption}
+        /*
+          Lazy by default. The portfolio renders every piece it matches with no
+          paging, so a grid of forty designs is forty full-size downloads the
+          moment the page opens — of which a visitor sees three. The browser
+          only fetches what is near the viewport.
+
+          decoding="async" keeps the decode off the main thread, which matters
+          once the images are portrait and there are more of them on screen.
+        */
+        loading="lazy"
+        decoding="async"
         className={`block object-cover ${className}`}
       />
     );

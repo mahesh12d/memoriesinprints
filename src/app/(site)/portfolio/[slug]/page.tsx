@@ -125,7 +125,7 @@ export default async function PortfolioItemPage({
           <ImagePlaceholder
             caption={`[Photograph — ${item.title.toLowerCase()}]`}
             src={imageUrl}
-            className="aspect-[4/5] w-full rounded-md"
+            className="aspect-[1142/1600] w-full rounded-md"
           />
 
           <div className="flex flex-col gap-7">
@@ -203,7 +203,7 @@ export default async function PortfolioItemPage({
                   <ImagePlaceholder
                     caption={`[Photograph — ${other.title.toLowerCase()}]`}
                     src={alsoImages[index]}
-                    className="aspect-[4/3] w-full rounded-md"
+                    className="aspect-[1142/1600] w-full rounded-md"
                   />
                   <h3 className="font-display text-lg group-hover:text-blue">
                     {other.title}

@@ -179,10 +179,18 @@ export default async function PortfolioPage({
                   href={`/portfolio/${item.slug}`}
                   className="group flex h-full flex-col gap-3"
                 >
+                  {/*
+                    1142/1600 is the studio's own template, not a design
+                    choice. These are A5-proportioned printed pages, and
+                    object-cover crops to fill: in a 4:3 frame it took a
+                    quarter off the top of every piece, which is exactly where
+                    the heading, the name and the dates sit. The frame matches
+                    the paper.
+                  */}
                   <ImagePlaceholder
                     caption={`[Photograph — ${item.title.toLowerCase()}]`}
                     src={images[index]}
-                    className="aspect-[4/3] w-full rounded-md"
+                    className="aspect-[1142/1600] w-full rounded-md"
                   />
                   <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-text">
                     {CATEGORY_LABEL[item.category]}

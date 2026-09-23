@@ -82,7 +82,7 @@ export default async function AccountSavedPage() {
                 <ImagePlaceholder
                   caption={`[Photograph — ${row.name.toLowerCase()}]`}
                   src={images[index]}
-                  className="aspect-[4/3] w-full"
+                  className="aspect-[1142/1600] w-full"
                 />
                 <div className="flex flex-col gap-1.5 p-5">
                   <span className="text-[10px] font-bold uppercase tracking-[0.05em] text-accent-text">
