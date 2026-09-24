@@ -25,6 +25,7 @@ import {
   users,
   verificationTokens,
 } from "./schema";
+import { CATALOGUE_PRODUCTS, catalogueSizes } from "./catalogue";
 import { buildStorageKey } from "@/lib/storage/keys";
 import { putObject } from "@/lib/storage/objects";
 import { samplePdf, samplePng } from "@/lib/storage/sample-proof";
@@ -373,121 +374,18 @@ async function main() {
     ])
     .returning({ id: users.id, email: users.email });
 
+  // The catalogue itself lives in catalogue.ts, so it can also be imported
+  // into a database that already has work in it. See npm run db:catalogue.
   const insertedProducts = await db
     .insert(products)
-    .values([
-      {
-        slug: "order-of-service",
-        name: "Order of service",
-        category: "funeral",
-        summary: "Booklets for the service, printed and folded by hand.",
-        description:
-          "An eight-page booklet printed on 170gsm silk paper, folded and saddle-stitched. Personalise with a photograph, the order of the service and a chosen verse or reading. A proof is sent for your approval before anything is printed.",
-        minimumQuantity: 25,
-        sortOrder: 1,
-      },
-      {
-        slug: "memorial-thank-you-card",
-        name: "Memorial thank-you card",
-        category: "funeral",
-        summary: "For thanking those who attended or sent flowers.",
-        description:
-          "A folded A6 card on 300gsm stock, with space for a short message inside. Often ordered alongside the order of service so the two match.",
-        minimumQuantity: 25,
-        sortOrder: 2,
-      },
-      {
-        slug: "attendance-card",
-        name: "Attendance card",
-        category: "funeral",
-        summary: "A keepsake card for those who came to the service.",
-        description:
-          "A single-sided card carrying the name, dates and a photograph — small enough to keep in a wallet or a frame.",
-        minimumQuantity: 25,
-        sortOrder: 3,
-      },
-      {
-        slug: "memory-box",
-        name: "Memory box",
-        category: "funeral",
-        summary: "A cloth-covered box for cards, photographs and keepsakes.",
-        description:
-          "A rigid, cloth-covered box made to hold the order of service, photographs and the cards that arrive afterwards. Printed lid personalised to match the stationery.",
-        minimumQuantity: 1,
-        sortOrder: 4,
-      },
-      {
-        slug: "wedding-invitation-suite",
-        name: "Wedding invitation suite",
-        category: "wedding",
-        summary: "Invitation, RSVP card and envelope, as one set.",
-        description:
-          "A complete suite: the invitation, a matching RSVP card and a lined envelope. Choose your stock and finish, and we'll proof the whole set together so the wording and colours match across every piece.",
-        minimumQuantity: 50,
-        sortOrder: 5,
-      },
-      {
-        slug: "save-the-date",
-        name: "Save the date",
-        category: "wedding",
-        summary: "Sent early, so the right people hold the day.",
-        description:
-          "A single card, usually posted six to twelve months ahead. Often the first piece we design, and the one that sets the look of everything that follows.",
-        minimumQuantity: 50,
-        sortOrder: 6,
-      },
-      {
-        slug: "order-of-the-day",
-        name: "Order of the day",
-        category: "wedding",
-        summary: "The running order, for the ceremony or the reception.",
-        description:
-          "A card or folded booklet setting out the timings, readings and the people involved. Designed to sit on a seat or a table without shouting.",
-        minimumQuantity: 50,
-        sortOrder: 7,
-      },
-      {
-        slug: "christening-invitation",
-        name: "Christening invitation",
-        category: "celebration",
-        summary: "Simple, warm invitations for a christening or naming day.",
-        description:
-          "A single card with a matching envelope, kept gentle and uncluttered. Photographs work well here if you have one you like.",
-        minimumQuantity: 25,
-        sortOrder: 8,
-      },
-      {
-        slug: "anniversary-keepsake-print",
-        name: "Anniversary keepsake print",
-        category: "celebration",
-        summary: "A framed print marking a date worth keeping.",
-        description:
-          "A single print on heavyweight stock, designed around a date, a place or a few words. Supplied unframed unless you ask otherwise.",
-        minimumQuantity: 1,
-        sortOrder: 9,
-      },
-    ])
+    .values(CATALOGUE_PRODUCTS)
     .returning({ id: products.id, slug: products.slug });
 
   const bySlug = Object.fromEntries(
     insertedProducts.map((p) => [p.slug, p.id]),
   );
 
-  await db.insert(productSizes).values([
-    { productId: bySlug["order-of-service"], label: "A5 booklet", widthMm: 148, heightMm: 210, sortOrder: 1 },
-    { productId: bySlug["order-of-service"], label: "A4 booklet", widthMm: 210, heightMm: 297, sortOrder: 2 },
-    { productId: bySlug["memorial-thank-you-card"], label: "A6", widthMm: 105, heightMm: 148, sortOrder: 1 },
-    { productId: bySlug["attendance-card"], label: "85 × 55mm", widthMm: 85, heightMm: 55, sortOrder: 1 },
-    { productId: bySlug["memory-box"], label: "Standard", widthMm: 250, heightMm: 200, sortOrder: 1 },
-    { productId: bySlug["wedding-invitation-suite"], label: "A6", widthMm: 105, heightMm: 148, sortOrder: 1 },
-    { productId: bySlug["wedding-invitation-suite"], label: "A5", widthMm: 148, heightMm: 210, sortOrder: 2 },
-    { productId: bySlug["wedding-invitation-suite"], label: "Square 148mm", widthMm: 148, heightMm: 148, sortOrder: 3 },
-    { productId: bySlug["save-the-date"], label: "A6", widthMm: 105, heightMm: 148, sortOrder: 1 },
-    { productId: bySlug["save-the-date"], label: "DL", widthMm: 99, heightMm: 210, sortOrder: 2 },
-    { productId: bySlug["order-of-the-day"], label: "DL", widthMm: 99, heightMm: 210, sortOrder: 1 },
-    { productId: bySlug["christening-invitation"], label: "A6", widthMm: 105, heightMm: 148, sortOrder: 1 },
-    { productId: bySlug["anniversary-keepsake-print"], label: "A4", widthMm: 210, heightMm: 297, sortOrder: 1 },
-  ]);
+  await db.insert(productSizes).values(catalogueSizes(bySlug));
 
   /**
    * Template numbers are the studio's own catalogue numbers and are unique
@@ -634,8 +532,8 @@ async function main() {
   });
 
   await db.insert(savedItems).values([
-    { userId: customer.id, productId: bySlug["memorial-thank-you-card"] },
-    { userId: customer.id, productId: bySlug["memory-box"] },
+    { userId: customer.id, productId: bySlug["thank-you-card"] },
+    { userId: customer.id, productId: bySlug["memory-boxes"] },
   ]);
 
   /* ---------------------------------------------------------------- */

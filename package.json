@@ -12,6 +12,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx src/db/seed.ts",
+    "db:catalogue": "tsx src/db/catalogue.ts",
     "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test",
     "test:unit": "tsx --test \"src/**/*.test.ts\"",

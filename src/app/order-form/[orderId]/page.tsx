@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import {
   orderForms,
@@ -104,7 +104,18 @@ export default async function OrderFormPage({
         eq(productSizes.isActive, true),
       ),
     )
-    .where(eq(products.isActive, true))
+    .where(
+      and(
+        eq(products.isActive, true),
+        /*
+          Keepsakes only. This form is the order of service — offering it
+          again under "other pieces", next to a wedding invitation suite,
+          is a list nobody on a funeral arrangement needs to read past.
+        */
+        eq(products.category, "funeral"),
+        ne(products.slug, "order-of-service"),
+      ),
+    )
     .orderBy(asc(products.sortOrder), asc(productSizes.sortOrder));
 
   const byProduct = new Map<string, ProductChoice>();

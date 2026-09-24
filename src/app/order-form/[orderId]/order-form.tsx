@@ -272,8 +272,42 @@ export function OrderForm({
         </p>
       )}
 
+      {/*
+        Who placed it, before anything about the service.
+
+        This is the top block of the studio's paper form for a reason: a
+        funeral director is a branch with several arrangers, and when the
+        studio rings about a detail they need the person who wrote it, not the
+        account it arrived from.
+      */}
+      <Section
+        title="Who is placing this order"
+        intro="So we know who to come back to if we have a question."
+      >
+        <Row label="Branch" name="branchName" error={errors.branchName}>
+          <input
+            id="branchName"
+            name="branchName"
+            maxLength={200}
+            defaultValue={saved?.branchName ?? ""}
+            className={`${inputClass} ${errors.branchName ? errorClass : ""}`}
+          />
+        </Row>
+
+        <Row label="Arranger" name="arrangerName" error={errors.arrangerName}>
+          <input
+            id="arrangerName"
+            name="arrangerName"
+            autoComplete="name"
+            maxLength={200}
+            defaultValue={saved?.arrangerName ?? ""}
+            className={`${inputClass} ${errors.arrangerName ? errorClass : ""}`}
+          />
+        </Row>
+      </Section>
+
       <section className="flex flex-col gap-6">
-        <h2 className="font-display text-[24px]">Who the service is for</h2>
+        <h2 className="font-display text-[24px]">The person being honoured</h2>
 
         <div className="grid gap-6 sm:grid-cols-2">
           <div className="sm:col-span-2">
@@ -328,9 +362,7 @@ export function OrderForm({
             />
           </Row>
         </div>
-      </section>
 
-      <Section title="The service">
         <div className="grid gap-6 sm:grid-cols-2">
           <Row label="Date" name="funeralDate" error={errors.funeralDate}>
             <input
@@ -369,43 +401,12 @@ export function OrderForm({
             </Row>
           </div>
         </div>
-      </Section>
+      </section>
 
-      {/*
-        Who placed it, before anything about the service.
-
-        This is the top block of the studio's paper form for a reason: a
-        funeral director is a branch with several arrangers, and when the
-        studio rings about a detail they need the person who wrote it, not the
-        account it arrived from.
-      */}
       <Section
-        title="Who is placing this order"
-        intro="So we know who to come back to if we have a question."
+        title="Print specification"
+        intro="The design, the paper it is printed on, and how many."
       >
-        <Row label="Branch" name="branchName" error={errors.branchName}>
-          <input
-            id="branchName"
-            name="branchName"
-            maxLength={200}
-            defaultValue={saved?.branchName ?? ""}
-            className={`${inputClass} ${errors.branchName ? errorClass : ""}`}
-          />
-        </Row>
-
-        <Row label="Arranger" name="arrangerName" error={errors.arrangerName}>
-          <input
-            id="arrangerName"
-            name="arrangerName"
-            autoComplete="name"
-            maxLength={200}
-            defaultValue={saved?.arrangerName ?? ""}
-            className={`${inputClass} ${errors.arrangerName ? errorClass : ""}`}
-          />
-        </Row>
-      </Section>
-
-      <Section title="The booklet">
         {/*
           Codes read off the studio's printed catalogue. An arranger sitting
           with a family has it open in front of them, and copying the code is
@@ -575,6 +576,127 @@ export function OrderForm({
         )}
       </Section>
 
+      {bespoke && (
+        <Section
+          title="Additional products"
+          intro="Keepsakes to go alongside the booklet, in the same design."
+        >
+          <Row
+            label="Other pieces"
+            name="additionalProducts"
+            error={errors.additionalProducts}
+          >
+            <div className="flex flex-col gap-3">
+              {rows.map((row, index) => (
+                <div
+                  key={index}
+                  className="grid gap-3 rounded-[3px] border border-line bg-surface-grey p-3 sm:grid-cols-[2fr_1fr_auto_auto]"
+                >
+                  <select
+                    name="productSlug"
+                    value={row.slug}
+                    onChange={(event) => {
+                      const product = products.find(
+                        (item) => item.slug === event.target.value,
+                      );
+                      setRows((current) =>
+                        current.map((item, at) =>
+                          at === index
+                            ? {
+                                ...item,
+                                slug: event.target.value,
+                                title: product?.name ?? "",
+                                size: product?.sizes[0] ?? "",
+                              }
+                            : item,
+                        ),
+                      );
+                    }}
+                    aria-label={`Piece ${index + 1}`}
+                    className={inputClass}
+                  >
+                    <option value="">Choose a piece</option>
+                    {products.map((product) => (
+                      <option key={product.slug} value={product.slug}>
+                        {product.name}
+                      </option>
+                    ))}
+                  </select>
+                  <input type="hidden" name="productTitle" value={row.title} />
+
+                  <select
+                    name="productSize"
+                    value={row.size}
+                    onChange={(event) =>
+                      setRows((current) =>
+                        current.map((item, at) =>
+                          at === index ? { ...item, size: event.target.value } : item,
+                        ),
+                      )
+                    }
+                    aria-label={`Size for piece ${index + 1}`}
+                    className={inputClass}
+                  >
+                    <option value="">Size</option>
+                    {(products.find((item) => item.slug === row.slug)?.sizes ?? []).map(
+                      (size) => (
+                        <option key={size} value={size}>
+                          {size}
+                        </option>
+                      ),
+                    )}
+                  </select>
+
+                  <input
+                    name="productQuantity"
+                    type="number"
+                    min={1}
+                    max={MAX.productQuantity}
+                    value={row.quantity}
+                    onChange={(event) =>
+                      setRows((current) =>
+                        current.map((item, at) =>
+                          at === index
+                            ? { ...item, quantity: Number(event.target.value) || 1 }
+                            : item,
+                        ),
+                      )
+                    }
+                    aria-label={`How many of piece ${index + 1}`}
+                    className={`w-[110px] ${inputClass}`}
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setRows((current) => current.filter((_, at) => at !== index))
+                    }
+                    className="rounded-[3px] px-4 text-[13px] font-semibold text-ink-quiet hover:text-alert"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+
+              {rows.length < MAX.products && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setRows((current) => [
+                      ...current,
+                      { slug: "", title: "", size: "", quantity: 1 },
+                    ])
+                  }
+                  className="w-fit rounded-[2px] border border-field-line px-5 py-2.5 text-[13px] font-semibold text-ink-soft hover:border-brand hover:text-blue"
+                >
+                  Add a piece
+                </button>
+              )}
+            </div>
+          </Row>
+        </Section>
+      )}
+
       <Section
         title="Photographs"
         intro="Add them below and they come straight through to the studio."
@@ -623,7 +745,82 @@ export function OrderForm({
             className={`${inputClass} font-sans ${errors.photoInstructions ? errorClass : ""}`}
           />
         </Row>
+      </Section>
 
+      <Section
+        title="Inside information"
+        intro="The running order, readings, and anything the design team should know."
+      >
+        <Row
+          label="Notes for the design team"
+          name="additionalNotes"
+          error={errors.additionalNotes}
+          hint="Anything you want us to know that is not printed in the booklet."
+        >
+          <textarea
+            id="additionalNotes"
+            name="additionalNotes"
+            rows={4}
+            maxLength={MAX.longText}
+            defaultValue={saved?.additionalNotes ?? ""}
+            className={`${inputClass} font-sans ${errors.additionalNotes ? errorClass : ""}`}
+          />
+        </Row>
+
+        <label className="flex items-center gap-3 text-[15px]">
+          <input
+            type="checkbox"
+            name="callbackRequested"
+            checked={callback}
+            onChange={(event) => setCallback(event.target.checked)}
+            className="size-4"
+          />
+          I would rather talk it through on the phone
+        </label>
+
+        {callback && (
+          <Row
+            label="The number to call"
+            name="callbackPhone"
+            error={errors.callbackPhone}
+          >
+            <input
+              id="callbackPhone"
+              name="callbackPhone"
+              type="tel"
+              maxLength={MAX.phone}
+              defaultValue={saved?.callbackPhone ?? ""}
+              className={`w-[260px] ${inputClass} ${errors.callbackPhone ? errorClass : ""}`}
+            />
+          </Row>
+        )}
+      </Section>
+
+      <Section
+        title="Backpage information"
+        intro="What goes on the back cover of the booklet."
+      >
+        <Row
+          label="Wording for the back cover"
+          name="backpageInformation"
+          error={errors.backpageInformation}
+          hint="Thanks to those who came, where the wake is being held, any donations in lieu of flowers. This is printed in the booklet."
+        >
+          <textarea
+            id="backpageInformation"
+            name="backpageInformation"
+            rows={5}
+            maxLength={MAX.longText}
+            defaultValue={saved?.backpageInformation ?? ""}
+            className={`${inputClass} font-sans ${errors.backpageInformation ? errorClass : ""}`}
+          />
+        </Row>
+      </Section>
+
+      <Section
+        title="Attachments"
+        intro="Photographs, artwork or a PDF to go with this order — as many as you need."
+      >
         <input
           type="hidden"
           name="attachments"
@@ -753,185 +950,6 @@ export function OrderForm({
             )}
           </div>
         </Row>
-      </Section>
-
-      <Section
-        title="Anything else"
-        intro="Other pieces you would like printed alongside the booklet, and the wording for the back cover."
-      >
-        <Row
-          label="Other pieces"
-          name="additionalProducts"
-          error={errors.additionalProducts}
-        >
-          <div className="flex flex-col gap-3">
-            {rows.map((row, index) => (
-              <div
-                key={index}
-                className="grid gap-3 rounded-[3px] border border-line bg-surface-grey p-3 sm:grid-cols-[2fr_1fr_auto_auto]"
-              >
-                <select
-                  name="productSlug"
-                  value={row.slug}
-                  onChange={(event) => {
-                    const product = products.find(
-                      (item) => item.slug === event.target.value,
-                    );
-                    setRows((current) =>
-                      current.map((item, at) =>
-                        at === index
-                          ? {
-                              ...item,
-                              slug: event.target.value,
-                              title: product?.name ?? "",
-                              size: product?.sizes[0] ?? "",
-                            }
-                          : item,
-                      ),
-                    );
-                  }}
-                  aria-label={`Piece ${index + 1}`}
-                  className={inputClass}
-                >
-                  <option value="">Choose a piece</option>
-                  {products.map((product) => (
-                    <option key={product.slug} value={product.slug}>
-                      {product.name}
-                    </option>
-                  ))}
-                </select>
-                <input type="hidden" name="productTitle" value={row.title} />
-
-                <select
-                  name="productSize"
-                  value={row.size}
-                  onChange={(event) =>
-                    setRows((current) =>
-                      current.map((item, at) =>
-                        at === index ? { ...item, size: event.target.value } : item,
-                      ),
-                    )
-                  }
-                  aria-label={`Size for piece ${index + 1}`}
-                  className={inputClass}
-                >
-                  <option value="">Size</option>
-                  {(products.find((item) => item.slug === row.slug)?.sizes ?? []).map(
-                    (size) => (
-                      <option key={size} value={size}>
-                        {size}
-                      </option>
-                    ),
-                  )}
-                </select>
-
-                <input
-                  name="productQuantity"
-                  type="number"
-                  min={1}
-                  max={MAX.productQuantity}
-                  value={row.quantity}
-                  onChange={(event) =>
-                    setRows((current) =>
-                      current.map((item, at) =>
-                        at === index
-                          ? { ...item, quantity: Number(event.target.value) || 1 }
-                          : item,
-                      ),
-                    )
-                  }
-                  aria-label={`How many of piece ${index + 1}`}
-                  className={`w-[110px] ${inputClass}`}
-                />
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setRows((current) => current.filter((_, at) => at !== index))
-                  }
-                  className="rounded-[3px] px-4 text-[13px] font-semibold text-ink-quiet hover:text-alert"
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
-
-            {rows.length < MAX.products && (
-              <button
-                type="button"
-                onClick={() =>
-                  setRows((current) => [
-                    ...current,
-                    { slug: "", title: "", size: "", quantity: 1 },
-                  ])
-                }
-                className="w-fit rounded-[2px] border border-field-line px-5 py-2.5 text-[13px] font-semibold text-ink-soft hover:border-brand hover:text-blue"
-              >
-                Add a piece
-              </button>
-            )}
-          </div>
-        </Row>
-
-        <Row
-          label="Wording for the back cover"
-          name="backpageInformation"
-          error={errors.backpageInformation}
-          hint="Thanks to those who came, where the wake is being held, any donations in lieu of flowers. This is printed in the booklet."
-        >
-          <textarea
-            id="backpageInformation"
-            name="backpageInformation"
-            rows={5}
-            maxLength={MAX.longText}
-            defaultValue={saved?.backpageInformation ?? ""}
-            className={`${inputClass} font-sans ${errors.backpageInformation ? errorClass : ""}`}
-          />
-        </Row>
-
-        <Row
-          label="Notes for the design team"
-          name="additionalNotes"
-          error={errors.additionalNotes}
-          hint="Anything you want us to know that is not printed in the booklet."
-        >
-          <textarea
-            id="additionalNotes"
-            name="additionalNotes"
-            rows={4}
-            maxLength={MAX.longText}
-            defaultValue={saved?.additionalNotes ?? ""}
-            className={`${inputClass} font-sans ${errors.additionalNotes ? errorClass : ""}`}
-          />
-        </Row>
-
-        <label className="flex items-center gap-3 text-[15px]">
-          <input
-            type="checkbox"
-            name="callbackRequested"
-            checked={callback}
-            onChange={(event) => setCallback(event.target.checked)}
-            className="size-4"
-          />
-          I would rather talk it through on the phone
-        </label>
-
-        {callback && (
-          <Row
-            label="The number to call"
-            name="callbackPhone"
-            error={errors.callbackPhone}
-          >
-            <input
-              id="callbackPhone"
-              name="callbackPhone"
-              type="tel"
-              maxLength={MAX.phone}
-              defaultValue={saved?.callbackPhone ?? ""}
-              className={`w-[260px] ${inputClass} ${errors.callbackPhone ? errorClass : ""}`}
-            />
-          </Row>
-        )}
       </Section>
 
       {/*

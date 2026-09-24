@@ -45,7 +45,15 @@ export default async function CheckoutPage() {
           <CheckoutForm />
         </div>
 
-        <aside className="flex h-fit flex-col gap-5 rounded-md border border-line bg-card p-7">
+        {/*
+          What is being ordered comes first on a phone.
+
+          Stacked, the summary would otherwise sit under the whole form, so
+          the first thing on the screen at checkout would be a question rather
+          than the thing being paid for. Side by side from lg, it goes back to
+          the right where it belongs.
+        */}
+        <aside className="-order-1 flex h-fit flex-col gap-5 rounded-md border border-line bg-card p-7 lg:order-none">
           <h2 className="font-display text-lg">Your order</h2>
 
           <ul className="flex flex-col divide-y divide-line-soft border-y border-line-soft">
