@@ -94,7 +94,15 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-6 border-t border-line pt-10">
+    /*
+      A card on a grey page rather than a rule across a white one.
+
+      This form is long, and read by someone who is not concentrating.
+      Nine sections separated by hairlines run together; the same nine on
+      their own white panels can be taken one at a time. The two tones are
+      the ones the rest of the site already uses for a card on a page.
+    */
+    <section className="flex flex-col gap-6 rounded-md border border-line bg-card p-6 sm:p-9">
       <div className="flex flex-col gap-2">
         <h2 className="font-display text-[24px]">{title}</h2>
         {intro && (
@@ -142,6 +150,41 @@ export function OrderForm({
   const [quantity, setQuantity] = useState(saved?.quantity ?? DEFAULT_QUANTITY);
   const [bespoke, setBespoke] = useState(saved?.bespokeDesign ?? false);
   const [callback, setCallback] = useState(saved?.callbackRequested ?? false);
+
+  /**
+   * The address shows as one line, with the fields behind a button.
+   *
+   * Nearly every order goes to the branch it came from, so six boxes
+   * already filled in are six things to read past. They open on their own
+   * when there is no address to show, and when something in them is wrong.
+   */
+  const [editAddress, setEditAddress] = useState(
+    !addressDefaults.shippingLine1,
+  );
+
+  const addressSummary =
+    [
+      addressDefaults.shippingName,
+      addressDefaults.shippingLine1,
+      addressDefaults.shippingLine2,
+      addressDefaults.shippingCity,
+      addressDefaults.shippingPostcode,
+      addressDefaults.shippingCountry,
+    ]
+      .filter(Boolean)
+      .join(", ") || "No address on your account yet.";
+
+  // An address that failed validation has to be on screen to be fixed.
+  const showAddressFields =
+    editAddress ||
+    Boolean(
+      errors.shippingName ||
+        errors.shippingLine1 ||
+        errors.shippingLine2 ||
+        errors.shippingCity ||
+        errors.shippingPostcode ||
+        errors.shippingCountry,
+    );
 
   const [rows, setRows] = useState(saved?.additionalProducts ?? []);
   /**
@@ -256,7 +299,7 @@ export function OrderForm({
   }
 
   return (
-    <form action={formAction} className="flex flex-col gap-10">
+    <form action={formAction} className="flex flex-col gap-6">
       <input type="hidden" name="orderId" value={orderId} />
 
       {state.message && (
@@ -272,45 +315,10 @@ export function OrderForm({
         </p>
       )}
 
-      {/*
-        Who placed it, before anything about the service.
-
-        This is the top block of the studio's paper form for a reason: a
-        funeral director is a branch with several arrangers, and when the
-        studio rings about a detail they need the person who wrote it, not the
-        account it arrived from.
-      */}
-      <Section
-        title="Who is placing this order"
-        intro="So we know who to come back to if we have a question."
-      >
-        <Row label="Branch" name="branchName" error={errors.branchName}>
-          <input
-            id="branchName"
-            name="branchName"
-            maxLength={200}
-            defaultValue={saved?.branchName ?? ""}
-            className={`${inputClass} ${errors.branchName ? errorClass : ""}`}
-          />
-        </Row>
-
-        <Row label="Arranger" name="arrangerName" error={errors.arrangerName}>
-          <input
-            id="arrangerName"
-            name="arrangerName"
-            autoComplete="name"
-            maxLength={200}
-            defaultValue={saved?.arrangerName ?? ""}
-            className={`${inputClass} ${errors.arrangerName ? errorClass : ""}`}
-          />
-        </Row>
-      </Section>
-
-      <section className="flex flex-col gap-6">
-        <h2 className="font-display text-[24px]">The person being honoured</h2>
-
-        <div className="grid gap-6 sm:grid-cols-2">
-          <div className="sm:col-span-2">
+      <Section title="The person being honoured">
+        {/* Three across: the dates and the age belong on one line. */}
+        <div className="grid gap-6 sm:grid-cols-3">
+          <div className="sm:col-span-3">
             <Row
               label="Name of the deceased, as it should appear"
               name="deceasedName"
@@ -390,7 +398,11 @@ export function OrderForm({
           </Row>
 
           <div className="sm:col-span-2">
-            <Row label="Where it is being held" name="venueName" error={errors.venueName}>
+            <Row
+              label="Church, crematorium, or venue"
+              name="venueName"
+              error={errors.venueName}
+            >
               <input
                 id="venueName"
                 name="venueName"
@@ -401,7 +413,7 @@ export function OrderForm({
             </Row>
           </div>
         </div>
-      </section>
+      </Section>
 
       <Section
         title="Print specification"
@@ -590,7 +602,13 @@ export function OrderForm({
               {rows.map((row, index) => (
                 <div
                   key={index}
-                  className="grid gap-3 rounded-[3px] border border-line bg-surface-grey p-3 sm:grid-cols-[2fr_1fr_auto_auto]"
+                  /*
+                    minmax(0,…) on both selects, or they refuse to shrink:
+                    a grid column is auto-sized to its content by default,
+                    so "A1 — 594 x 841mm" pushed the size box wider than
+                    its share and the text was cut off mid-word.
+                  */
+                  className="grid gap-3 rounded-[3px] border border-line bg-surface-grey p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_96px_auto]"
                 >
                   <select
                     name="productSlug"
@@ -613,7 +631,7 @@ export function OrderForm({
                       );
                     }}
                     aria-label={`Piece ${index + 1}`}
-                    className={inputClass}
+                    className={`min-w-0 ${inputClass}`}
                   >
                     <option value="">Choose a piece</option>
                     {products.map((product) => (
@@ -635,7 +653,8 @@ export function OrderForm({
                       )
                     }
                     aria-label={`Size for piece ${index + 1}`}
-                    className={inputClass}
+                    title={row.size || undefined}
+                    className={`min-w-0 ${inputClass}`}
                   >
                     <option value="">Size</option>
                     {(products.find((item) => item.slug === row.slug)?.sizes ?? []).map(
@@ -663,7 +682,7 @@ export function OrderForm({
                       )
                     }
                     aria-label={`How many of piece ${index + 1}`}
-                    className={`w-[110px] ${inputClass}`}
+                    className={`w-full min-w-0 ${inputClass}`}
                   />
 
                   <button
@@ -962,9 +981,27 @@ export function OrderForm({
         address is left alone.
       */}
       <Section
-        title="Where should we send it?"
+        title="Shipment"
         intro="Taken from your account. Change it if this order is going somewhere else."
       >
+        {!showAddressFields && (
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-[4px] bg-surface-grey px-[18px] py-4">
+            <p className="text-[15px] leading-relaxed">{addressSummary}</p>
+            <button
+              type="button"
+              onClick={() => setEditAddress(true)}
+              className="rounded-[2px] border border-field-line bg-card px-5 py-2.5 text-[13px] font-semibold text-ink-soft hover:border-brand hover:text-blue"
+            >
+              Send it somewhere else
+            </button>
+          </div>
+        )}
+
+        {/*
+          Hidden with a class rather than unmounted: the inputs stay in the
+          form, so the address still posts whether or not anyone opened this.
+        */}
+        <div className={showAddressFields ? "flex flex-col gap-6" : "hidden"}>
         <Row label="Addressed to" name="shippingName" error={errors.shippingName}>
           <input
             id="shippingName"
@@ -1030,9 +1067,10 @@ export function OrderForm({
             className={`w-[320px] ${inputClass} ${errors.shippingCountry ? errorClass : ""}`}
           />
         </Row>
+        </div>
       </Section>
 
-      <div className="flex flex-wrap items-center gap-4 border-t border-line pt-8">
+      <div className="flex flex-wrap items-center gap-4 rounded-md border border-line bg-card p-6 sm:p-9">
         <button
           type="submit"
           name="intent"

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, asc, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
@@ -216,6 +217,17 @@ function Received({
         If something needs changing, call the studio on {STUDIO.phone} or reply
         to the email we sent — no need to fill the form in again.
       </p>
+
+      {/*
+        Sending the form redirects to the dashboard, so this page is only
+        reached by opening the link again afterwards. It still needs a way on.
+      */}
+      <Link
+        href="/account"
+        className="w-fit rounded-[2px] bg-brand px-6 py-3 text-[13px] font-semibold text-on-accent hover:bg-brand-deep hover:text-white"
+      >
+        Go to your account
+      </Link>
     </Shell>
   );
 }
@@ -227,9 +239,19 @@ function Received({
  */
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <main className="mx-auto flex max-w-[760px] flex-col gap-12 px-6 py-16 sm:px-10 sm:py-24">
-      <p className="font-display text-lg font-semibold">Memories in Prints</p>
-      {children}
-    </main>
+    <div className="min-h-screen bg-surface-grey">
+      {/*
+        Wider than the reading measure the rest of the site uses.
+
+        760px was right when this was one column of questions with a rule
+        between each group. As cards holding three fields across, that width
+        left a strip of page on either side and stacked dates that belong on
+        one line.
+      */}
+      <main className="mx-auto flex max-w-[1040px] flex-col gap-10 px-4 py-12 sm:px-8 sm:py-16">
+        <p className="font-display text-lg font-semibold">Memories in Prints</p>
+        {children}
+      </main>
+    </div>
   );
 }

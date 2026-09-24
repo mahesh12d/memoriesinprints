@@ -12,11 +12,10 @@ import { productSizes, products } from "./schema";
  * its own (`npm run db:catalogue`) and it adds what is missing and leaves
  * everything else alone.
  *
- * Sizes carry their printed dimensions in the label. A memory box is
- * 300 x 310 x 70mm and a Contemporary portrait comes in either of two sizes,
- * neither of which fits a width and a height, and the studio quotes all of
- * these by their dimensions. The two columns are still filled wherever the
- * size really is a flat rectangle.
+ * Sizes carry their printed dimensions in the label, because that is how the
+ * studio quotes them. A portrait offered in two sizes is listed as two sizes
+ * rather than one line reading "or": one line is not a thing anyone can
+ * order, and it was too long to read in the picker.
  */
 export const CATALOGUE_PRODUCTS = [
       {
@@ -200,9 +199,11 @@ export function catalogueSizes(bySlug: Record<string, string>) {
     { productId: bySlug["photo-prints"], label: "10 × 8in — 254 × 203mm", widthMm: 254, heightMm: 203, sortOrder: 3 },
     { productId: bySlug["bookmarks"], label: "Standard — 50 × 200mm", widthMm: 50, heightMm: 200, sortOrder: 1 },
     { productId: bySlug["memorial-portraits"], label: "The Classic — 229 × 305mm", widthMm: 229, heightMm: 305, sortOrder: 1 },
-    { productId: bySlug["memorial-portraits"], label: "The Contemporary — 305 × 305 × 38mm or 305 × 406 × 38mm", sortOrder: 2 },
-    { productId: bySlug["memorial-portraits"], label: "The Reflection — 279 × 103 × 19mm or 152 × 203 × 19mm", sortOrder: 3 },
-    { productId: bySlug["memorial-portraits"], label: "The Traditional — 458 × 599mm", widthMm: 458, heightMm: 599, sortOrder: 4 },
+    { productId: bySlug["memorial-portraits"], label: "The Contemporary — 305 × 305 × 38mm", widthMm: 305, heightMm: 305, sortOrder: 2 },
+    { productId: bySlug["memorial-portraits"], label: "The Contemporary — 305 × 406 × 38mm", widthMm: 305, heightMm: 406, sortOrder: 3 },
+    { productId: bySlug["memorial-portraits"], label: "The Reflection — 279 × 103 × 19mm", widthMm: 279, heightMm: 103, sortOrder: 4 },
+    { productId: bySlug["memorial-portraits"], label: "The Reflection — 152 × 203 × 19mm", widthMm: 152, heightMm: 203, sortOrder: 5 },
+    { productId: bySlug["memorial-portraits"], label: "The Traditional — 458 × 599mm", widthMm: 458, heightMm: 599, sortOrder: 6 },
     { productId: bySlug["wedding-invitation-suite"], label: "A6", widthMm: 105, heightMm: 148, sortOrder: 1 },
     { productId: bySlug["wedding-invitation-suite"], label: "A5", widthMm: 148, heightMm: 210, sortOrder: 2 },
     { productId: bySlug["wedding-invitation-suite"], label: "Square 148mm", widthMm: 148, heightMm: 148, sortOrder: 3 },

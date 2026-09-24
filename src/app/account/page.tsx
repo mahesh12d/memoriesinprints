@@ -5,10 +5,19 @@ import { orderForms, orders, proofVersions, savedItems } from "@/db/schema";
 import { requireUser } from "@/lib/auth/guards";
 import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
 
-export default async function AccountDashboardPage() {
+export default async function AccountDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sent?: string | string[] }>;
+}) {
   const session = await requireUser();
   const verified = Boolean(session.user.emailVerifiedAt);
   const userId = session.user.id;
+
+  // Set by the order form when it redirects here, so the confirmation lands
+  // in front of the order it belongs to rather than on a page of its own.
+  const sentParam = (await searchParams).sent;
+  const justSent = Array.isArray(sentParam) ? sentParam[0] : sentParam;
 
   const myOrders = await db
     .select({ id: orders.id, reference: orders.reference })
@@ -69,6 +78,19 @@ export default async function AccountDashboardPage() {
 
       <PortalBody>
         <div className="flex flex-col gap-6">
+          {justSent && (
+            <div className="rounded-md border border-good-deep/20 bg-good-tint px-5 py-4">
+              <p className="text-sm font-semibold text-good-deep">
+                Order form received for {justSent}.
+              </p>
+              <p className="mt-1 text-sm text-ink-soft">
+                It is with the design team now. We will email you as soon as
+                there is a proof to look at &mdash; nothing is printed until
+                you have approved it.
+              </p>
+            </div>
+          )}
+
           {!verified && (
             <div className="flex items-center justify-between gap-6 rounded-md border border-pending-deep/25 bg-pending-tint px-5 py-4">
               <p className="text-sm text-ink-soft">

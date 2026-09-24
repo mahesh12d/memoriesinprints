@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
@@ -60,7 +61,7 @@ export async function saveOrderFormAction(
   }
 
   const [order] = await db
-    .select({ id: orders.id, status: orders.status })
+    .select({ id: orders.id, status: orders.status, reference: orders.reference })
     .from(orders)
     .where(and(eq(orders.id, orderId), eq(orders.userId, session.user.id)))
     .limit(1);
@@ -191,11 +192,22 @@ export async function saveOrderFormAction(
   revalidatePath("/account/orders");
   revalidatePath("/staff/queue");
 
+  /**
+   * A sent form is the end of this page, so it ends on the dashboard.
+   *
+   * Left here, someone has filled in the longest form on the site and is
+   * looking at a page with nothing on it and nowhere to go. The confirmation
+   * travels with them and is shown once at the top of the dashboard, next to
+   * the order it belongs to.
+   */
+  if (submitting) {
+    revalidatePath("/account");
+    redirect(`/account?sent=${encodeURIComponent(order.reference)}`);
+  }
+
   return {
     ok: true,
-    message: submitting
-      ? "Order form received."
-      : "Saved. You can come back to this link whenever you're ready.",
+    message: "Saved. You can come back to this link whenever you're ready.",
   };
 }
 
