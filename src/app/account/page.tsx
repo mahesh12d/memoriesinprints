@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { and, count, desc, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { enquiries, orders, proofVersions, savedItems } from "@/db/schema";
+import { orderForms, orders, proofVersions, savedItems } from "@/db/schema";
 import { requireUser } from "@/lib/auth/guards";
 import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
 
@@ -18,7 +18,7 @@ export default async function AccountDashboardPage() {
 
   const orderIds = myOrders.map((row) => row.id);
 
-  const [waiting, openQuotes, saved] = await Promise.all([
+  const [waiting, formsOutstanding, saved] = await Promise.all([
     orderIds.length
       ? db
           .select({
@@ -35,10 +35,13 @@ export default async function AccountDashboardPage() {
           .orderBy(desc(proofVersions.sentToCustomerAt))
           .limit(1)
       : Promise.resolve([]),
+    // Orders whose form has not been sent — the only thing here that stops
+    // the studio starting work.
     db
       .select({ value: count() })
-      .from(enquiries)
-      .where(and(eq(enquiries.userId, userId), eq(enquiries.status, "new"))),
+      .from(orders)
+      .leftJoin(orderForms, eq(orderForms.orderId, orders.id))
+      .where(and(eq(orders.userId, userId), isNull(orderForms.submittedAt))),
     db.select({ value: count() }).from(savedItems).where(eq(savedItems.userId, userId)),
   ]);
 
@@ -52,7 +55,11 @@ export default async function AccountDashboardPage() {
 
   const tiles = [
     { label: "Orders", value: myOrders.length, href: "/account/orders" },
-    { label: "Open quotes", value: openQuotes[0]?.value ?? 0, href: "/account/quotes" },
+    {
+      label: "Forms to fill",
+      value: formsOutstanding[0]?.value ?? 0,
+      href: "/account/order-forms",
+    },
     { label: "Saved items", value: saved[0]?.value ?? 0, href: "/account/saved" },
   ];
 

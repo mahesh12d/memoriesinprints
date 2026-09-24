@@ -126,7 +126,7 @@ export async function submitEnquiryAction(
       type: "quote_update",
       title: `We've received your enquiry (${reference})`,
       body: "We'll come back to you within one working day.",
-      linkUrl: "/account/quotes",
+      linkUrl: "/account/order-forms",
     });
   }
 

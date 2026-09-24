@@ -74,7 +74,7 @@ export function PortfolioFilters({
   return (
     <section
       aria-label="Refine this collection"
-      className="mb-10 flex flex-col gap-6 border-y border-line py-7"
+      className="mb-8 flex flex-col gap-5 border-y border-line py-5"
     >
       <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
         <h2 className="font-display text-xl">Refine this collection</h2>
@@ -104,6 +104,14 @@ export function PortfolioFilters({
         )}
       </div>
 
+      {/*
+        The two filter groups share a row from lg up.
+
+        Stacked, they pushed the first portfolio card to y=722 on a 900px
+        screen — the grid itself started below the fold, so the page opened on
+        controls rather than on the work. Side by side they cost one row.
+      */}
+      <div className="flex flex-col gap-6 lg:flex-row lg:flex-wrap lg:items-end lg:gap-x-10">
       {styles.length > 0 && (
         <div className="flex flex-col gap-2.5">
           <h3 className="text-[13px] font-semibold text-ink-soft">
@@ -157,6 +165,7 @@ export function PortfolioFilters({
             </Chip>
           </div>
         )}
+      </div>
       </div>
     </section>
   );

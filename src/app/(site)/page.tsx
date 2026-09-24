@@ -11,8 +11,68 @@ import { Section, SectionHeading } from "@/components/site/section";
 import { ImagePlaceholder } from "@/components/site/image-placeholder";
 import { ImageAutoSlider } from "@/components/ui/image-auto-slider";
 import { DiscoverButton } from "@/components/ui/discover-button";
+import { and, asc, desc, eq } from "drizzle-orm";
+import { db } from "@/db";
+import { portfolioItems } from "@/db/schema";
+import { resolveImageUrls } from "@/lib/storage/image-url";
 
 export default async function HomePage() {
+  /**
+   * The pieces the studio has marked popular.
+   *
+   * This strip used to be eight stock photographs from a component library —
+   * under a heading reading "Our popular designs", on a page selling the
+   * studio's own work. Ticking "popular" on a portfolio piece now puts it
+   * here, which is what that tick was always supposed to mean.
+   *
+   * Falling back to the newest published work rather than to nothing: a studio
+   * that has not got round to flagging anything should still show its
+   * portfolio, and an empty strip under that heading looks broken.
+   */
+  const popular = await db
+    .select({
+      slug: portfolioItems.slug,
+      title: portfolioItems.title,
+      imageUrl: portfolioItems.imageUrl,
+    })
+    .from(portfolioItems)
+    .where(
+      and(
+        eq(portfolioItems.isPublished, true),
+        eq(portfolioItems.isPopular, true),
+      ),
+    )
+    .orderBy(asc(portfolioItems.sortOrder))
+    .limit(12);
+
+  const shown =
+    popular.length > 0
+      ? popular
+      : await db
+          .select({
+            slug: portfolioItems.slug,
+            title: portfolioItems.title,
+            imageUrl: portfolioItems.imageUrl,
+          })
+          .from(portfolioItems)
+          .where(eq(portfolioItems.isPublished, true))
+          .orderBy(desc(portfolioItems.createdAt))
+          .limit(12);
+
+  const slides = (await resolveImageUrls(shown.map((item) => item.imageUrl)))
+    .map((src, index) =>
+      src
+        ? {
+            src,
+            alt: shown[index].title,
+            href: `/portfolio/${shown[index].slug}`,
+          }
+        : null,
+    )
+    // A piece with no photograph yet would be an empty tile in a moving
+    // strip, which reads as a broken image rather than as work in progress.
+    .filter((slide): slide is NonNullable<typeof slide> => slide !== null);
+
   return (
     <>
       {/* HERO */}
@@ -126,7 +186,7 @@ export default async function HomePage() {
 
         <DiscoverButton groups={QUICK_LINKS} className="mb-10" />
 
-        <ImageAutoSlider />
+        <ImageAutoSlider images={slides} />
       </Section>
 
       {/* CASE STUDY */}

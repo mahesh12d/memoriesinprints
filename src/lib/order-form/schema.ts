@@ -25,11 +25,16 @@ export const MAX = {
   photoQty: 1000,
   products: 50,
   productQuantity: 10_000,
+  designCode: 60,
+  attachments: 40,
+  addressLine: 200,
+  city: 120,
+  postcode: 20,
+  country: 120,
 } as const;
 
 export const PHOTO_OPTIONS = ["none", "colour", "bw"] as const;
 export const INSIDE_PAGE_STYLES = ["bw", "match_cover"] as const;
-export const PHOTO_SUPPLIED_VIA = ["email", "post"] as const;
 export const PAGE_COUNTS = [4, 8, 12, 16] as const;
 
 /** Offered as buttons; any number at or above the minimum is still accepted. */
@@ -73,6 +78,9 @@ export const additionalProductSchema = z.object({
 });
 
 export const orderFormSchema = z.object({
+  branchName: optionalText(MAX.name),
+  arrangerName: optionalText(MAX.name),
+
   deceasedName: optionalText(MAX.name),
   dateOfBirth: optionalDate,
   dateOfDeath: optionalDate,
@@ -82,6 +90,8 @@ export const orderFormSchema = z.object({
   funeralTime: optionalText(MAX.time),
   venueName: optionalText(MAX.venue),
 
+  coverDesignCode: optionalText(MAX.designCode),
+  insidePagesCode: optionalText(MAX.designCode),
   photoOption: optionalEnum(PHOTO_OPTIONS),
   numberOfPages: z
     .union([z.literal(""), z.coerce.number().int()])
@@ -111,10 +121,24 @@ export const orderFormSchema = z.object({
       (value) => value === null || (value >= 0 && value <= MAX.photoQty),
       { message: `A number between 0 and ${MAX.photoQty}.` },
     ),
-  photoSuppliedVia: optionalEnum(PHOTO_SUPPLIED_VIA),
   photoInstructions: optionalText(MAX.instructions),
-  attachmentKey: z.string().trim().max(500).nullable().default(null),
-  attachmentName: z.string().trim().max(300).nullable().default(null),
+  /**
+   * Everything the family has sent through, not one file.
+   *
+   * Capped so a stuck uploader cannot write an unbounded array, but high
+   * enough for a twenty-page booklet with a photograph on every page.
+   */
+  attachments: z
+    .array(
+      z.object({
+        key: z.string().trim().min(1).max(500),
+        name: z.string().trim().min(1).max(300),
+        size: z.number().int().nonnegative(),
+        type: z.string().trim().max(120),
+      }),
+    )
+    .max(MAX.attachments, `That is more than ${MAX.attachments} files.`)
+    .default([]),
 
   additionalProducts: z
     .array(additionalProductSchema)
@@ -124,6 +148,47 @@ export const orderFormSchema = z.object({
   additionalNotes: optionalText(MAX.longText),
   callbackRequested: z.boolean(),
   callbackPhone: optionalText(MAX.phone),
+
+  /**
+   * Where the finished stationery goes.
+   *
+   * Optional while the form is a draft, like everything else here — someone
+   * filling this in the week of a funeral should be able to save what they
+   * have and come back. It is checked on submit instead, by
+   * requiredForSubmission below, because a printed order with nowhere to go is
+   * the one gap that costs the studio a reprint.
+   */
+  shippingName: optionalText(MAX.name),
+  shippingLine1: optionalText(MAX.addressLine),
+  shippingLine2: optionalText(MAX.addressLine),
+  shippingCity: optionalText(MAX.city),
+  shippingPostcode: optionalText(MAX.postcode),
+  shippingCountry: optionalText(MAX.country),
 });
+
+/**
+ * What has to be there before the form can be sent.
+ *
+ * Kept apart from the schema so a draft can be saved half-finished. Only the
+ * address is enforced: the studio can chase a missing middle name, but it
+ * cannot post a parcel to nowhere.
+ */
+export function missingForSubmission(
+  values: OrderFormValues,
+): Record<string, string> {
+  const errors: Record<string, string> = {};
+
+  if (!values.shippingLine1) {
+    errors.shippingLine1 = "We need somewhere to send the printing.";
+  }
+  if (!values.shippingCity) {
+    errors.shippingCity = "Enter the town or city.";
+  }
+  if (!values.shippingPostcode) {
+    errors.shippingPostcode = "Enter the postcode.";
+  }
+
+  return errors;
+}
 
 export type OrderFormValues = z.infer<typeof orderFormSchema>;

@@ -54,6 +54,8 @@ export function OrderCard({
   href,
   proofHref,
   payHref,
+  orderFormHref,
+  formSubmitted = true,
   needsYou,
   statusLabel,
   statusTone,
@@ -72,6 +74,9 @@ export function OrderCard({
   href?: string;
   proofHref: string | null;
   payHref: string | null;
+  /** Set while the order form is still outstanding, so it can be finished. */
+  orderFormHref?: string | null;
+  formSubmitted?: boolean;
   needsYou: boolean;
   statusLabel: string;
   statusTone: PillTone;
@@ -115,7 +120,11 @@ export function OrderCard({
         </summary>
 
         <div className="flex flex-col gap-5 border-t border-line-soft px-6 pb-5 pt-5">
-          <OrderProgress status={status} proofStatus={proofStatus} />
+          <OrderProgress
+            status={status}
+            proofStatus={proofStatus}
+            formSubmitted={formSubmitted}
+          />
 
           {/*
             What is actually in the order, by template number where there is
@@ -144,6 +153,19 @@ export function OrderCard({
           )}
 
           <div className="flex flex-wrap gap-3">
+            {/*
+              The form comes before anything else that can be done to an
+              order, so its link leads.
+            */}
+            {orderFormHref && (
+              <Link
+                href={orderFormHref}
+                className="rounded-[2px] bg-brand px-5 py-2.5 text-[13px] font-semibold text-on-accent hover:bg-brand-deep hover:text-white"
+              >
+                Fill in your order form
+              </Link>
+            )}
+
             {payHref && (
               <Link
                 href={payHref}

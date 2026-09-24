@@ -23,7 +23,12 @@ export function TemplatePurchase({
   price: { amountMinor: number; currency: string } | null;
   quoteHref: string;
 }) {
-  const [quantity, setQuantity] = useState(25);
+  /*
+    Starts at one, not at a guessed run length. A quantity that arrives
+    pre-filled reads as the studio's minimum order rather than a suggestion,
+    and someone who wanted a single keepsake had to notice and correct it.
+  */
+  const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
   const [pending, startTransition] = useTransition();
   const router = useRouter();

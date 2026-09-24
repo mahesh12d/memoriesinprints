@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { MAX, MIN_QUANTITY, orderFormSchema } from "./schema";
+import {
+  MAX,
+  MIN_QUANTITY,
+  missingForSubmission,
+  orderFormSchema,
+} from "./schema";
 
 /**
  * The form is filled in a few sittings by someone who has just been bereaved,
@@ -10,6 +15,8 @@ import { MAX, MIN_QUANTITY, orderFormSchema } from "./schema";
 
 /** An untouched form: every field blank, as the browser posts it. */
 const blank = {
+  branchName: "",
+  arrangerName: "",
   deceasedName: "",
   dateOfBirth: "",
   dateOfDeath: "",
@@ -17,6 +24,8 @@ const blank = {
   funeralDate: "",
   funeralTime: "",
   venueName: "",
+  coverDesignCode: "",
+  insidePagesCode: "",
   photoOption: "",
   numberOfPages: "",
   insidePagesStyle: "",
@@ -24,7 +33,6 @@ const blank = {
   bespokeDesign: false,
   bespokeDetails: "",
   photoQty: "",
-  photoSuppliedVia: "",
   photoInstructions: "",
   attachmentKey: null,
   attachmentName: null,
@@ -33,6 +41,12 @@ const blank = {
   additionalNotes: "",
   callbackRequested: false,
   callbackPhone: "",
+  shippingName: "",
+  shippingLine1: "",
+  shippingLine2: "",
+  shippingCity: "",
+  shippingPostcode: "",
+  shippingCountry: "",
 };
 
 test("an empty form is valid, and blanks become null rather than empty strings", () => {
@@ -60,8 +74,7 @@ test("enums take only the listed values", () => {
     true,
   );
   assert.equal(
-    orderFormSchema.safeParse({ ...blank, photoSuppliedVia: "carrier-pigeon" })
-      .success,
+    orderFormSchema.safeParse({ ...blank, photoOption: "sepia" }).success,
     false,
   );
 });
@@ -175,4 +188,50 @@ test("the back cover wording and the design notes stay separate fields", () => {
     result.data?.additionalNotes,
     "Her name is spelled Ellen, not Elaine.",
   );
+});
+
+/**
+ * The address is the one thing the studio cannot work around.
+ *
+ * It stays optional while the form is a draft — someone filling this in the
+ * week of a funeral must be able to save half of it — but a form cannot be
+ * sent without somewhere to post the printing to.
+ */
+test("a draft may have no address at all", () => {
+  const result = orderFormSchema.safeParse(blank);
+  assert.equal(result.success, true, "a blank form is still a valid draft");
+});
+
+test("sending without an address is refused, field by field", () => {
+  const values = orderFormSchema.parse(blank);
+  const missing = missingForSubmission(values);
+
+  assert.ok(missing.shippingLine1, "the street is named as missing");
+  assert.ok(missing.shippingCity, "the town is named as missing");
+  assert.ok(missing.shippingPostcode, "the postcode is named as missing");
+});
+
+test("a complete address clears the way to send", () => {
+  const values = orderFormSchema.parse({
+    ...blank,
+    shippingName: "Jordan Ellis",
+    shippingLine1: "12 Chapel Row",
+    shippingCity: "Bristol",
+    shippingPostcode: "BS1 4XX",
+  });
+
+  assert.deepEqual(missingForSubmission(values), {});
+});
+
+test("line 2 and country are not insisted on", () => {
+  // Plenty of addresses have no second line, and the country defaults.
+  const values = orderFormSchema.parse({
+    ...blank,
+    shippingLine1: "12 Chapel Row",
+    shippingCity: "Bristol",
+    shippingPostcode: "BS1 4XX",
+  });
+
+  assert.equal(values.shippingLine2, null);
+  assert.deepEqual(missingForSubmission(values), {});
 });

@@ -8,7 +8,7 @@ import {
   uploadProofAction,
 } from "@/lib/proofs/actions";
 import { emptyFormState } from "@/lib/auth/form-state";
-import { ACCEPT_ATTRIBUTE, MAX_UPLOAD_BYTES } from "@/lib/storage/uploads";
+import { MAX_UPLOAD_BYTES } from "@/lib/storage/uploads";
 import { FormMessage, SubmitButton } from "@/components/ui/form";
 
 export function UploadProofForm({ orderId }: { orderId: string }) {
@@ -21,19 +21,21 @@ export function UploadProofForm({ orderId }: { orderId: string }) {
 
       <label className="flex flex-col gap-2">
         <span className="text-[13px] font-semibold text-ink-soft">
-          Proof file
+          Proof pages
         </span>
         <input
           type="file"
           name="file"
-          accept={ACCEPT_ATTRIBUTE}
+          accept="image/*"
+          multiple
           required
           className="rounded-[3px] border border-field-line bg-card px-3 py-2.5 text-sm file:mr-3 file:rounded-[2px] file:border-0 file:bg-surface-grey file:px-3 file:py-1.5 file:text-[13px] file:font-semibold"
         />
-        <span className="text-[12px] text-ink-quiet">
-          PDF, JPEG, PNG or WebP, up to{" "}
-          {Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))}MB. Each upload becomes
-          a new version.
+        <span className="text-[12px] leading-relaxed text-ink-quiet">
+          One image per page, chosen in reading order &mdash; JPEG, PNG or
+          WebP, up to {Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))}MB each.
+          Export each page of the booklet separately so the customer can mark
+          up any of them. The whole set becomes one new version.
         </span>
       </label>
 

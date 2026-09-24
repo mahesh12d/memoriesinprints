@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { pinFromClick, type Pin } from "@/lib/proofs/pins";
-import { renderPdfFirstPage } from "@/lib/proofs/render-pdf";
 
 export type ProofComment = {
   id: string;
   body: string;
+  sheetIndex: number;
   xPct: number;
   yPct: number;
   pinNumber: number;
@@ -14,70 +14,69 @@ export type ProofComment = {
   isMine: boolean;
 };
 
+export type ProofSheet = {
+  key: string;
+  url: string;
+  name: string;
+};
+
 /**
- * The proof itself, with comments pinned to it.
+ * The proof, sheet by sheet, with comments pinned to it.
  *
- * A PDF is rendered in the browser rather than converted on the server, so
- * there's one stored file and the artwork the customer marks up is the
- * artwork the studio sent. Pins sit in a layer over the top, positioned as
- * percentages, so they hold wherever the page is resized.
+ * Proofs are images — one per sheet, in reading order. A booklet runs to
+ * sixteen pages and every one of them has to be checked, so the reviewer
+ * moves between sheets here rather than being shown only the cover.
+ *
+ * There is no PDF rendering any more. It could only ever show the first page,
+ * and it needed pdf.js plus a polyfill for browser features that only landed
+ * in 2025 — on the devices a bereaved family is likely to be using, that was a
+ * viewer that sometimes simply failed. An <img> cannot.
+ *
+ * Pins are stored as percentages of the sheet they sit on, so they hold
+ * wherever the page is resized.
  */
 export function ProofCanvas({
-  fileUrl,
-  isPdf,
+  sheets,
   comments,
   readOnly,
   pending,
   onPlace,
   activeCommentId,
   onSelectComment,
+  activeSheet,
+  onSelectSheet,
+  seenSheets,
 }: {
-  fileUrl: string;
-  isPdf: boolean;
+  sheets: ProofSheet[];
   comments: ProofComment[];
   readOnly: boolean;
   pending: Pin | null;
   onPlace: (pin: Pin | null) => void;
   activeCommentId: string | null;
   onSelectComment: (id: string | null) => void;
+  activeSheet: number;
+  onSelectSheet: (index: number) => void;
+  /** Which sheets have been opened, so nothing is approved unseen. */
+  seenSheets: Set<number>;
 }) {
   const surfaceRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [pdfError, setPdfError] = useState<string | null>(null);
-  const [loaded, setLoaded] = useState(!isPdf);
 
-  /** Renders the first page of a PDF onto the canvas. */
-  useEffect(() => {
-    if (!isPdf) return;
+  /**
+   * Which sheet has finished loading, rather than a boolean.
+   *
+   * Two things go wrong with a flag. A cached image has already loaded by the
+   * time React attaches onLoad, so the handler never fires and "Opening your
+   * proof…" sits over the artwork for good. And switching sheets has to clear
+   * it again, or the next one claims to be ready before it is. Keying on the
+   * sheet answers both.
+   */
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
 
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-
-        await renderPdfFirstPage(
-          fileUrl,
-          canvas,
-          surfaceRef.current?.clientWidth ?? 900,
-        );
-
-        if (!cancelled) setLoaded(true);
-      } catch (error) {
-        console.error("[proof] could not render pdf", error);
-        if (!cancelled) {
-          setPdfError(
-            "We couldn't display this proof here. Download it to view it.",
-          );
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [fileUrl, isPdf]);
+  const sheet = sheets[activeSheet] ?? sheets[0] ?? null;
+  const loaded = sheet !== null && loadedKey === sheet.key;
+  const onThisSheet = comments.filter(
+    (comment) => comment.sheetIndex === activeSheet,
+  );
 
   function handleClick(event: React.MouseEvent<HTMLDivElement>) {
     if (readOnly) return;
@@ -94,8 +93,75 @@ export function ProofCanvas({
     }
   }
 
+  if (!sheet) {
+    return (
+      <p className="rounded-md border border-line bg-card p-10 text-center text-sm text-ink-muted">
+        There is nothing to look at on this proof yet.
+      </p>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-3">
+      {/*
+        Sheet navigation, above the artwork rather than below it: on a booklet
+        the first question is "how many pages am I checking", and it should be
+        answered before scrolling starts.
+      */}
+      {sheets.length > 1 && (
+        <nav
+          aria-label="Proof sheets"
+          className="flex flex-wrap items-center gap-2"
+        >
+          {sheets.map((one, index) => {
+            const active = index === activeSheet;
+            const pins = comments.filter(
+              (comment) => comment.sheetIndex === index,
+            ).length;
+
+            return (
+              <button
+                key={one.key}
+                type="button"
+                onClick={() => onSelectSheet(index)}
+                aria-current={active ? "true" : undefined}
+                className={`flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
+                  active
+                    ? "bg-band text-white"
+                    : "border border-line text-ink-muted hover:bg-surface-grey"
+                }`}
+              >
+                <span>Page {index + 1}</span>
+
+                {pins > 0 && (
+                  <span
+                    className={`rounded-full px-1.5 text-[11px] font-bold ${
+                      active ? "bg-white/20" : "bg-brand text-on-accent"
+                    }`}
+                  >
+                    {pins}
+                  </span>
+                )}
+
+                {/*
+                  A quiet dot on anything not yet opened. It is the only way
+                  someone can tell, at a glance, that there is a page they
+                  have not actually looked at.
+                */}
+                {!seenSheets.has(index) && (
+                  <span
+                    aria-label="not yet viewed"
+                    className={`size-1.5 rounded-full ${
+                      active ? "bg-white/70" : "bg-pending-deep"
+                    }`}
+                  />
+                )}
+              </button>
+            );
+          })}
+        </nav>
+      )}
+
       <div
         ref={surfaceRef}
         onClick={handleClick}
@@ -103,30 +169,32 @@ export function ProofCanvas({
           readOnly ? "" : "cursor-crosshair"
         }`}
       >
-        {isPdf ? (
-          <>
-            <canvas ref={canvasRef} className="block w-full" />
-            {!loaded && !pdfError && (
-              <p className="p-16 text-center text-sm text-ink-muted">
-                Opening your proof…
-              </p>
-            )}
-            {pdfError && (
-              <p className="p-16 text-center text-sm text-alert">{pdfError}</p>
-            )}
-          </>
-        ) : (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={fileUrl}
-            alt="Your proof"
-            className="block w-full"
-            onLoad={() => setLoaded(true)}
-          />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          key={sheet.key}
+          ref={(node) => {
+            // Catches the image that was already in cache.
+            if (node?.complete && loadedKey !== sheet.key) {
+              setLoadedKey(sheet.key);
+            }
+          }}
+          src={sheet.url}
+          alt={
+            sheets.length > 1
+              ? `Your proof, page ${activeSheet + 1} of ${sheets.length}`
+              : "Your proof"
+          }
+          className="block w-full"
+          onLoad={() => setLoadedKey(sheet.key)}
+        />
+
+        {!loaded && (
+          <p className="absolute inset-0 flex items-center justify-center text-sm text-ink-muted">
+            Opening your proof…
+          </p>
         )}
 
-        {/* Existing comments */}
-        {comments.map((comment) => (
+        {onThisSheet.map((comment) => (
           <button
             key={comment.id}
             type="button"
@@ -148,7 +216,6 @@ export function ProofCanvas({
           </button>
         ))}
 
-        {/* The pin being placed right now */}
         {pending && (
           <span
             style={{ left: `${pending.xPct}%`, top: `${pending.yPct}%` }}
@@ -162,6 +229,8 @@ export function ProofCanvas({
       {!readOnly && (
         <p className="text-[13px] text-ink-muted">
           Click anywhere on the proof to leave a comment at that spot.
+          {sheets.length > 1 &&
+            ` Page ${activeSheet + 1} of ${sheets.length}.`}
         </p>
       )}
     </div>

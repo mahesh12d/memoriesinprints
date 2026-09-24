@@ -152,7 +152,6 @@ export default async function StaffOrderDetailPage({
     previous ? signedReadUrl(previous.storageKey) : null,
   ]);
 
-  const isPdf = (mimeType: string | null) => mimeType === "application/pdf";
 
   const canProofread =
     session.user.role === "proofreader" || session.user.role === "admin";
@@ -209,13 +208,11 @@ export default async function StaffOrderDetailPage({
                     previous={{
                       versionNumber: previous.versionNumber,
                       fileUrl: previousFileUrl,
-                      isPdf: isPdf(previous.mimeType),
                       fileName: previous.fileName,
                     }}
                     current={{
                       versionNumber: current.versionNumber,
                       fileUrl: currentFileUrl,
-                      isPdf: isPdf(current.mimeType),
                       fileName: current.fileName,
                     }}
                   />

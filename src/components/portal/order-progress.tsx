@@ -24,11 +24,11 @@ type ProofStatus =
   | "changes_requested";
 
 const STEPS = [
-  "Placed",
+  "Details",
+  "Design",
   "Proof",
   "Payment",
   "Printing",
-  "Shipped",
   "Delivered",
 ] as const;
 
@@ -43,8 +43,8 @@ const STEPS = [
 const CURRENT_STEP: Record<Exclude<OrderStatus, "cancelled">, number> = {
   awaiting_price: 1,
   awaiting_proof: 1,
-  awaiting_payment: 2,
-  in_production: 3,
+  awaiting_payment: 3,
+  in_production: 4,
   shipped: 4,
   // Past the last index, so every step reads as done.
   delivered: STEPS.length,
@@ -71,7 +71,7 @@ function currentNote(
       if (proofStatus === "changes_requested") {
         return "We are making the changes you asked for.";
       }
-      return "We are preparing your proof.";
+      return "Your designer is working on it.";
     case "in_production":
       return "Approved and being printed.";
     case "shipped":
@@ -87,9 +87,16 @@ function currentNote(
 export function OrderProgress({
   status,
   proofStatus,
+  formSubmitted = true,
 }: {
   status: OrderStatus;
   proofStatus?: ProofStatus | null;
+  /**
+   * Whether the order form has been sent. Derived from its submittedAt rather
+   * than from a new order status: the form already records when it went, and
+   * a second place to say the same thing is a second place to get it wrong.
+   */
+  formSubmitted?: boolean;
 }) {
   const note = currentNote(status, proofStatus);
 
@@ -102,6 +109,22 @@ export function OrderProgress({
       <p className="text-[13px] text-alert" role="status">
         {note}
       </p>
+    );
+  }
+
+  /**
+   * Nothing moves until the details are in. A designer cannot draw an order
+   * of service without the name and the date, so an order whose form has not
+   * been sent sits on the first step however far the rest has got.
+   */
+  if (!formSubmitted) {
+    return (
+      <ProgressSteps
+        steps={STEPS}
+        current={0}
+        note="We need a few details before we can start — your order form is waiting."
+        label="Order progress"
+      />
     );
   }
 

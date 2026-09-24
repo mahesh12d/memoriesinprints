@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { and, desc, eq, exists, ilike, inArray, ne, not, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { orderItems, orders, proofVersions } from "@/db/schema";
+import { orderForms, orderItems, orders, proofVersions } from "@/db/schema";
 import { requireUser } from "@/lib/auth/guards";
 import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
 import { type PillTone } from "@/components/portal/status-pill";
@@ -269,6 +269,34 @@ export default async function AccountOrdersPage({
     );
   }
 
+  /**
+   * Which of these orders still need their form sent.
+   *
+   * One query for the page rather than one per row, and keyed on submittedAt
+   * because that is what actually hands the job to the studio — a saved draft
+   * is not the same as a sent form.
+   */
+  const formRows = rows.length
+    ? await db
+        .select({
+          orderId: orderForms.orderId,
+          submittedAt: orderForms.submittedAt,
+        })
+        .from(orderForms)
+        .where(
+          inArray(
+            orderForms.orderId,
+            rows.map((row) => row.id),
+          ),
+        )
+    : [];
+
+  const formSent = new Set(
+    formRows
+      .filter((row) => row.submittedAt !== null)
+      .map((row) => row.orderId as string),
+  );
+
   const describes = new Map<string, string>();
   for (const item of itemRows) {
     const existing = describes.get(item.orderId);
@@ -421,7 +449,13 @@ export default async function AccountOrdersPage({
                           proofStatus ? `/account/orders/${row.id}/proof` : null
                         }
                         payHref={canPay ? `/checkout/${row.id}` : null}
-                        needsYou={waitingOnCustomer(row)}
+                        formSubmitted={formSent.has(row.id)}
+                        orderFormHref={
+                          formSent.has(row.id)
+                            ? null
+                            : `/order-form/${row.id}`
+                        }
+                        needsYou={waitingOnCustomer(row) || !formSent.has(row.id)}
                         statusLabel={STATUS[row.status]?.label ?? row.status}
                         statusTone={STATUS[row.status]?.tone ?? "neutral"}
                         paymentLabel={

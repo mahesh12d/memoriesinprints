@@ -69,9 +69,11 @@ export default async function PortfolioPage({
       slug: portfolioItems.slug,
       title: portfolioItems.title,
       category: portfolioItems.category,
-      description: portfolioItems.description,
+      // Not selected: the grid shows titles only. Search still matches on
+      // the column itself, in the where clause below.
       imageUrl: portfolioItems.imageUrl,
       templateNumber: portfolioItems.templateNumber,
+      isPopular: portfolioItems.isPopular,
     })
     .from(portfolioItems)
     .where(
@@ -171,13 +173,19 @@ export default async function PortfolioPage({
         ) : (
           <ul
             aria-label="Portfolio pieces"
-            className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+            /*
+              Four across from xl. The frame is portrait — it has to be, or the
+              name is cropped off the top — so three across made each card
+              500px tall and pushed the titles below the fold. Narrower cards
+              are shorter ones, and a portfolio is for scanning.
+            */
+            className="grid gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
           >
             {items.map((item, index) => (
               <li key={item.id}>
                 <Link
                   href={`/portfolio/${item.slug}`}
-                  className="group flex h-full flex-col gap-3"
+                  className="group flex h-full flex-col gap-2"
                 >
                   {/*
                     1142/1600 is the studio's own template, not a design
@@ -187,11 +195,25 @@ export default async function PortfolioPage({
                     the heading, the name and the dates sit. The frame matches
                     the paper.
                   */}
-                  <ImagePlaceholder
-                    caption={`[Photograph — ${item.title.toLowerCase()}]`}
-                    src={images[index]}
-                    className="aspect-[1142/1600] w-full rounded-md"
-                  />
+                  <div className="relative">
+                    <ImagePlaceholder
+                      caption={`[Photograph — ${item.title.toLowerCase()}]`}
+                      src={images[index]}
+                      className="aspect-[1142/1600] w-full rounded-md"
+                    />
+
+                    {/*
+                      The studio's own mark, on the artwork rather than under
+                      it. Below the image it would be a fourth line of text
+                      competing with the title; over the corner it reads as a
+                      label on the piece, which is what it is.
+                    */}
+                    {item.isPopular && (
+                      <span className="absolute left-3 top-3 rounded-full bg-brand px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.06em] text-on-accent shadow-sm">
+                        Popular
+                      </span>
+                    )}
+                  </div>
                   <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-text">
                     {CATEGORY_LABEL[item.category]}
                   </span>
@@ -201,11 +223,6 @@ export default async function PortfolioPage({
                   {item.templateNumber !== null && (
                     <p className="text-[12px] text-ink-quiet">
                       Template no. {item.templateNumber}
-                    </p>
-                  )}
-                  {item.description && (
-                    <p className="text-[14px] leading-relaxed text-ink-muted">
-                      {item.description}
                     </p>
                   )}
                 </Link>

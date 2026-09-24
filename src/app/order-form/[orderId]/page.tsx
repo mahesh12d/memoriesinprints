@@ -3,11 +3,13 @@ import { notFound } from "next/navigation";
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  enquiries,
   orderForms,
+  orders,
   productSizes,
   products,
+  users,
 } from "@/db/schema";
+import { requireUser } from "@/lib/auth/guards";
 import { STUDIO } from "@/lib/studio";
 import { OrderForm } from "./order-form";
 import type { OrderFormRow, ProductChoice } from "./types";
@@ -29,32 +31,62 @@ const dateFormat = new Intl.DateTimeFormat("en-GB", {
 export default async function OrderFormPage({
   params,
 }: {
-  params: Promise<{ enquiryId: string }>;
+  params: Promise<{ orderId: string }>;
 }) {
-  const { enquiryId } = await params;
+  const session = await requireUser();
+  const { orderId } = await params;
 
   // A malformed id is a 404 rather than a database error.
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(enquiryId)) {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId)) {
     notFound();
   }
 
-  const [enquiry] = await db
+  const [order] = await db
     .select({
-      id: enquiries.id,
-      reference: enquiries.reference,
-      name: enquiries.name,
+      id: orders.id,
+      reference: orders.reference,
+      orderedFor: orders.orderedFor,
     })
-    .from(enquiries)
-    .where(eq(enquiries.id, enquiryId))
+    .from(orders)
+    .where(and(eq(orders.id, orderId), eq(orders.userId, session.user.id)))
     .limit(1);
 
-  if (!enquiry) notFound();
+  if (!order) notFound();
 
   const [saved] = await db
     .select()
     .from(orderForms)
-    .where(eq(orderForms.enquiryId, enquiryId))
+    .where(eq(orderForms.orderId, orderId))
     .limit(1);
+
+  /**
+   * The delivery address starts as whatever is on the account.
+   *
+   * A funeral director sends nearly everything to the same place, so the
+   * address should already be filled in by the time they reach that part of
+   * the form — and still be editable for the order that goes somewhere else.
+   */
+  const [profile] = await db
+    .select({
+      name: users.name,
+      addressLine1: users.addressLine1,
+      addressLine2: users.addressLine2,
+      city: users.city,
+      postcode: users.postcode,
+      country: users.country,
+    })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
+
+  const addressDefaults = {
+    shippingName: saved?.shippingName ?? profile?.name ?? "",
+    shippingLine1: saved?.shippingLine1 ?? profile?.addressLine1 ?? "",
+    shippingLine2: saved?.shippingLine2 ?? profile?.addressLine2 ?? "",
+    shippingCity: saved?.shippingCity ?? profile?.city ?? "",
+    shippingPostcode: saved?.shippingPostcode ?? profile?.postcode ?? "",
+    shippingCountry: saved?.shippingCountry ?? profile?.country ?? "United Kingdom",
+  };
 
   // The picker offers what the studio actually prints today, not a list
   // frozen into the form when it was built.
@@ -87,12 +119,14 @@ export default async function OrderFormPage({
   }
 
   if (saved?.status === "submitted") {
-    return <Received reference={enquiry.reference} at={saved.submittedAt} />;
+    return <Received reference={order.reference} at={saved.submittedAt} />;
   }
 
   const values: OrderFormRow | null = saved
     ? {
         status: saved.status,
+        branchName: saved.branchName,
+        arrangerName: saved.arrangerName,
         deceasedName: saved.deceasedName,
         dateOfBirth: saved.dateOfBirth,
         dateOfDeath: saved.dateOfDeath,
@@ -100,6 +134,8 @@ export default async function OrderFormPage({
         funeralDate: saved.funeralDate,
         funeralTime: saved.funeralTime,
         venueName: saved.venueName,
+        coverDesignCode: saved.coverDesignCode,
+        insidePagesCode: saved.insidePagesCode,
         photoOption: saved.photoOption,
         numberOfPages: saved.numberOfPages,
         insidePagesStyle: saved.insidePagesStyle,
@@ -107,8 +143,8 @@ export default async function OrderFormPage({
         bespokeDesign: saved.bespokeDesign,
         bespokeDetails: saved.bespokeDetails,
         photoQty: saved.photoQty,
-        photoSuppliedVia: saved.photoSuppliedVia,
         photoInstructions: saved.photoInstructions,
+        attachments: saved.attachments ?? [],
         attachmentKey: saved.attachmentKey,
         attachmentName: saved.attachmentName,
         additionalProducts: saved.additionalProducts,
@@ -129,13 +165,14 @@ export default async function OrderFormPage({
           back to what you have written.
         </p>
         <p className="text-[13px] text-ink-quiet">
-          Order {enquiry.reference}. If anything here is difficult, call us on{" "}
+          Order {order.reference}. If anything here is difficult, call us on{" "}
           {STUDIO.phone} and we will fill it in with you.
         </p>
       </header>
 
       <OrderForm
-        enquiryId={enquiry.id}
+        orderId={order.id}
+        addressDefaults={addressDefaults}
         saved={values}
         products={[...byProduct.values()]}
       />

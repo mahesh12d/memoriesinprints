@@ -1,51 +1,80 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { enquiries, orderForms } from "@/db/schema";
+import { orderForms, orders } from "@/db/schema";
+import { requireUser } from "@/lib/auth/guards";
 import { fail, type FormState } from "@/lib/auth/form-state";
 import {
   additionalProductSchema,
   MAX,
+  missingForSubmission,
   orderFormSchema,
 } from "./schema";
 
 /**
  * Saves the order form.
  *
- * The enquiry id in the link is the only credential, so it is checked against
- * a real enquiry on every save — a made-up id gets the same nothing a missing
- * one does.
- *
- * Saving is always an upsert on the unique enquiry id. Two tabs, a double
- * click or a retry after a dropped connection all land on the same row rather
- * than quietly creating a second form the studio would never think to look
- * for.
+ * Saving is always an upsert on the unique order id. Two tabs, a double click
+ * or a retry after a dropped connection all land on the same row rather than
+ * quietly creating a second form the studio would never think to look for.
  */
+/**
+ * The uploaded files, as the client posts them.
+ *
+ * Sent as one JSON field rather than indexed inputs: the list is built in the
+ * browser as each upload finishes, so it arrives as a unit or not at all.
+ */
+function readAttachments(formData: FormData): unknown {
+  const raw = formData.get("attachments");
+  if (typeof raw !== "string" || raw === "") return [];
+
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function saveOrderFormAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const enquiryId = String(formData.get("enquiryId") ?? "");
-  if (!z.string().uuid().safeParse(enquiryId).success) {
-    return fail("That link doesn't look right. Please use the one we sent you.");
+  /**
+   * Keyed on the order, and guarded on who is asking.
+   *
+   * This used to take an enquiry id from the form and trust it: anyone who
+   * guessed or was forwarded a link could read and overwrite another family's
+   * details. Orders belong to an account, so ownership can actually be
+   * checked, and it is checked here rather than only on the page, because the
+   * action is reachable on its own.
+   */
+  const session = await requireUser();
+
+  const orderId = String(formData.get("orderId") ?? "");
+  if (!z.string().uuid().safeParse(orderId).success) {
+    return fail("That link doesn't look right.");
   }
 
-  const [enquiry] = await db
-    .select({ id: enquiries.id })
-    .from(enquiries)
-    .where(eq(enquiries.id, enquiryId))
+  const [order] = await db
+    .select({ id: orders.id, status: orders.status })
+    .from(orders)
+    .where(and(eq(orders.id, orderId), eq(orders.userId, session.user.id)))
     .limit(1);
 
-  if (!enquiry) {
-    return fail("That link doesn't look right. Please use the one we sent you.");
+  if (!order) {
+    return fail("We couldn't find that order.");
   }
 
   const submitting = formData.get("intent") === "submit";
 
   const parsed = orderFormSchema.safeParse({
+    branchName: formData.get("branchName") ?? "",
+    arrangerName: formData.get("arrangerName") ?? "",
+
     deceasedName: formData.get("deceasedName") ?? "",
     dateOfBirth: formData.get("dateOfBirth") ?? "",
     dateOfDeath: formData.get("dateOfDeath") ?? "",
@@ -55,6 +84,8 @@ export async function saveOrderFormAction(
     funeralTime: formData.get("funeralTime") ?? "",
     venueName: formData.get("venueName") ?? "",
 
+    coverDesignCode: formData.get("coverDesignCode") ?? "",
+    insidePagesCode: formData.get("insidePagesCode") ?? "",
     photoOption: formData.get("photoOption") ?? "",
     numberOfPages: formData.get("numberOfPages") ?? "",
     insidePagesStyle: formData.get("insidePagesStyle") ?? "",
@@ -63,16 +94,21 @@ export async function saveOrderFormAction(
     bespokeDetails: formData.get("bespokeDetails") ?? "",
 
     photoQty: formData.get("photoQty") ?? "",
-    photoSuppliedVia: formData.get("photoSuppliedVia") ?? "",
     photoInstructions: formData.get("photoInstructions") ?? "",
-    attachmentKey: readOptional(formData.get("attachmentKey")),
-    attachmentName: readOptional(formData.get("attachmentName")),
+    attachments: readAttachments(formData),
 
     additionalProducts: readProducts(formData),
     backpageInformation: formData.get("backpageInformation") ?? "",
     additionalNotes: formData.get("additionalNotes") ?? "",
     callbackRequested: formData.get("callbackRequested") === "on",
     callbackPhone: formData.get("callbackPhone") ?? "",
+
+    shippingName: formData.get("shippingName") ?? "",
+    shippingLine1: formData.get("shippingLine1") ?? "",
+    shippingLine2: formData.get("shippingLine2") ?? "",
+    shippingCity: formData.get("shippingCity") ?? "",
+    shippingPostcode: formData.get("shippingPostcode") ?? "",
+    shippingCountry: formData.get("shippingCountry") ?? "",
   });
 
   if (!parsed.success) {
@@ -88,6 +124,17 @@ export async function saveOrderFormAction(
   }
 
   const values = parsed.data;
+
+  if (submitting) {
+    const missing = missingForSubmission(values);
+    if (Object.keys(missing).length > 0) {
+      return fail(
+        "Almost there — we just need a delivery address before this can go to the studio.",
+        missing,
+      );
+    }
+  }
+
   const now = new Date();
 
   // A checkbox that is off makes its revealed field meaningless, so it is
@@ -98,7 +145,7 @@ export async function saveOrderFormAction(
   await db
     .insert(orderForms)
     .values({
-      enquiryId,
+      orderId,
       ...values,
       bespokeDetails,
       callbackPhone,
@@ -107,7 +154,7 @@ export async function saveOrderFormAction(
       updatedAt: now,
     })
     .onConflictDoUpdate({
-      target: orderForms.enquiryId,
+      target: orderForms.orderId,
       set: {
         ...values,
         bespokeDetails,
@@ -118,7 +165,31 @@ export async function saveOrderFormAction(
       },
     });
 
-  revalidatePath(`/order-form/${enquiryId}`);
+  /**
+   * Sending the form is what hands the job to the studio.
+   *
+   * The address is copied onto the order as well as kept on the form: the
+   * order is what production and delivery read, and it should not have to
+   * join through a form to find out where a parcel goes.
+   */
+  if (submitting) {
+    await db
+      .update(orders)
+      .set({
+        shippingName: values.shippingName,
+        shippingLine1: values.shippingLine1,
+        shippingLine2: values.shippingLine2,
+        shippingCity: values.shippingCity,
+        shippingPostcode: values.shippingPostcode,
+        shippingCountry: values.shippingCountry,
+        updatedAt: now,
+      })
+      .where(eq(orders.id, orderId));
+  }
+
+  revalidatePath(`/order-form/${orderId}`);
+  revalidatePath("/account/orders");
+  revalidatePath("/staff/queue");
 
   return {
     ok: true,
@@ -128,10 +199,6 @@ export async function saveOrderFormAction(
   };
 }
 
-function readOptional(value: FormDataEntryValue | null): string | null {
-  const text = String(value ?? "").trim();
-  return text === "" ? null : text;
-}
 
 /**
  * Reads the repeated product rows.

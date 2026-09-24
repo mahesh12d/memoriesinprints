@@ -28,5 +28,5 @@ export async function cancelEnquiryAction(formData: FormData): Promise<void> {
       ),
     );
 
-  revalidatePath("/account/quotes");
+  revalidatePath("/account/order-forms");
 }

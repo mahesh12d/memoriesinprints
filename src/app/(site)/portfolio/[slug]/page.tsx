@@ -3,7 +3,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, asc, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
-import { portfolioItemPrices, portfolioItems } from "@/db/schema";
+import {
+  customerItemPrices,
+  portfolioItemPrices,
+  portfolioItems,
+} from "@/db/schema";
+import { getSession } from "@/lib/auth/session";
 import { CATEGORY_LABEL } from "@/lib/catalogue";
 import { resolveImageUrl, resolveImageUrls } from "@/lib/storage/image-url";
 import { loadSavedTemplateIds } from "@/lib/saved/queries";
@@ -100,9 +105,37 @@ export default async function PortfolioItemPage({
 
   const alsoImages = await resolveImageUrls(alsoIn.map((row) => row.imageUrl));
 
-  // A price only counts when the studio has left it switched on.
-  const price =
-    item.amountMinor !== null && item.priceActive
+  /**
+   * A price only counts when the studio has left it switched on — and a rate
+   * agreed with this particular customer beats the list price.
+   *
+   * The page used to join portfolioItemPrices alone, so a funeral director
+   * with negotiated rates was quoted the list price here, added to cart at
+   * their own rate, and found the basket disagreeing with the page they had
+   * just been reading. The cart was right; this page was not.
+   */
+  const session = await getSession("site");
+
+  const [agreed] = session
+    ? await db
+        .select({
+          amountMinor: customerItemPrices.amountMinor,
+          currency: customerItemPrices.currency,
+        })
+        .from(customerItemPrices)
+        .where(
+          and(
+            eq(customerItemPrices.userId, session.user.id),
+            eq(customerItemPrices.portfolioItemId, item.id),
+            eq(customerItemPrices.isActive, true),
+          ),
+        )
+        .limit(1)
+    : [];
+
+  const price = agreed
+    ? { amountMinor: agreed.amountMinor, currency: agreed.currency ?? "GBP" }
+    : item.amountMinor !== null && item.priceActive
       ? { amountMinor: item.amountMinor, currency: item.currency ?? "GBP" }
       : null;
 

@@ -109,7 +109,7 @@ export async function quoteEnquiryAction(
       type: "quote_update",
       title: `We've quoted for ${enquiry.reference}`,
       body: notes ?? "Have a look and let us know how you'd like to proceed.",
-      linkUrl: "/account/quotes",
+      linkUrl: "/account/order-forms",
     });
   }
 

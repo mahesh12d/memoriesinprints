@@ -45,7 +45,7 @@ export default async function QuoteThankYouPage({
         <div className="mt-2 flex flex-wrap justify-center gap-3">
           {session ? (
             <Link
-              href="/account/quotes"
+              href="/account/order-forms"
               className="rounded-[2px] bg-brand px-7 py-3.5 text-sm font-semibold text-on-accent hover:bg-band-deep"
             >
               See it in my account

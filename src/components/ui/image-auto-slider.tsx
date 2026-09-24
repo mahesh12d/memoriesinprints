@@ -1,10 +1,18 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
+
+export interface SlideImage {
+  src: string;
+  alt: string;
+  /** Where the piece lives, when it is one of the studio's own. */
+  href?: string;
+}
 
 export interface ImageAutoSliderProps {
-  /** Array of image objects with src and alt text */
-  images?: { src: string; alt: string }[];
+  /** The pieces to show. Required: there is no stock fallback any more. */
+  images: SlideImage[];
   /** Animation duration in seconds (lower = faster). Default 25 */
   speed?: number;
   /** Pause on hover. Default true */
@@ -18,11 +26,14 @@ export interface ImageAutoSliderProps {
  * Images are duplicated once so the loop joins seamlessly.
  */
 export function ImageAutoSlider({
-  images = DEFAULT_IMAGES,
+  images,
   speed = 25,
   pauseOnHover = true,
   className = "",
 }: ImageAutoSliderProps) {
+  // Nothing to scroll: better to render nothing than an empty moving strip.
+  if (images.length === 0) return null;
+
   // Duplicate for seamless loop
   const duplicated = [...images, ...images];
 
@@ -76,59 +87,52 @@ export function ImageAutoSlider({
         className={`mip-scroll-container w-full overflow-hidden ${className}`}
       >
         <div className="mip-scroll-track flex w-max gap-5">
-          {duplicated.map((image, index) => (
-            <div
-              key={index}
-              className="mip-slide-item flex-shrink-0 w-56 h-56 sm:w-64 sm:h-64 md:w-72 md:h-72 lg:w-80 lg:h-80 rounded-lg overflow-hidden border border-line-soft"
-            >
-              <img
-                src={image.src}
-                alt={image.alt}
-                className="w-full h-full object-cover"
-                loading="lazy"
-              />
-            </div>
-          ))}
+          {duplicated.map((image, index) => {
+            /*
+              Portrait, matching the studio's own template.
+
+              These were square, and object-cover crops to fill: a 1142x1600
+              page squeezed into a square lost about a seventh off the top and
+              bottom — which is where the heading, the name and the dates are.
+              The tile is the shape of the paper.
+            */
+            const tile = (
+              <div className="mip-slide-item aspect-[1142/1600] w-44 flex-shrink-0 overflow-hidden rounded-lg border border-line-soft sm:w-48 md:w-56 lg:w-60">
+                <img
+                  src={image.src}
+                  alt={image.alt}
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </div>
+            );
+
+            /*
+              The duplicate half of the loop is hidden from screen readers and
+              taken out of the tab order: it is the same pieces again, and
+              tabbing through everything twice is worse than not at all.
+            */
+            const isDuplicate = index >= images.length;
+
+            return image.href ? (
+              <Link
+                key={index}
+                href={image.href}
+                aria-hidden={isDuplicate || undefined}
+                tabIndex={isDuplicate ? -1 : undefined}
+                className="flex-shrink-0"
+              >
+                {tile}
+              </Link>
+            ) : (
+              <div key={index} aria-hidden={isDuplicate || undefined}>
+                {tile}
+              </div>
+            );
+          })}
         </div>
       </div>
     </>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/*  Default images — curated print/stationery themed stock photos      */
-/* ------------------------------------------------------------------ */
-const DEFAULT_IMAGES = [
-  {
-    src: "https://cdn.21st.dev/assets/mirror/0b/0b2eee3635f20ec932fa27ae8db24eb760045aee6dd53c6cd05b01799761b6fb.jpg",
-    alt: "Elegant printed stationery design 1",
-  },
-  {
-    src: "https://cdn.21st.dev/assets/mirror/a0/a0e1a6affa10f9d1304e1ec7a0a074efa2e5befddbe5f55ec1674ca4606a7272.jpg",
-    alt: "Elegant printed stationery design 2",
-  },
-  {
-    src: "https://cdn.21st.dev/assets/mirror/c5/c50a953b2534eeb024de5eb84901abda556e6a8faa74bb6c13983557f14f02e2.jpg",
-    alt: "Elegant printed stationery design 3",
-  },
-  {
-    src: "https://cdn.21st.dev/assets/mirror/2c/2c3bda48c0009be1f143cfed1b28a012de388bcd39d662df550ec1d28966b864.jpg",
-    alt: "Elegant printed stationery design 4",
-  },
-  {
-    src: "https://cdn.21st.dev/assets/mirror/df/df5b37ca7d83d93ddbece6430932d006f89d70704f4cf14c91bc724b9653ec9f.jpg",
-    alt: "Elegant printed stationery design 5",
-  },
-  {
-    src: "https://cdn.21st.dev/assets/mirror/fe/fe0e5e4058e6fc722507077aa70c1e0fd48ee254ab0bae5512902dc6729ff155.jpg",
-    alt: "Elegant printed stationery design 6",
-  },
-  {
-    src: "https://cdn.21st.dev/assets/mirror/6f/6ff6818c9f0e9b6b28eb7f16f650538626b00cf3b10c36eac6840d280c799636.jpg",
-    alt: "Elegant printed stationery design 7",
-  },
-  {
-    src: "https://cdn.21st.dev/assets/mirror/97/971ee8523c7efc71ed5323f0b7c386b7b09dde6af9bae9bedd7288ca7a787b40.jpg",
-    alt: "Elegant printed stationery design 8",
-  },
-];

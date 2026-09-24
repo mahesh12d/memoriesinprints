@@ -11,6 +11,8 @@ import {
   QUANTITY_PRESETS,
 } from "@/lib/order-form/schema";
 import { ACCEPT_ATTRIBUTE } from "@/lib/storage/uploads";
+
+type UploadedFile = { key: string; name: string; size: number; type: string };
 import type { OrderFormRow, ProductChoice } from "./types";
 
 const inputClass =
@@ -107,11 +109,21 @@ function Section({
 }
 
 export function OrderForm({
-  enquiryId,
+  orderId,
+  addressDefaults,
   saved,
   products,
 }: {
-  enquiryId: string;
+  orderId: string;
+  /** The account's address, so the delivery block starts filled in. */
+  addressDefaults: {
+    shippingName: string;
+    shippingLine1: string;
+    shippingLine2: string;
+    shippingCity: string;
+    shippingPostcode: string;
+    shippingCountry: string;
+  };
   saved: OrderFormRow | null;
   products: ProductChoice[];
 }) {
@@ -129,70 +141,108 @@ export function OrderForm({
   const [insideStyle, setInsideStyle] = useState(saved?.insidePagesStyle ?? "");
   const [quantity, setQuantity] = useState(saved?.quantity ?? DEFAULT_QUANTITY);
   const [bespoke, setBespoke] = useState(saved?.bespokeDesign ?? false);
-  const [suppliedVia, setSuppliedVia] = useState(saved?.photoSuppliedVia ?? "");
   const [callback, setCallback] = useState(saved?.callbackRequested ?? false);
 
   const [rows, setRows] = useState(saved?.additionalProducts ?? []);
-  const [attachment, setAttachment] = useState(
-    saved?.attachmentKey
-      ? { key: saved.attachmentKey, name: saved.attachmentName ?? "Attached file" }
-      : null,
-  );
-  const [uploading, setUploading] = useState(false);
+  /**
+   * Every file sent so far.
+   *
+   * Seeded from the array, falling back to the single attachment a form saved
+   * before multiple files were allowed — otherwise reopening an older form
+   * would silently lose what was already sent.
+   */
+  const [files, setFiles] = useState<UploadedFile[]>(() => {
+    if (saved?.attachments?.length) return saved.attachments;
+    if (saved?.attachmentKey) {
+      return [
+        {
+          key: saved.attachmentKey,
+          name: saved.attachmentName ?? "Attached file",
+          size: 0,
+          type: "",
+        },
+      ];
+    }
+    return [];
+  });
+
+  /** Files currently in flight, by name, so each row can speak for itself. */
+  const [inFlight, setInFlight] = useState<string[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const uploading = inFlight.length > 0;
 
   /**
-   * Sends the file to storage before the form is submitted, and keeps only
-   * the key it was given. The bytes never pass through the server action, so
-   * a large photograph can't time the submission out.
+  /**
+   * Sends one file to storage and returns what the form should remember.
+   *
+   * The bytes go straight to object storage rather than through the server
+   * action, so a folder of photographs cannot time the submission out.
    */
-  async function upload(file: File) {
-    setUploading(true);
-    setUploadError(null);
+  async function uploadOne(file: File): Promise<UploadedFile | null> {
+    const ticket = await fetch(`/api/order-form/${orderId}/attachment`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fileName: file.name,
+        contentType: file.type,
+        size: file.size,
+      }),
+    }).then((response) => response.json());
 
-    try {
-      const ticket = await fetch(
-        `/api/order-form/${enquiryId}/attachment`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fileName: file.name,
-            contentType: file.type,
-            size: file.size,
-          }),
-        },
-      ).then((response) => response.json());
-
-      if (!ticket?.uploadUrl) {
-        setUploadError(ticket?.error ?? "That file couldn't be sent. Try again.");
-        return;
-      }
-
-      const put = await fetch(ticket.uploadUrl, {
-        method: "PUT",
-        headers: { "Content-Type": file.type },
-        body: file,
-      });
-
-      if (!put.ok) {
-        setUploadError("That file couldn't be sent. Try again.");
-        return;
-      }
-
-      setAttachment({ key: ticket.storageKey, name: file.name });
-    } catch {
-      setUploadError("That file couldn't be sent. Try again.");
-    } finally {
-      setUploading(false);
+    if (!ticket?.uploadUrl) {
+      throw new Error(ticket?.error ?? "That file couldn't be sent.");
     }
+
+    const put = await fetch(ticket.uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": file.type },
+      body: file,
+    });
+
+    if (!put.ok) throw new Error("That file couldn't be sent.");
+
+    return {
+      key: ticket.storageKey,
+      name: file.name,
+      size: file.size,
+      type: file.type,
+    };
   }
 
   /**
-   * Once it is sent, the form is replaced here and now rather than waiting
-   * for the page to be reloaded. Returning nothing would leave whoever just
-   * pressed the button looking at an empty page, unsure it worked.
+   * Takes everything chosen at once.
+   *
+   * Uploaded one at a time rather than all in parallel: twenty photographs
+   * fired together will saturate a phone's connection and are more likely to
+   * fail together than to arrive faster. Each one that lands is kept even if
+   * a later one fails, so nobody has to start the whole set again.
    */
+  async function uploadMany(chosen: File[]) {
+    setUploadError(null);
+    setInFlight(chosen.map((file) => file.name));
+
+    const failed: string[] = [];
+
+    for (const file of chosen) {
+      try {
+        const done = await uploadOne(file);
+        if (done) setFiles((current) => [...current, done]);
+      } catch {
+        failed.push(file.name);
+      } finally {
+        setInFlight((current) => current.filter((name) => name !== file.name));
+      }
+    }
+
+    if (failed.length === 1) {
+      setUploadError(`${failed[0]} couldn't be sent. Try it again.`);
+    } else if (failed.length > 1) {
+      setUploadError(
+        `${failed.length} files couldn't be sent: ${failed.join(", ")}.`,
+      );
+    }
+  }
+
   if (state.ok && state.message === "Order form received.") {
     return (
       <div className="flex flex-col gap-4 rounded-md border border-brand-line bg-brand-tint p-10">
@@ -207,7 +257,7 @@ export function OrderForm({
 
   return (
     <form action={formAction} className="flex flex-col gap-10">
-      <input type="hidden" name="enquiryId" value={enquiryId} />
+      <input type="hidden" name="orderId" value={orderId} />
 
       {state.message && (
         <p
@@ -321,7 +371,76 @@ export function OrderForm({
         </div>
       </Section>
 
+      {/*
+        Who placed it, before anything about the service.
+
+        This is the top block of the studio's paper form for a reason: a
+        funeral director is a branch with several arrangers, and when the
+        studio rings about a detail they need the person who wrote it, not the
+        account it arrived from.
+      */}
+      <Section
+        title="Who is placing this order"
+        intro="So we know who to come back to if we have a question."
+      >
+        <Row label="Branch" name="branchName" error={errors.branchName}>
+          <input
+            id="branchName"
+            name="branchName"
+            maxLength={200}
+            defaultValue={saved?.branchName ?? ""}
+            className={`${inputClass} ${errors.branchName ? errorClass : ""}`}
+          />
+        </Row>
+
+        <Row label="Arranger" name="arrangerName" error={errors.arrangerName}>
+          <input
+            id="arrangerName"
+            name="arrangerName"
+            autoComplete="name"
+            maxLength={200}
+            defaultValue={saved?.arrangerName ?? ""}
+            className={`${inputClass} ${errors.arrangerName ? errorClass : ""}`}
+          />
+        </Row>
+      </Section>
+
       <Section title="The booklet">
+        {/*
+          Codes read off the studio's printed catalogue. An arranger sitting
+          with a family has it open in front of them, and copying the code is
+          quicker and less error-prone than finding the same design again in a
+          list on screen.
+        */}
+        <Row
+          label="Cover design code"
+          name="coverDesignCode"
+          error={errors.coverDesignCode}
+          hint="From the catalogue, if you have it to hand."
+        >
+          <input
+            id="coverDesignCode"
+            name="coverDesignCode"
+            maxLength={60}
+            defaultValue={saved?.coverDesignCode ?? ""}
+            className={`w-[200px] ${inputClass} ${errors.coverDesignCode ? errorClass : ""}`}
+          />
+        </Row>
+
+        <Row
+          label="Inside pages code"
+          name="insidePagesCode"
+          error={errors.insidePagesCode}
+        >
+          <input
+            id="insidePagesCode"
+            name="insidePagesCode"
+            maxLength={60}
+            defaultValue={saved?.insidePagesCode ?? ""}
+            className={`w-[200px] ${inputClass} ${errors.insidePagesCode ? errorClass : ""}`}
+          />
+        </Row>
+
         <input type="hidden" name="photoOption" value={photoOption} />
         <Row label="A photograph on the cover" name="photoOption" error={errors.photoOption}>
           <div className="grid gap-2.5 sm:grid-cols-3">
@@ -406,15 +525,36 @@ export function OrderForm({
           </div>
         </Row>
 
-        <label className="flex items-center gap-3 text-[15px]">
+        {/*
+          Optional, and shaped like it: a tick that opens a box, rather than a
+          field sitting open asking to be filled in. Most orders are a
+          catalogue design, and an empty box on every one of them reads as
+          something left undone.
+        */}
+        <label
+          className={`flex cursor-pointer items-start gap-3 rounded-md border p-4 transition-colors ${
+            bespoke
+              ? "border-brand bg-brand-tint"
+              : "border-line bg-card hover:border-field-line"
+          }`}
+        >
           <input
             type="checkbox"
             name="bespokeDesign"
             checked={bespoke}
             onChange={(event) => setBespoke(event.target.checked)}
-            className="size-4"
+            className="mt-0.5 size-4 accent-[color:var(--color-brand-deep)]"
           />
-          I would like something designed specially
+          <span className="flex flex-col gap-1">
+            <span className="text-[15px] font-semibold">
+              I would like something designed specially
+            </span>
+            <span className="text-[13px] leading-relaxed text-ink-muted">
+              Optional. Tick this and tell us what you have in mind, and a
+              designer will work from your description rather than a catalogue
+              design.
+            </span>
+          </span>
         </label>
 
         {bespoke && (
@@ -437,9 +577,19 @@ export function OrderForm({
 
       <Section
         title="Photographs"
-        intro="Send them however is easiest. If you would rather post originals, we scan them and send them back with the order."
+        intro="Add them below and they come straight through to the studio."
       >
-        <div className="grid gap-6 sm:grid-cols-2">
+        {/*
+          The allowance, stated before the field that counts them.
+          It is on the studio's paper form and it is the one thing here that
+          changes the price, so someone should not have to be told afterwards.
+        */}
+        <p className="rounded-[4px] bg-surface-grey px-[14px] py-3 text-[13px] leading-relaxed text-ink-soft">
+          Two photographs are included in the price. Any more are &pound;5.00
+          each, and we will confirm the total with you before printing.
+        </p>
+
+        <div>
           <Row
             label="How many photographs"
             name="photoQty"
@@ -456,19 +606,6 @@ export function OrderForm({
             />
           </Row>
 
-          <div>
-            <input type="hidden" name="photoSuppliedVia" value={suppliedVia} />
-            <Row label="How you'll send them" name="photoSuppliedVia" error={errors.photoSuppliedVia}>
-              <div className="grid gap-2.5 sm:grid-cols-2">
-                <Choice name="suppliedChoice" value="email" checked={suppliedVia === "email"} onChange={setSuppliedVia}>
-                  By email
-                </Choice>
-                <Choice name="suppliedChoice" value="post" checked={suppliedVia === "post"} onChange={setSuppliedVia}>
-                  By post
-                </Choice>
-              </div>
-            </Row>
-          </div>
         </div>
 
         <Row
@@ -487,43 +624,132 @@ export function OrderForm({
           />
         </Row>
 
-        <input type="hidden" name="attachmentKey" value={attachment?.key ?? ""} />
-        <input type="hidden" name="attachmentName" value={attachment?.name ?? ""} />
+        <input
+          type="hidden"
+          name="attachments"
+          value={JSON.stringify(files)}
+        />
 
-        <Row label="Attach a file" name="attachment" hint="One file, if you have something ready to send now.">
-          <div className="flex flex-col gap-3">
+        <Row
+          label="Photographs and artwork"
+          name="attachment"
+          hint="Add as many as you need — the cover, the inside pages, the back. JPEG, PNG, WebP or PDF, up to 25MB each."
+        >
+          <div className="flex flex-col gap-4">
+            {/*
+              A label styled as a drop area rather than a bare file input.
+              The input itself stays in the DOM and keyboard-reachable; only
+              its default appearance is replaced, so focus and the file picker
+              behave exactly as the browser intends.
+            */}
+            <label
+              htmlFor="attachment"
+              className="flex cursor-pointer flex-col items-center gap-2 rounded-md border border-dashed border-field-line bg-surface-grey/40 px-6 py-8 text-center transition-colors hover:border-brand hover:bg-brand-tint/40"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                className="h-7 w-7 text-ink-pale"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 16V4" />
+                <path d="m7.5 8.5 4.5-4.5 4.5 4.5" />
+                <path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15" />
+              </svg>
+              <span className="text-sm font-semibold text-ink-soft">
+                Choose files
+              </span>
+              <span className="text-[12px] text-ink-quiet">
+                You can select several at once
+              </span>
+            </label>
+
             <input
               id="attachment"
               type="file"
+              multiple
               accept={ACCEPT_ATTRIBUTE}
               onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) void upload(file);
+                const chosen = Array.from(event.target.files ?? []);
+                // Cleared so choosing the same file twice still fires.
+                event.target.value = "";
+                if (chosen.length) void uploadMany(chosen);
               }}
-              className="rounded-[3px] border border-field-line bg-card px-3 py-2.5 text-sm file:mr-3 file:rounded-[2px] file:border-0 file:bg-surface-grey file:px-3 file:py-1.5 file:text-[13px] file:font-semibold"
+              className="sr-only"
             />
 
-            {uploading && (
-              <p role="status" className="text-[13px] text-ink-muted">
-                Sending…
-              </p>
+            {(files.length > 0 || inFlight.length > 0) && (
+              <ul
+                aria-label="Attached files"
+                aria-busy={uploading}
+                className="flex flex-col divide-y divide-line-soft rounded-md border border-line"
+              >
+                {files.map((file) => (
+                  <li
+                    key={file.key}
+                    className="flex items-center justify-between gap-4 px-4 py-3"
+                  >
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <span className="text-good-deep" aria-hidden="true">
+                        <svg viewBox="0 0 12 12" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M2.5 6.5 5 9l4.5-5" />
+                        </svg>
+                      </span>
+                      <span className="truncate text-[13px]">{file.name}</span>
+                      {file.size > 0 && (
+                        <span className="shrink-0 text-[12px] text-ink-quiet">
+                          {Math.max(1, Math.round(file.size / 1024))} KB
+                        </span>
+                      )}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFiles((current) =>
+                          current.filter((row) => row.key !== file.key),
+                        )
+                      }
+                      className="shrink-0 text-[12px] font-semibold text-ink-quiet hover:text-alert hover:underline"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+
+                {inFlight.map((name) => (
+                  <li
+                    key={`sending-${name}`}
+                    className="flex items-center gap-2.5 px-4 py-3"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-line border-t-brand"
+                    />
+                    <span className="truncate text-[13px] text-ink-muted">
+                      Sending {name}…
+                    </span>
+                  </li>
+                ))}
+              </ul>
             )}
 
-            {attachment && !uploading && (
-              <p className="flex items-center gap-3 text-[13px] text-good-deep">
-                {attachment.name} is attached.
-                <button
-                  type="button"
-                  onClick={() => setAttachment(null)}
-                  className="font-semibold text-ink-quiet underline"
-                >
-                  Remove
-                </button>
+            {files.length > 0 && !uploading && (
+              <p role="status" className="text-[12px] text-ink-quiet">
+                {files.length === 1
+                  ? "1 file attached."
+                  : `${files.length} files attached.`}
               </p>
             )}
 
             {uploadError && (
-              <p className="text-[13px] font-medium text-alert">{uploadError}</p>
+              <p className="text-[13px] font-semibold text-alert" role="alert">
+                {uploadError}
+              </p>
             )}
           </div>
         </Row>
@@ -706,6 +932,86 @@ export function OrderForm({
             />
           </Row>
         )}
+      </Section>
+
+      {/*
+        Where it goes, as its own block at the end of the form.
+
+        Filled in from the account already, because a funeral director sends
+        nearly everything to the same place — but editable, because the order
+        that goes to a family's house instead is exactly the one nobody wants
+        to get wrong. Editing here changes this order only; the account
+        address is left alone.
+      */}
+      <Section
+        title="Where should we send it?"
+        intro="Taken from your account. Change it if this order is going somewhere else."
+      >
+        <Row label="Addressed to" name="shippingName" error={errors.shippingName}>
+          <input
+            id="shippingName"
+            name="shippingName"
+            autoComplete="name"
+            maxLength={200}
+            defaultValue={addressDefaults.shippingName}
+            className={`${inputClass} ${errors.shippingName ? errorClass : ""}`}
+          />
+        </Row>
+
+        <Row label="Address" name="shippingLine1" error={errors.shippingLine1}>
+          <input
+            id="shippingLine1"
+            name="shippingLine1"
+            autoComplete="address-line1"
+            maxLength={200}
+            defaultValue={addressDefaults.shippingLine1}
+            className={`${inputClass} ${errors.shippingLine1 ? errorClass : ""}`}
+          />
+        </Row>
+
+        <Row label="Address line 2" name="shippingLine2" error={errors.shippingLine2}>
+          <input
+            id="shippingLine2"
+            name="shippingLine2"
+            autoComplete="address-line2"
+            maxLength={200}
+            defaultValue={addressDefaults.shippingLine2}
+            className={`${inputClass} ${errors.shippingLine2 ? errorClass : ""}`}
+          />
+        </Row>
+
+        <Row label="Town or city" name="shippingCity" error={errors.shippingCity}>
+          <input
+            id="shippingCity"
+            name="shippingCity"
+            autoComplete="address-level2"
+            maxLength={120}
+            defaultValue={addressDefaults.shippingCity}
+            className={`w-[320px] ${inputClass} ${errors.shippingCity ? errorClass : ""}`}
+          />
+        </Row>
+
+        <Row label="Postcode" name="shippingPostcode" error={errors.shippingPostcode}>
+          <input
+            id="shippingPostcode"
+            name="shippingPostcode"
+            autoComplete="postal-code"
+            maxLength={20}
+            defaultValue={addressDefaults.shippingPostcode}
+            className={`w-[200px] ${inputClass} ${errors.shippingPostcode ? errorClass : ""}`}
+          />
+        </Row>
+
+        <Row label="Country" name="shippingCountry" error={errors.shippingCountry}>
+          <input
+            id="shippingCountry"
+            name="shippingCountry"
+            autoComplete="country-name"
+            maxLength={120}
+            defaultValue={addressDefaults.shippingCountry}
+            className={`w-[320px] ${inputClass} ${errors.shippingCountry ? errorClass : ""}`}
+          />
+        </Row>
       </Section>
 
       <div className="flex flex-wrap items-center gap-4 border-t border-line pt-8">

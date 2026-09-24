@@ -83,8 +83,6 @@ export const insidePagesStyle = pgEnum("inside_pages_style", [
   "match_cover",
 ]);
 
-export const photoSuppliedVia = pgEnum("photo_supplied_via", ["email", "post"]);
-
 export const proofStatus = pgEnum("proof_status", [
   "awaiting_proofreading",
   "returned_to_designer",
@@ -381,10 +379,33 @@ export const orderForms = pgTable(
   "order_forms",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    enquiryId: uuid("enquiry_id")
-      .notNull()
-      .references(() => enquiries.id, { onDelete: "cascade" }),
+    /**
+     * The order this form belongs to.
+     *
+     * The form used to hang off an enquiry, which was wrong for how the studio
+     * actually works: an enquiry is a question about the business and never
+     * becomes an order, while every order needs these details before a
+     * designer can draw anything. Nullable only so the column could be added
+     * to rows that already existed.
+     */
+    orderId: uuid("order_id").references(() => orders.id, {
+      onDelete: "cascade",
+    }),
+    /** Kept for the forms written before the move, and for nothing new. */
+    enquiryId: uuid("enquiry_id").references(() => enquiries.id, {
+      onDelete: "cascade",
+    }),
     status: orderFormStatus("status").notNull().default("draft"),
+
+    /**
+     * Who placed it, inside the funeral home.
+     *
+     * A director is a branch with several arrangers, and the studio rings the
+     * person who wrote the form rather than the account it came from. Both are
+     * on the paper form for exactly that reason.
+     */
+    branchName: varchar("branch_name", { length: 200 }),
+    arrangerName: varchar("arranger_name", { length: 200 }),
 
     /* Deceased details */
     deceasedName: varchar("deceased_name", { length: 200 }),
@@ -398,6 +419,15 @@ export const orderForms = pgTable(
     venueName: varchar("venue_name", { length: 300 }),
 
     /* Design */
+    /**
+     * The codes off the studio's own catalogue.
+     *
+     * An arranger sitting with a family has the printed catalogue open and
+     * reads the code from it — asking them to find the same design again in a
+     * web list is slower and gets it wrong.
+     */
+    coverDesignCode: varchar("cover_design_code", { length: 60 }),
+    insidePagesCode: varchar("inside_pages_code", { length: 60 }),
     photoOption: photoOption("photo_option"),
     numberOfPages: integer("number_of_pages"),
     insidePagesStyle: insidePagesStyle("inside_pages_style"),
@@ -407,9 +437,20 @@ export const orderForms = pgTable(
 
     /* Photographs */
     photoQty: integer("photo_qty"),
-    photoSuppliedVia: photoSuppliedVia("photo_supplied_via"),
     photoInstructions: text("photo_instructions"),
-    /** Object key in storage, never a public URL — reads go through a signed link. */
+    /**
+     * Object keys in storage, never public URLs — reads go through a signed
+     * link.
+     *
+     * An array because an order of service is not one picture: there is a
+     * cover, the inside pages and a back, and a twenty-page booklet can carry
+     * twenty photographs. The two single-file columns below are what this
+     * replaced, kept so forms saved before the change still open.
+     */
+    attachments: jsonb("attachments")
+      .$type<{ key: string; name: string; size: number; type: string }[]>()
+      .notNull()
+      .default([]),
     attachmentKey: text("attachment_key"),
     attachmentName: text("attachment_name"),
 
@@ -423,6 +464,14 @@ export const orderForms = pgTable(
     callbackRequested: boolean("callback_requested").notNull().default(false),
     callbackPhone: varchar("callback_phone", { length: 60 }),
 
+    /* Where it is going. Prefilled from the account, editable per order. */
+    shippingName: varchar("shipping_name", { length: 200 }),
+    shippingLine1: varchar("shipping_line1", { length: 200 }),
+    shippingLine2: varchar("shipping_line2", { length: 200 }),
+    shippingCity: varchar("shipping_city", { length: 120 }),
+    shippingPostcode: varchar("shipping_postcode", { length: 20 }),
+    shippingCountry: varchar("shipping_country", { length: 120 }),
+
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -431,7 +480,11 @@ export const orderForms = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [uniqueIndex("order_forms_enquiry_unique").on(t.enquiryId)],
+  (t) => [
+    uniqueIndex("order_forms_enquiry_unique").on(t.enquiryId),
+    // One form per order.
+    uniqueIndex("order_forms_order_unique").on(t.orderId),
+  ],
 );
 
 export const orders = pgTable(
@@ -537,6 +590,21 @@ export const proofVersions = pgTable(
       .notNull()
       .references(() => orders.id, { onDelete: "cascade" }),
     versionNumber: integer("version_number").notNull(),
+    /**
+     * The sheets of this proof, in reading order.
+     *
+     * A booklet is 4 to 16 pages and every one of them has to be checked, so
+     * a proof is a sequence rather than a file. One image per sheet: it is
+     * what the pins are placed on, and it needs no rendering step that can
+     * fail on an older browser.
+     *
+     * storageKey below is the first sheet, kept so proofs uploaded before
+     * this still open.
+     */
+    sheets: jsonb("sheets")
+      .$type<{ key: string; name: string; width: number; height: number }[]>()
+      .notNull()
+      .default([]),
     /** Object key in R2. Never a public URL — reads go through a signed link. */
     storageKey: text("storage_key").notNull(),
     fileName: text("file_name"),
@@ -594,6 +662,13 @@ export const proofComments = pgTable(
       onDelete: "set null",
     }),
     body: text("body").notNull(),
+    /**
+     * Which sheet the pin is on, counting from zero.
+     *
+     * Defaults to the first, which is where every comment made before proofs
+     * had more than one sheet belongs.
+     */
+    sheetIndex: integer("sheet_index").notNull().default(0),
     /** 0–100, relative to the rendered image, so a pin survives any resize. */
     xPct: doublePrecision("x_pct").notNull(),
     yPct: doublePrecision("y_pct").notNull(),

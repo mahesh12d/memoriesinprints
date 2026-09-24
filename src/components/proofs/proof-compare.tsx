@@ -1,16 +1,21 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { renderPdfFirstPage } from "@/lib/proofs/render-pdf";
+import { useState } from "react";
 
 export type CompareVersion = {
   versionNumber: number;
   fileUrl: string;
-  isPdf: boolean;
   fileName: string | null;
 };
 
-/** One proof, drawn to fill its box. PDFs render; images just load. */
+/**
+ * One sheet, drawn to fill its box.
+ *
+ * Proofs are images, so this is an <img> and nothing more. It used to render
+ * PDFs to a canvas, which could only ever compare the first page of each
+ * version — on a twelve-page booklet, the one page least likely to have
+ * changed.
+ */
 function Sheet({
   version,
   label,
@@ -18,54 +23,14 @@ function Sheet({
   version: CompareVersion;
   label: string;
 }) {
-  const boxRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    if (!version.isPdf) return;
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        await renderPdfFirstPage(
-          version.fileUrl,
-          canvas,
-          boxRef.current?.clientWidth ?? 700,
-        );
-      } catch (error) {
-        console.error("[proof] could not render pdf for comparison", error);
-        if (!cancelled) setFailed(true);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [version.fileUrl, version.isPdf]);
-
   return (
-    <div ref={boxRef} className="h-full w-full bg-card">
-      {failed ? (
-        <p className="flex h-full items-center justify-center p-6 text-center text-[13px] text-ink-muted">
-          This version won&rsquo;t display here. Open the file to check it.
-        </p>
-      ) : version.isPdf ? (
-        <canvas
-          ref={canvasRef}
-          className="h-full w-full object-contain"
-          aria-label={label}
-        />
-      ) : (
-        /* eslint-disable-next-line @next/next/no-img-element */
-        <img
-          src={version.fileUrl}
-          alt={label}
-          className="h-full w-full object-contain"
-        />
-      )}
+    <div className="h-full w-full bg-card">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={version.fileUrl}
+        alt={label}
+        className="h-full w-full object-contain"
+      />
     </div>
   );
 }

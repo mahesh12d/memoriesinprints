@@ -156,7 +156,15 @@ export async function placeOrderAction(
   revalidatePath("/cart");
   revalidatePath("/account/orders");
 
-  redirect(`/checkout/${created.orderId}`);
+  /**
+   * Straight into the order form, not to the order.
+   *
+   * A designer cannot start without the names, the dates and the venue, so
+   * asking for them at the moment of ordering is the only point at which the
+   * customer is already sitting down to the task. Sent to the order instead,
+   * the form became something to be chased.
+   */
+  redirect(`/order-form/${created.orderId}`);
 }
 
 /**

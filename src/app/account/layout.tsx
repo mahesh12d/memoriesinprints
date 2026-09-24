@@ -17,7 +17,11 @@ import { markNotificationsReadAction } from "@/lib/notifications/actions";
 const NAV = [
   { href: "/account", label: "Dashboard", icon: <GridIcon /> },
   { href: "/account/orders", label: "Orders", icon: <BoxIcon /> },
-  { href: "/account/quotes", label: "Quotes", icon: <MessageIcon /> },
+  {
+    href: "/account/order-forms",
+    label: "Order forms",
+    icon: <MessageIcon />,
+  },
   { href: "/account/saved", label: "Saved items", icon: <HeartIcon /> },
   { href: "/account/profile", label: "Profile", icon: <UserIcon /> },
   { href: "/account/security", label: "Security", icon: <ShieldIcon /> },

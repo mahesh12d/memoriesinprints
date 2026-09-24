@@ -6,7 +6,6 @@ import { db } from "@/db";
 import { notifications, orders, proofComments, proofVersions, users } from "@/db/schema";
 import { requireUser } from "@/lib/auth/guards";
 import { signedReadUrl } from "@/lib/storage/storage";
-import { isPdf } from "@/lib/storage/uploads";
 import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
 import { ProofReviewer } from "@/components/proofs/proof-reviewer";
 import { isUuid } from "@/lib/utils";
@@ -37,6 +36,7 @@ export default async function ProofReviewPage({
     .select({
       id: proofVersions.id,
       versionNumber: proofVersions.versionNumber,
+      sheets: proofVersions.sheets,
       storageKey: proofVersions.storageKey,
       mimeType: proofVersions.mimeType,
       status: proofVersions.status,
@@ -73,6 +73,7 @@ export default async function ProofReviewPage({
     .select({
       id: proofComments.id,
       body: proofComments.body,
+      sheetIndex: proofComments.sheetIndex,
       xPct: proofComments.xPct,
       yPct: proofComments.yPct,
       pinNumber: proofComments.pinNumber,
@@ -84,7 +85,26 @@ export default async function ProofReviewPage({
     .where(eq(proofComments.proofVersionId, version.id))
     .orderBy(asc(proofComments.pinNumber));
 
-  const fileUrl = await signedReadUrl(version.storageKey);
+  /**
+   * Every sheet of this proof, signed for reading.
+   *
+   * A proof saved before it had sheets has only its single storageKey, so
+   * that becomes a one-sheet proof rather than an empty one.
+   */
+  const stored =
+    version.sheets.length > 0
+      ? version.sheets
+      : [{ key: version.storageKey, name: "Proof", width: 0, height: 0 }];
+
+  const sheets = await Promise.all(
+    stored.map(async (sheet) => ({
+      key: sheet.key,
+      name: sheet.name,
+      url: await signedReadUrl(sheet.key),
+    })),
+  );
+
+  const fileUrl = sheets[0]?.url ?? "";
 
   // Opening the proof clears the notification that brought them here.
   await db
@@ -113,14 +133,14 @@ export default async function ProofReviewPage({
       <PortalBody>
         <ProofReviewer
           proofVersionId={version.id}
-          fileUrl={fileUrl}
+          sheets={sheets}
           downloadUrl={fileUrl}
-          isPdf={isPdf(version.mimeType)}
           status={version.status}
           versionNumber={version.versionNumber}
           comments={rows.map((row) => ({
             id: row.id,
             body: row.body,
+            sheetIndex: row.sheetIndex,
             xPct: row.xPct,
             yPct: row.yPct,
             pinNumber: row.pinNumber,

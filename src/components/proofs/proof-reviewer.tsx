@@ -9,21 +9,23 @@ import {
 } from "@/lib/proofs/actions";
 import { emptyFormState, type FormState } from "@/lib/auth/form-state";
 import { FormMessage } from "@/components/ui/form";
-import { ProofCanvas, type ProofComment } from "./proof-canvas";
+import {
+  ProofCanvas,
+  type ProofComment,
+  type ProofSheet,
+} from "./proof-canvas";
 
 export function ProofReviewer({
   proofVersionId,
-  fileUrl,
+  sheets,
   downloadUrl,
-  isPdf,
   comments,
   status,
   versionNumber,
 }: {
   proofVersionId: string;
-  fileUrl: string;
+  sheets: ProofSheet[];
   downloadUrl: string;
-  isPdf: boolean;
   comments: ProofComment[];
   status: string;
   versionNumber: number;
@@ -34,8 +36,27 @@ export function ProofReviewer({
   const [state, setState] = useState<FormState>(emptyFormState);
   const [busy, startTransition] = useTransition();
 
+  const [activeSheet, setActiveSheet] = useState(0);
+
+  /**
+   * Which sheets have actually been opened.
+   *
+   * The first one has been, by definition — it is on screen. The rest are
+   * added as they are visited, and approval waits until the set is complete:
+   * on a sixteen-page booklet printed a hundred times over, "I never saw page
+   * six" is a reprint, not a note.
+   */
+  const [seenSheets, setSeenSheets] = useState<Set<number>>(new Set([0]));
+
+  function openSheet(index: number) {
+    setActiveSheet(index);
+    setPending(null);
+    setSeenSheets((current) => new Set(current).add(index));
+  }
+
   const decided = status === "approved" || status === "changes_requested";
   const readOnly = decided;
+  const allSeen = seenSheets.size >= sheets.length;
 
   function submitComment() {
     if (!pending || !draft.trim()) return;
@@ -43,6 +64,7 @@ export function ProofReviewer({
     const formData = new FormData();
     formData.set("proofVersionId", proofVersionId);
     formData.set("body", draft);
+    formData.set("sheetIndex", String(activeSheet));
     formData.set("xPct", String(pending.xPct));
     formData.set("yPct", String(pending.yPct));
 
@@ -69,14 +91,16 @@ export function ProofReviewer({
   return (
     <div className="grid gap-8 lg:grid-cols-[1.7fr_1fr]">
       <ProofCanvas
-        fileUrl={fileUrl}
-        isPdf={isPdf}
+        sheets={sheets}
         comments={comments}
         readOnly={readOnly}
         pending={pending}
         onPlace={setPending}
         activeCommentId={activeCommentId}
         onSelectComment={setActiveCommentId}
+        activeSheet={activeSheet}
+        onSelectSheet={openSheet}
+        seenSheets={seenSheets}
       />
 
       <aside className="flex h-fit flex-col gap-5">
@@ -219,14 +243,30 @@ export function ProofReviewer({
               charge for changes.
             </p>
             <div className="mt-1 flex flex-col gap-2.5">
+              {/*
+                Approval waits until every page has been opened. Not a nag —
+                approving is the moment a booklet goes to print in the
+                hundreds, and a page nobody looked at is a reprint the studio
+                pays for.
+              */}
               <button
                 type="button"
                 onClick={() => decide("approve")}
-                disabled={busy}
+                disabled={busy || !allSeen}
                 className="rounded-[2px] bg-brand px-6 py-3.5 text-sm font-semibold text-on-accent hover:bg-brand-deep hover:text-white disabled:opacity-60"
               >
                 Approve this proof
               </button>
+
+              {!allSeen && (
+                <p className="text-[12px] leading-relaxed text-pending-deep">
+                  Have a look at{" "}
+                  {sheets.length - seenSheets.size === 1
+                    ? "the remaining page"
+                    : `the other ${sheets.length - seenSheets.size} pages`}{" "}
+                  before approving.
+                </p>
+              )}
               <button
                 type="button"
                 onClick={() => decide("changes")}

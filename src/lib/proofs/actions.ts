@@ -57,13 +57,34 @@ export async function uploadProofAction(
   }
 
   const orderId = String(formData.get("orderId") ?? "");
-  const file = formData.get("file");
+
+  /**
+   * One image per sheet, in the order they were chosen.
+   *
+   * A booklet is four to sixteen pages and the customer has to be able to
+   * check every one of them, so a proof is a sequence rather than a file.
+   */
+  const chosen = formData
+    .getAll("file")
+    .filter((entry): entry is File => entry instanceof File && entry.size > 0);
 
   if (!orderId) return fail("Missing order.");
-  if (!(file instanceof File)) return fail("Choose a file to upload.");
+  if (chosen.length === 0) return fail("Choose the pages to upload.");
 
-  const check = checkUpload({ type: file.type, size: file.size, name: file.name });
-  if (!check.ok) return fail(check.reason);
+  for (const one of chosen) {
+    const check = checkUpload({
+      type: one.type,
+      size: one.size,
+      name: one.name,
+    });
+    if (!check.ok) return fail(`${one.name}: ${check.reason}`);
+
+    if (!one.type.startsWith("image/")) {
+      return fail(
+        `${one.name} is not an image. Export each page of the proof as a JPEG, PNG or WebP so the customer can mark it up.`,
+      );
+    }
+  }
 
   const [order] = await db
     .select({
@@ -87,15 +108,21 @@ export async function uploadProofAction(
     return fail("That order is assigned to another designer.");
   }
 
-  const storageKey = buildStorageKey(`proofs/${order.reference}`, file.name);
-  const bytes = Buffer.from(await file.arrayBuffer());
+  const sheets: { key: string; name: string; width: number; height: number }[] =
+    [];
 
   try {
-    await putObject(storageKey, bytes, check.mimeType);
+    for (const one of chosen) {
+      const key = buildStorageKey(`proofs/${order.reference}`, one.name);
+      await putObject(key, Buffer.from(await one.arrayBuffer()), one.type);
+      // Dimensions are not read server-side; the browser lays out from the
+      // image itself and pins are stored as percentages, so they add nothing.
+      sheets.push({ key, name: one.name, width: 0, height: 0 });
+    }
   } catch (error) {
     console.error("[proofs] upload failed", error);
     return fail(
-      "We couldn't store that file. Nothing has changed — please try again.",
+      "We couldn't store those files. Nothing has changed — please try again.",
     );
   }
 
@@ -110,10 +137,13 @@ export async function uploadProofAction(
   await db.insert(proofVersions).values({
     orderId,
     versionNumber: nextVersion,
-    storageKey,
-    fileName: file.name,
-    mimeType: check.mimeType,
-    sizeBytes: file.size,
+    sheets,
+    // The first sheet also fills the single-file columns, so anything still
+    // reading them — the archive, the compare view — keeps working.
+    storageKey: sheets[0].key,
+    fileName: chosen[0].name,
+    mimeType: chosen[0].type,
+    sizeBytes: chosen.reduce((total, one) => total + one.size, 0),
     uploadedById: session.user.id,
     status: "awaiting_proofreading",
   });
@@ -137,14 +167,17 @@ export async function uploadProofAction(
     orderId,
     actorId: session.user.id,
     type: "proof_uploaded",
-    summary: `${session.user.name} uploaded a proof for ${order.reference}`,
+    summary: `${session.user.name} uploaded a proof for ${order.reference} (${chosen.length} page${chosen.length === 1 ? "" : "s"})`,
   });
 
   revalidatePath(`/staff/orders/${orderId}`);
   revalidatePath("/staff");
   revalidatePath("/staff/queue");
 
-  return { ok: true, message: "Proof uploaded and sent for proofreading." };
+  return {
+    ok: true,
+    message: `${chosen.length} page${chosen.length === 1 ? "" : "s"} uploaded and sent for proofreading.`,
+  };
 }
 
 /**
@@ -429,6 +462,16 @@ export async function addProofCommentAction(
   const xPct = Number.parseFloat(String(formData.get("xPct") ?? ""));
   const yPct = Number.parseFloat(String(formData.get("yPct") ?? ""));
 
+  /**
+   * Which sheet the pin belongs to.
+   *
+   * Anything unreadable falls back to the first rather than refusing the
+   * comment: losing which page it was on is recoverable, losing what someone
+   * wrote about their mother's name is not.
+   */
+  const rawSheet = Number.parseInt(String(formData.get("sheetIndex") ?? "0"), 10);
+  const sheetIndex = Number.isFinite(rawSheet) && rawSheet >= 0 ? rawSheet : 0;
+
   if (!body) return fail("Write what you'd like changed.");
   if (!Number.isFinite(xPct) || !Number.isFinite(yPct)) {
     return fail("Click the proof to place your comment.");
@@ -452,8 +495,11 @@ export async function addProofCommentAction(
     proofVersionId,
     authorId: proof.session.user.id,
     body: body.slice(0, 2000),
+    sheetIndex,
     xPct: pin.xPct,
     yPct: pin.yPct,
+    // Numbered across the whole proof, not per sheet, so "pin 7" means one
+    // thing when it is read out over the phone.
     pinNumber: count + 1,
   });
 

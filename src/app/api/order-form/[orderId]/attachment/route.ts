@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { enquiries } from "@/db/schema";
+import { orders } from "@/db/schema";
 import {
   buildStorageKey,
   isRemoteStorageConfigured,
@@ -10,6 +10,7 @@ import {
   signedUploadUrl,
 } from "@/lib/storage/storage";
 import { checkUpload } from "@/lib/storage/uploads";
+import { getSession } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -26,27 +27,37 @@ export const dynamic = "force-dynamic";
  * the key is generated here rather than accepted from the caller so nothing
  * outside this enquiry's folder can be written.
  */
-async function requireEnquiry(enquiryId: string) {
-  if (!z.string().uuid().safeParse(enquiryId).success) return null;
+/**
+ * The order behind this request, or nothing.
+ *
+ * Ownership is checked, not just existence. Before the move these attachments
+ * hung off an enquiry id that was the only credential, so a forwarded link let
+ * a stranger read a family's photographs.
+ */
+async function requireOwnOrder(orderId: string) {
+  if (!z.string().uuid().safeParse(orderId).success) return null;
 
-  const [enquiry] = await db
-    .select({ id: enquiries.id, reference: enquiries.reference })
-    .from(enquiries)
-    .where(eq(enquiries.id, enquiryId))
+  const session = await getSession("site");
+  if (!session) return null;
+
+  const [order] = await db
+    .select({ id: orders.id, reference: orders.reference })
+    .from(orders)
+    .where(and(eq(orders.id, orderId), eq(orders.userId, session.user.id)))
     .limit(1);
 
-  return enquiry ?? null;
+  return order ?? null;
 }
 
 export async function POST(
   request: Request,
-  { params }: { params: Promise<{ enquiryId: string }> },
+  { params }: { params: Promise<{ orderId: string }> },
 ) {
-  const { enquiryId } = await params;
-  const enquiry = await requireEnquiry(enquiryId);
+  const { orderId } = await params;
+  const order = await requireOwnOrder(orderId);
 
   // A made-up id gets the same answer as a missing one.
-  if (!enquiry) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!order) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await request.json().catch(() => null);
   const fileName = String(body?.fileName ?? "").trim();
@@ -59,7 +70,7 @@ export async function POST(
   }
 
   const storageKey = buildStorageKey(
-    `order-forms/${enquiry.reference}`,
+    `order-forms/${order.reference}`,
     fileName,
   );
 
@@ -70,7 +81,7 @@ export async function POST(
     // Falls back to this same route, which accepts the PUT below.
     uploadUrl:
       uploadUrl ??
-      `/api/order-form/${enquiryId}/attachment?key=${encodeURIComponent(storageKey)}`,
+      `/api/order-form/${orderId}/attachment?key=${encodeURIComponent(storageKey)}`,
     direct: uploadUrl !== null,
   });
 }
@@ -78,7 +89,7 @@ export async function POST(
 /** The development fallback: R2 isn't configured, so take the bytes here. */
 export async function PUT(
   request: Request,
-  { params }: { params: Promise<{ enquiryId: string }> },
+  { params }: { params: Promise<{ orderId: string }> },
 ) {
   if (isRemoteStorageConfigured()) {
     return NextResponse.json(
@@ -87,15 +98,15 @@ export async function PUT(
     );
   }
 
-  const { enquiryId } = await params;
-  const enquiry = await requireEnquiry(enquiryId);
-  if (!enquiry) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const { orderId } = await params;
+  const order = await requireOwnOrder(orderId);
+  if (!order) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const storageKey = new URL(request.url).searchParams.get("key") ?? "";
 
-  // The key must be one this route generated for this enquiry, or a caller
+  // The key must be one this route generated for this order, or a caller
   // could write anywhere in the bucket by asking nicely.
-  if (!storageKey.startsWith(`order-forms/${enquiry.reference}/`)) {
+  if (!storageKey.startsWith(`order-forms/${order.reference}/`)) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

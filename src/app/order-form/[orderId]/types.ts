@@ -8,6 +8,8 @@ export type ProductChoice = {
 
 export type OrderFormRow = {
   status: "draft" | "submitted";
+  branchName: string | null;
+  arrangerName: string | null;
   deceasedName: string | null;
   dateOfBirth: string | null;
   dateOfDeath: string | null;
@@ -15,6 +17,8 @@ export type OrderFormRow = {
   funeralDate: string | null;
   funeralTime: string | null;
   venueName: string | null;
+  coverDesignCode: string | null;
+  insidePagesCode: string | null;
   photoOption: string | null;
   numberOfPages: number | null;
   insidePagesStyle: string | null;
@@ -22,8 +26,9 @@ export type OrderFormRow = {
   bespokeDesign: boolean;
   bespokeDetails: string | null;
   photoQty: number | null;
-  photoSuppliedVia: string | null;
   photoInstructions: string | null;
+  /** Everything sent through. The two below are the pre-array form. */
+  attachments: { key: string; name: string; size: number; type: string }[];
   attachmentKey: string | null;
   attachmentName: string | null;
   additionalProducts: {
