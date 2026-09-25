@@ -180,7 +180,7 @@ export default async function OrderFormPage({
   return (
     <Shell>
       <header className="flex flex-col gap-4">
-        <h1 className="text-[34px] leading-tight">Your order of service</h1>
+        <h1 className="text-[34px] leading-tight">Your Order of Service</h1>
         <p className="max-w-[62ch] text-[16px] leading-relaxed text-ink-muted">
           {sent
             ? "You have already sent this. Everything you wrote is below — change what you need to and send it again, and the design team will work from the new version."
@@ -213,7 +213,7 @@ function Received({
   return (
     <Shell>
       <div className="flex flex-col gap-4 rounded-md border border-brand-line bg-brand-tint p-10">
-        <h1 className="text-[30px] leading-tight">Order form received</h1>
+        <h1 className="text-[30px] leading-tight">Order Form Received</h1>
         <p className="max-w-[60ch] text-[16px] leading-relaxed text-ink-muted">
           Thank you. Everything you sent is with the design team, and we will be
           in touch with a proof before anything is printed.

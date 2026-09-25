@@ -188,7 +188,7 @@ export default async function StaffDashboardPage() {
   return (
     <>
       <PortalHeader
-        title="Studio dashboard"
+        title="Studio Dashboard"
         actions={
           <Link
             href="/staff/queue"
@@ -224,7 +224,7 @@ export default async function StaffDashboardPage() {
 
             {routes && (
             <section className="rounded-md border border-line bg-card p-6">
-              <h2 className="font-display text-[15px]">Designer workload</h2>
+              <h2 className="font-display text-[15px]">Designer Workload</h2>
               <ul className="mt-4 flex flex-col gap-3.5">
                 {workload.map((row) => (
                   <li key={row.designerId} className="flex flex-col gap-1.5">
@@ -252,7 +252,7 @@ export default async function StaffDashboardPage() {
 
           <section className="overflow-hidden rounded-md border border-line bg-card">
             <div className="border-b border-line-soft px-6 py-4">
-              <h2 className="font-display text-[15px]">Recent activity</h2>
+              <h2 className="font-display text-[15px]">Recent Activity</h2>
             </div>
             {activity.length === 0 ? (
               <p className="px-6 py-5 text-sm text-ink-muted">

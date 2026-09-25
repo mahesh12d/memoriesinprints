@@ -13,6 +13,9 @@ export const enquirySchema = z.object({
   category: z.enum(["funeral", "wedding", "celebration"], {
     message: "Choose a project type",
   }),
+  userType: z.enum(["funeral_director", "celebrant", "client"], {
+    message: "Tell us which of these you are",
+  }),
   subject: z
     .string()
     .trim()

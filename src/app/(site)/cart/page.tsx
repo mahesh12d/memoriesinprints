@@ -17,7 +17,7 @@ export default async function CartPage() {
     return (
       <Section>
         <div className="mx-auto flex max-w-[52ch] flex-col items-center gap-5 py-12 text-center">
-          <h1 className="text-[34px] leading-tight">Your cart is empty</h1>
+          <h1 className="text-[34px] leading-tight">Your Cart Is Empty</h1>
           <p className="text-[15px] leading-relaxed text-ink-muted">
             Anything you add will wait here. If what you need is bespoke, ask us
             for a quote instead and we&rsquo;ll price it properly.
@@ -46,7 +46,7 @@ export default async function CartPage() {
 
   return (
     <Section>
-      <h1 className="mb-10 text-[34px] leading-tight">Your cart</h1>
+      <h1 className="mb-10 text-[34px] leading-tight">Your Cart</h1>
 
       <div className="grid gap-12 lg:grid-cols-[1.6fr_1fr]">
         <ul className="flex flex-col divide-y divide-line border-y border-line">

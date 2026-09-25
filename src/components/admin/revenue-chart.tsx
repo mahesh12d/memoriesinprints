@@ -18,7 +18,7 @@ export function RevenueChart({ points }: { points: RevenuePoint[] }) {
   if (points.length === 0) {
     return (
       <div className="flex flex-col gap-2">
-        <h2 className="font-display text-[15px]">Taken, last six months</h2>
+        <h2 className="font-display text-[15px]">Taken, Last Six Months</h2>
         <p className="text-[13px] text-ink-muted">
           Nothing has been paid for yet. Once an order is paid, it shows here.
         </p>
@@ -32,7 +32,7 @@ export function RevenueChart({ points }: { points: RevenuePoint[] }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-baseline justify-between gap-4">
-        <h2 className="font-display text-[15px]">Taken, last six months</h2>
+        <h2 className="font-display text-[15px]">Taken, Last Six Months</h2>
         <span className="text-[13px] text-ink-muted">
           <strong className="font-semibold text-blue">
             {formatMoney(total, "GBP")}

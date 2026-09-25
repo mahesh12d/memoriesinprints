@@ -23,7 +23,7 @@ export default function GuidePage() {
             How it works
           </span>
           <h1 className="text-[40px] leading-tight">
-            Your guide to working with us
+            Your Guide to Working with Us
           </h1>
           <p className="text-[15px] leading-relaxed text-ink-muted">
             Everything you need to know before you order — the papers and
@@ -36,7 +36,7 @@ export default function GuidePage() {
       <Section tone="white">
         <SectionHeading
           eyebrow="The order process"
-          title="From browsing to your door"
+          title="From Browsing to Your Door"
           intro="A walkthrough of how any order moves through the studio, start to finish."
         />
 
@@ -62,7 +62,7 @@ export default function GuidePage() {
       <Section>
         <SectionHeading
           eyebrow="Paper &amp; finishing"
-          title="What sets a print studio apart"
+          title="What Sets a Print Studio Apart"
           intro="The stock, the finish, the care in the fold — the things you notice in the hand rather than on a screen."
         />
 
@@ -86,7 +86,7 @@ export default function GuidePage() {
       <Section tone="white" id="faq">
         <SectionHeading
           eyebrow="Questions"
-          title="Answered before you ask"
+          title="Answered Before You Ask"
           intro={`The questions we're asked most often. If yours isn't here, call the studio on ${STUDIO.phone} or email ${STUDIO.email} — ${STUDIO.openingHours}.`}
         />
 
@@ -124,7 +124,7 @@ export default function GuidePage() {
       <Section tone="grey">
         <SectionHeading
           eyebrow="From the studio"
-          title="Guides &amp; resources"
+          title="Guides &amp; Resources"
           intro="Notes from the studio on paper, planning and what to expect when you order with us."
         />
 

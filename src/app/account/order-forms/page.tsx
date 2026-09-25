@@ -47,12 +47,12 @@ export default async function AccountOrderFormsPage() {
 
   return (
     <>
-      <PortalHeader title="Order forms" />
+      <PortalHeader title="Order Forms" />
 
       <PortalBody>
         {rows.length === 0 ? (
           <div className="rounded-md border border-line bg-card p-10 text-center">
-            <h2 className="font-display text-lg">Nothing here yet</h2>
+            <h2 className="font-display text-lg">Nothing Here Yet</h2>
             <p className="mx-auto mt-2 max-w-[46ch] text-sm leading-relaxed text-ink-muted">
               When you place an order we&rsquo;ll ask for the details that go on
               it, and they&rsquo;ll be kept here so you can check or change them.

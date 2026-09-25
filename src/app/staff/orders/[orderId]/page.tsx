@@ -213,7 +213,7 @@ export default async function StaffOrderDetailPage({
 
             {canUpload && (
               <section className="rounded-md border border-line bg-card p-6">
-                <h2 className="font-display text-lg">Upload a proof</h2>
+                <h2 className="font-display text-lg">Upload a Proof</h2>
                 <p className="mb-5 mt-1 text-[13px] text-ink-muted">
                   The order keeps the current proof and the one before it.
                   Uploading replaces the older of the two.
@@ -253,7 +253,7 @@ export default async function StaffOrderDetailPage({
                         canUpload ? (
                           <div className="flex flex-col gap-3 rounded-md border border-brand-line bg-brand-tint p-6">
                             <h3 className="font-display text-[15px]">
-                              Not sent yet
+                              Not Sent Yet
                             </h3>
                             <p className="text-[13px] leading-relaxed text-ink-soft">
                               Nobody else can see this version. Compare it
@@ -277,7 +277,7 @@ export default async function StaffOrderDetailPage({
                         current.status === "awaiting_proofreading" ? (
                         <div className="flex flex-col gap-3 rounded-md border border-line bg-card p-6">
                           <h3 className="font-display text-[15px]">
-                            Checked it?
+                            Checked It?
                           </h3>
                           <p className="text-[13px] leading-relaxed text-ink-muted">
                             Send it on to the customer, or return it to the

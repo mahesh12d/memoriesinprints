@@ -118,19 +118,19 @@ export default async function PortfolioItemPage({
 
   const [agreed] = session
     ? await db
-        .select({
-          amountMinor: customerItemPrices.amountMinor,
-          currency: customerItemPrices.currency,
-        })
-        .from(customerItemPrices)
-        .where(
-          and(
-            eq(customerItemPrices.userId, session.user.id),
-            eq(customerItemPrices.portfolioItemId, item.id),
-            eq(customerItemPrices.isActive, true),
-          ),
-        )
-        .limit(1)
+      .select({
+        amountMinor: customerItemPrices.amountMinor,
+        currency: customerItemPrices.currency,
+      })
+      .from(customerItemPrices)
+      .where(
+        and(
+          eq(customerItemPrices.userId, session.user.id),
+          eq(customerItemPrices.portfolioItemId, item.id),
+          eq(customerItemPrices.isActive, true),
+        ),
+      )
+      .limit(1)
     : [];
 
   const price = agreed
@@ -148,7 +148,7 @@ export default async function PortfolioItemPage({
         <Breadcrumb
           trail={[
             { href: "/", label: "Home" },
-            { href: "/portfolio", label: "Portfolio" },
+            { href: "/portfolio", label: "Designs" },
             { href: categoryHref, label: CATEGORY_LABEL[item.category] },
             { label: item.title },
           ]}
@@ -183,7 +183,7 @@ export default async function PortfolioItemPage({
                 )}
                 {item.isPopular && (
                   <li className="rounded-full bg-brand-tint px-3.5 py-1.5 text-[12px] font-semibold text-brand-deep">
-                    Often chosen
+                    Popular
                   </li>
                 )}
               </ul>
@@ -254,7 +254,7 @@ export default async function PortfolioItemPage({
       )}
 
       <CtaBand
-        title="Want it changed?"
+        title="Want It Changed?"
         body="Any design here can be reworked around your own photographs, wording and colours. Tell us what you have in mind."
         primary={{ href: `/quote?design=${item.slug}`, label: "Ask the studio" }}
         secondary={{ href: "/portfolio", label: "Back to the portfolio" }}

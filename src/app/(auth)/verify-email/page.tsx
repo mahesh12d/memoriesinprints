@@ -54,7 +54,7 @@ export default async function VerifyEmailPage({
   if (session?.user.emailVerifiedAt) {
     return (
       <AuthCard
-        title="Email already confirmed"
+        title="Email Already Confirmed"
         intro="Nothing more to do here."
       >
         <Link
@@ -69,7 +69,7 @@ export default async function VerifyEmailPage({
 
   return (
     <AuthCard
-      title="Confirm your email"
+      title="Confirm Your Email"
       intro={
         params.sent
           ? "We've sent you a link. Open it to confirm your address."

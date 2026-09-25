@@ -10,7 +10,7 @@ export default async function NewProductPage() {
   return (
     <>
       <PortalHeader
-        title="Add a product"
+        title="Add a Product"
         actions={
           <Link
             href="/admin/products"

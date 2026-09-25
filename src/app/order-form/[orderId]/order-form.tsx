@@ -292,7 +292,7 @@ export function OrderForm({
   if (state.ok && state.message === "Order form received.") {
     return (
       <div className="flex flex-col gap-4 rounded-md border border-brand-line bg-brand-tint p-10">
-        <h2 className="font-display text-[26px]">Order form received</h2>
+        <h2 className="font-display text-[26px]">Order Form Received</h2>
         <p className="max-w-[60ch] text-[15px] leading-relaxed text-ink-muted">
           Thank you. Everything you sent is with the design team, and we will
           be in touch with a proof before anything is printed.
@@ -318,7 +318,7 @@ export function OrderForm({
         </p>
       )}
 
-      <Section title="The person being honoured">
+      <Section title="The Person Being Honoured">
         {/* Three across: the dates and the age belong on one line. */}
         <div className="grid gap-6 sm:grid-cols-3">
           <div className="sm:col-span-3">
@@ -419,7 +419,7 @@ export function OrderForm({
       </Section>
 
       <Section
-        title="Print specification"
+        title="Print Specification"
         intro="The design, the paper it is printed on, and how many."
       >
         <input type="hidden" name="photoOption" value={photoOption} />
@@ -558,7 +558,7 @@ export function OrderForm({
 
       {bespoke && (
         <Section
-          title="Additional products"
+          title="Additional Products"
           intro="Keepsakes to go alongside the booklet, in the same design."
         >
           <Row
@@ -735,7 +735,7 @@ export function OrderForm({
       </Section>
 
       <Section
-        title="Inside information"
+        title="Inside Information"
         intro="The running order, readings, and anything the design team should know."
       >
         <Row
@@ -784,7 +784,7 @@ export function OrderForm({
       </Section>
 
       <Section
-        title="Backpage information"
+        title="Backpage Information"
         intro="What goes on the back cover of the booklet."
       >
         <Row

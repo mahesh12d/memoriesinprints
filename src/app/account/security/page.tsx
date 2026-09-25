@@ -49,7 +49,7 @@ export default async function SecurityPage() {
       <PortalBody>
         <div className="flex max-w-[860px] flex-col gap-6">
           <section className="rounded-md border border-line bg-card p-9">
-            <h2 className="text-lg">Change password</h2>
+            <h2 className="text-lg">Change Password</h2>
             <p className="mt-1.5 text-[13px] text-ink-muted">
               Changing it signs you out everywhere else.
             </p>
@@ -61,7 +61,7 @@ export default async function SecurityPage() {
           <section className="overflow-hidden rounded-md border border-line bg-card">
             <div className="flex items-center justify-between border-b border-line-soft px-7 py-5">
               <div>
-                <h2 className="text-lg">Where you&rsquo;re signed in</h2>
+                <h2 className="text-lg">Where You&rsquo;re Signed In</h2>
                 <p className="mt-1 text-[13px] text-ink-muted">
                   {activeSessions.length} active{" "}
                   {activeSessions.length === 1 ? "session" : "sessions"}

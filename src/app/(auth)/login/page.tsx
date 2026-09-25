@@ -19,7 +19,7 @@ export default async function LoginPage({
 
   return (
     <AuthCard
-      title="Sign in"
+      title="Sign In"
       intro="Track your orders, review proofs and manage your details."
     >
       {params.reset && (

@@ -55,12 +55,12 @@ export default async function AccountSavedPage() {
 
   return (
     <>
-      <PortalHeader title="Saved items" />
+      <PortalHeader title="Saved Items" />
 
       <PortalBody>
         {rows.length === 0 ? (
           <div className="rounded-md border border-line bg-card p-10 text-center">
-            <h2 className="font-display text-lg">Nothing saved yet</h2>
+            <h2 className="font-display text-lg">Nothing Saved Yet</h2>
             <p className="mx-auto mt-2 max-w-[46ch] text-sm leading-relaxed text-ink-muted">
               Save a product or a portfolio design while you&rsquo;re browsing
               and it will wait for you here.

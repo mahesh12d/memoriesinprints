@@ -46,6 +46,13 @@ export const productCategory = pgEnum("product_category", [
   "celebration",
 ]);
 
+/** Who is asking. The studio answers a funeral director differently. */
+export const enquiryUserType = pgEnum("enquiry_user_type", [
+  "funeral_director",
+  "celebrant",
+  "client",
+]);
+
 export const enquiryStatus = pgEnum("enquiry_status", [
   "new",
   "reviewed",
@@ -364,6 +371,7 @@ export const enquiries = pgTable(
     email: text("email").notNull(),
     phone: text("phone"),
     category: productCategory("category").notNull(),
+    userType: enquiryUserType("user_type"),
     subject: text("subject").notNull(),
     message: text("message").notNull(),
     eventDate: timestamp("event_date", { withTimezone: true }),

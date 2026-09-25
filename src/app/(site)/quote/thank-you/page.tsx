@@ -26,7 +26,7 @@ export default async function QuoteThankYouPage({
           </svg>
         </span>
 
-        <h1 className="text-[34px] leading-tight">Thank you — that&rsquo;s with us</h1>
+        <h1 className="text-[34px] leading-tight">Thank You — That&rsquo;s with Us</h1>
 
         {ref && (
           <p className="text-[15px] text-ink-muted">

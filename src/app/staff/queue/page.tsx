@@ -31,11 +31,11 @@ export default async function StaffQueuePage() {
 
   return (
     <>
-      <PortalHeader title="Work queue" />
+      <PortalHeader title="Work Queue" />
       <PortalBody>
         {groups.length === 0 ? (
           <div className="rounded-md border border-line bg-card p-10 text-center">
-            <h2 className="font-display text-lg">Nothing in the queue</h2>
+            <h2 className="font-display text-lg">Nothing in the Queue</h2>
             <p className="mt-2 text-sm text-ink-muted">
               Every order is either delivered or cancelled.
             </p>

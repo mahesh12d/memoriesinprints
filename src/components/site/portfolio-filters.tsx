@@ -93,7 +93,7 @@ export function PortfolioFilters({
       className="mb-8 flex flex-col gap-5 border-y border-line py-5"
     >
       <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
-        <h2 className="font-display text-xl">Refine this collection</h2>
+        <h2 className="font-display text-xl">Refine This Collection</h2>
         <p className="text-[13px] text-ink-quiet">
           {matchCount} {matchCount === 1 ? "piece" : "pieces"}
         </p>
@@ -131,7 +131,7 @@ export function PortfolioFilters({
       {styles.length > 0 && (
         <div className="flex flex-col gap-2.5">
           <h3 className="text-[13px] font-semibold text-ink-soft">
-            Filter by style
+            Filter by Collection
           </h3>
 
           {/* Wraps rather than clipping: a label nobody can read is one nobody can choose. */}
@@ -209,7 +209,7 @@ export function PortfolioFilters({
         {popularCount > 0 && (
           <div className="flex flex-col gap-2.5">
             <h3 className="text-[13px] font-semibold text-ink-soft">
-              Filter by popularity
+              Filter by Popularity
             </h3>
             <Chip href={hrefWith({ popular: popular ? null : "1" })} active={popular}>
               Popular

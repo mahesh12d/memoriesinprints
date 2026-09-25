@@ -72,6 +72,14 @@ async function run() {
   if (!PUBLIC) throw new Error("R2_PUBLIC_URL is not set.");
 
   const dryRun = process.argv.includes("--dry");
+
+  /*
+    A published piece whose image 404s is a broken card on a public page, and
+    the homepage strip will happily pick it up as "recent work". This takes
+    those out of the window until their file is uploaded — a flag, not a
+    delete, so re-running after the upload puts them straight back.
+  */
+  const hideMissing = process.argv.includes("--unpublish-missing");
   const keys = await listBucket();
 
   /*
@@ -108,6 +116,14 @@ async function run() {
 
     if (matches.length === 0) {
       unmatched.push(`${row.slug}  →  ${current}`);
+
+      if (hideMissing && !dryRun) {
+        await db
+          .update(portfolioItems)
+          .set({ isPublished: false, updatedAt: new Date() })
+          .where(eq(portfolioItems.id, row.id));
+      }
+
       continue;
     }
 

@@ -109,7 +109,7 @@ export default async function AdminPortfolioPage() {
           hrefFor={(row) => `/admin/portfolio/${row.id}`}
           empty={
             <>
-              <h2 className="font-display text-lg">No work shown yet</h2>
+              <h2 className="font-display text-lg">No Work Shown Yet</h2>
               <p className="mt-2 text-sm text-ink-muted">
                 Add a piece to start building the portfolio.
               </p>

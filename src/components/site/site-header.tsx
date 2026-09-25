@@ -14,8 +14,9 @@ const PORTFOLIO_ITEMS = CATEGORIES.map((value) => ({
 }));
 
 const LINKS = [
-  { href: "/portfolio", label: "Portfolio", items: PORTFOLIO_ITEMS },
+  { href: "/portfolio", label: "Designs", items: PORTFOLIO_ITEMS },
   { href: "/products", label: "Products" },
+  { href: "/corporate", label: "Corporate Printing" },
   { href: "/guide", label: "Guide" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact Us" },

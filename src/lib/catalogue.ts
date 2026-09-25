@@ -2,7 +2,16 @@ import type { productCategory } from "@/db/schema";
 
 export type Category = (typeof productCategory.enumValues)[number];
 
-export const CATEGORIES: Category[] = ["funeral", "wedding", "celebration"];
+/*
+  The studio only takes funeral work today. Every category tab, nav dropdown
+  and quote-form option is built from this list, so shortening it hides the
+  others everywhere at once — and `isCategory` stops honouring
+  ?category=wedding typed into the address bar.
+
+  The labels and blurbs below keep all three: nothing breaks if a stray row
+  still carries one, and putting a category back is adding it here.
+*/
+export const CATEGORIES: Category[] = ["funeral"];
 
 export const CATEGORY_LABEL: Record<Category, string> = {
   funeral: "Funeral",

@@ -4,12 +4,11 @@ import { and, asc, eq, ilike, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { portfolioItems } from "@/db/schema";
 import {
-  CATEGORIES,
   CATEGORY_LABEL,
   isCategory,
   type Category,
 } from "@/lib/catalogue";
-import { Section } from "@/components/site/section";
+import { CtaBand, Section } from "@/components/site/section";
 import { ImagePlaceholder } from "@/components/site/image-placeholder";
 import { DiscoverButton } from "@/components/ui/discover-button";
 import { PortfolioFilters } from "@/components/site/portfolio-filters";
@@ -43,9 +42,9 @@ const SWATCH: Record<string, string> = {
 };
 
 export const metadata: Metadata = {
-  title: "Portfolio",
+  title: "Designs",
   description:
-    "Recent funeral and wedding stationery from the Memories in Prints studio.",
+    "Funeral stationery designs from the Memories in Prints studio.",
 };
 
 export default async function PortfolioPage({
@@ -163,13 +162,17 @@ export default async function PortfolioPage({
     popular ||
     Object.keys(chosen).length > 0;
 
+  /**
+   * The two halves of what the studio sells.
+   *
+   * Service sheets are the design templates on this page; other products —
+   * the memorial cards, boxes and prints — have their own page with their own
+   * sizes and prices, so the second tab goes there rather than rebuilding
+   * that grid here.
+   */
   const filters = [
-    { id: "all", label: "All work", href: filterHref() },
-    ...CATEGORIES.map((value) => ({
-      id: value,
-      label: CATEGORY_LABEL[value],
-      href: filterHref(value),
-    })),
+    { id: "service-sheets", label: "Service Sheets", href: resetHref },
+    { id: "other-products", label: "Other Products", href: "/products" },
   ];
 
   return (
@@ -177,22 +180,20 @@ export default async function PortfolioPage({
       <Section>
         <div className="mb-12 flex max-w-[62ch] flex-col gap-4">
           <h1 className="text-[40px] leading-tight">
-            {query ? `Portfolio results for “${query}”` : "Portfolio"}
+            {query ? `Designs matching “${query}”` : "Funeral Stationery"}
           </h1>
           <p className="text-[15px] leading-relaxed text-ink-muted">
-            Every piece is designed to order and proofed with the client before
-            it goes to print. Browse recent funeral and wedding stationery
-            below, or filter by category.
+            Every piece is designed to order and proofed with the client
+            before it goes to print. Explore our designs &amp; stationery below,
+            or browse by styles.
           </p>
         </div>
 
         <DiscoverButton
           groups={filters}
-          activeId={active ?? "all"}
-          searchAction="/portfolio"
-          searchPlaceholder="Search the portfolio…"
-          searchLabel="Search the portfolio"
-          tabsLabel="Filter by category"
+          activeId="service-sheets"
+          showSearch={false}
+          tabsLabel="Service sheets or other products"
           className="mb-10"
         />
 
@@ -290,7 +291,7 @@ export default async function PortfolioPage({
                         label on the piece, which is what it is.
                       */}
                       {item.isPopular && (
-                        <span className="absolute left-3 top-3 rounded-full bg-brand px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.06em] text-on-accent shadow-sm">
+                        <span className="absolute left-3 top-3 rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-ink shadow-sm ring-1 ring-black/5 backdrop-blur-sm">
                           Popular
                         </span>
                       )}
@@ -334,6 +335,12 @@ export default async function PortfolioPage({
           </ul>
         )}
       </Section>
+
+      <CtaBand
+        title="Haven't Found What You're Looking For Yet?"
+        body="Please don't hesitate to reach out. Most of what leaves this studio started as a conversation about something that wasn't in the catalogue."
+        primary={{ href: "/contact", label: "Contact Us" }}
+      />
     </>
   );
 }

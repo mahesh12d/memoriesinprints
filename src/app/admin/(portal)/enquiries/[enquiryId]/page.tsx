@@ -147,7 +147,7 @@ export default async function AdminEnquiryDetailPage({
             </section>
 
             <section className="rounded-md border border-line bg-card p-7">
-              <h2 className="font-display text-lg">Turn this into an order</h2>
+              <h2 className="font-display text-lg">Turn This into an Order</h2>
               <p className="mb-5 mt-1 max-w-[58ch] text-[13px] leading-relaxed text-ink-muted">
                 The quoted figure becomes the order total, and the customer can
                 follow it from their account.
@@ -191,7 +191,7 @@ export default async function AdminEnquiryDetailPage({
 
           <aside className="flex h-fit flex-col gap-6">
             <section className="rounded-md border border-line bg-card p-6">
-              <h2 className="font-display text-lg">Who sent it</h2>
+              <h2 className="font-display text-lg">Who Sent It</h2>
               <dl className="mt-3 flex flex-col gap-2.5 text-[13px]">
                 <div className="flex justify-between gap-4">
                   <dt className="text-ink-muted">Name</dt>
@@ -228,7 +228,7 @@ export default async function AdminEnquiryDetailPage({
             </section>
 
             <section className="rounded-md border border-line bg-card p-6">
-              <h2 className="font-display text-lg">Move it along</h2>
+              <h2 className="font-display text-lg">Move It Along</h2>
               <div className="mt-4">
                 <StatusForm enquiryId={enquiry.id} current={enquiry.status} />
               </div>

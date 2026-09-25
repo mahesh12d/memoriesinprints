@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default function ForgotPasswordPage() {
   return (
     <AuthCard
-      title="Reset your password"
+      title="Reset Your Password"
       intro="We'll email you a link to choose a new one."
       footer={
         <Link href="/login" className="font-semibold text-accent-text">

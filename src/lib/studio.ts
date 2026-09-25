@@ -7,14 +7,24 @@
  */
 export const STUDIO = {
   city: "[Studio City]",
-  email: "[studio email]",
+  email: "info@memoriesinprints.com",
   phone: "[studio phone]",
-  openingHours: "Mon–Fri, [X]am–[X]pm",
+  openingHours: "Mon–Fri, 08:30 am– 05:30 pm",
   founderName: "[Founder Name]",
   foundedYear: "[Year]",
-  instagram: "https://instagram.com/",
-  facebook: "https://facebook.com/",
-  pinterest: "https://pinterest.com/",
+  /** The domain shown in the footer. Confirm before launch. */
+  domain: "www.memoriesinprints.com",
+  /** The company behind the brand, for the copyright line. */
+  legalEntity: "Viora Memories In Prints Pvt Ltd",
+  instagram: "https://www.instagram.com/memoriesin.prints/",
+  facebook:
+    "https://www.facebook.com/profile.php?id=61584548137585&sk=photos",
+  /*
+    The public company page. The URL supplied was the admin dashboard
+    (/company/122754103/admin/dashboard/), which only signed-in page admins
+    can open — a visitor clicking it would land on a LinkedIn error.
+  */
+  linkedin: "https://www.linkedin.com/company/122754103/",
   /** Where quote notifications are sent. Falls back to the from address. */
   enquiriesInbox:
     process.env.STUDIO_ENQUIRIES_EMAIL ?? "studio@memoriesinprints.co.uk",

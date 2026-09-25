@@ -85,7 +85,7 @@ export default async function AdminPortfolioDetailPage({
           <aside className="flex h-fit flex-col gap-6">
             <section className="overflow-hidden rounded-md border border-line bg-card">
               <div className="border-b border-line-soft px-6 py-4">
-                <h2 className="font-display text-lg">Current photograph</h2>
+                <h2 className="font-display text-lg">Current Photograph</h2>
               </div>
               {imageUrl ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
@@ -113,7 +113,7 @@ export default async function AdminPortfolioDetailPage({
             </section>
 
             <section className="rounded-md border border-alert/30 bg-card p-6">
-              <h2 className="font-display text-lg">Remove this piece</h2>
+              <h2 className="font-display text-lg">Remove This Piece</h2>
               <p className="mb-4 mt-1 text-[13px] leading-relaxed text-ink-muted">
                 This deletes it outright. If you only want it off the website,
                 untick &ldquo;Show this in the portfolio&rdquo; instead.

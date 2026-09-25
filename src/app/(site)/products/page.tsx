@@ -4,7 +4,6 @@ import { and, asc, eq, ilike, inArray, or } from "drizzle-orm";
 import { db } from "@/db";
 import { productSizes, products } from "@/db/schema";
 import {
-  CATEGORIES,
   CATEGORY_BLURB,
   CATEGORY_LABEL,
   isCategory,
@@ -92,8 +91,8 @@ export default async function ProductsPage({
   const heading = query
     ? `Results for “${query}”`
     : active
-      ? `${CATEGORY_LABEL[active]} stationery`
-      : "Our stationery";
+      ? `${CATEGORY_LABEL[active]} & Memorial Products`
+      : "Funeral & Memorial Products";
 
   const blurb = query
     ? `${rows.length} ${rows.length === 1 ? "piece" : "pieces"} matched your search. Browse the categories below to see everything we print.`
@@ -121,36 +120,29 @@ export default async function ProductsPage({
           <p className="text-[15px] leading-relaxed text-ink-muted">{blurb}</p>
         </div>
 
-        <nav aria-label="Filter by category" className="mb-10">
+        {/*
+          The same pair as on Designs, so the two pages read as two halves of
+          one catalogue rather than as separate sections of the site.
+        */}
+        <nav aria-label="Service sheets or other products" className="mb-10">
           <ul className="flex flex-wrap gap-2.5">
             <li>
               <Link
-                href="/products"
-                aria-current={!active ? "true" : undefined}
-                className={`inline-flex rounded-full px-5 py-2.5 text-[13px] font-semibold ${
-                  !active
-                    ? "bg-band text-white"
-                    : "border border-line bg-card text-ink-soft hover:border-brand"
-                }`}
+                href="/portfolio"
+                className="inline-flex rounded-full border border-line bg-card px-5 py-2.5 text-[13px] font-semibold text-ink-soft hover:border-brand"
               >
-                Everything
+                Service Sheets
               </Link>
             </li>
-            {CATEGORIES.map((value) => (
-              <li key={value}>
-                <Link
-                  href={`/products?category=${value}`}
-                  aria-current={active === value ? "true" : undefined}
-                  className={`inline-flex rounded-full px-5 py-2.5 text-[13px] font-semibold ${
-                    active === value
-                      ? "bg-band text-white"
-                      : "border border-line bg-card text-ink-soft hover:border-brand"
-                  }`}
-                >
-                  {CATEGORY_LABEL[value]}
-                </Link>
-              </li>
-            ))}
+            <li>
+              <Link
+                href="/products"
+                aria-current="true"
+                className="inline-flex rounded-full bg-band px-5 py-2.5 text-[13px] font-semibold text-white"
+              >
+                Other Products
+              </Link>
+            </li>
           </ul>
         </nav>
 

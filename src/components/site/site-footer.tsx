@@ -1,32 +1,38 @@
 import Link from "next/link";
 import { STUDIO } from "@/lib/studio";
 
+/**
+ * The three columns carried over from memoriesinprints.com.
+ *
+ * Two of the old site's links have no page here yet, so they point at the
+ * nearest thing rather than at a 404: "Process" and "Turnaround Times" both
+ * go to the guide, which is where turnaround and the order of work are
+ * written up. Build /process and they move.
+ */
 const COLUMNS = [
-  {
-    title: "Shop",
-    links: [
-      { href: "/products?category=funeral", label: "Funeral stationery" },
-      { href: "/products?category=wedding", label: "Wedding stationery" },
-      { href: "/products?category=celebration", label: "Celebrations" },
-      { href: "/contact", label: "Request a Quote" },
-    ],
-  },
   {
     title: "Studio",
     links: [
-      { href: "/portfolio", label: "Portfolio" },
-      { href: "/guide", label: "Guide" },
-      { href: "/guide#faq", label: "FAQs" },
-      { href: "/about", label: "About" },
+      // Called Designs here since the rename; same page as the old Portfolio.
+      { href: "/portfolio", label: "Designs" },
+      { href: "/guide", label: "Process" },
+      { href: "/about", label: "About Us" },
+    ],
+  },
+  {
+    title: "Support",
+    links: [
       { href: "/contact", label: "Contact Us" },
+      { href: "/guide", label: "Turnaround Times" },
+      { href: "/guide#faq", label: "FAQ" },
     ],
   },
   {
     title: "Legal",
     links: [
-      { href: "/terms", label: "Terms" },
-      { href: "/privacy", label: "Privacy" },
-      { href: "/cookies", label: "Cookies" },
+      { href: "/privacy", label: "Privacy Policy" },
+      { href: "/terms", label: "Terms & Conditions" },
+      { href: "/cookies", label: "Cookies Policy" },
     ],
   },
 ];
@@ -62,8 +68,10 @@ export function SiteFooter() {
             Memories in Prints
           </span>
           <p className="max-w-[38ch] text-[13px] leading-relaxed text-white/80">
-            Bespoke funeral stationery, memorial keepsakes and wedding
-            stationery, printed with care in {STUDIO.city}, UK.
+            A full-service design and print studio.
+          </p>
+          <p className="max-w-[38ch] text-[13px] leading-relaxed text-white/75">
+            Serving families, brands, and Organisations worldwide.
           </p>
           <p className="text-[13px] leading-relaxed text-white/75">
             Proud member of the Funeral Service Association (FSA)
@@ -82,11 +90,13 @@ export function SiteFooter() {
                 <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
               </svg>
             </SocialLink>
-            <SocialLink href={STUDIO.pinterest} label="Pinterest">
+            <SocialLink href={STUDIO.linkedin} label="LinkedIn">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M9.5 18.5 12 8" />
-                <path d="M10.4 12.6a2.8 2.8 0 0 0 4.3-2.3 3.3 3.3 0 0 0-6.6 0" />
+                <rect x="2" y="2" width="20" height="20" rx="3" />
+                <line x1="7" y1="10" x2="7" y2="17" />
+                <line x1="7" y1="6.6" x2="7" y2="6.6" />
+                <path d="M11.5 17v-4a2.5 2.5 0 0 1 5 0v4" />
+                <line x1="11.5" y1="10" x2="11.5" y2="17" />
               </svg>
             </SocialLink>
           </div>
@@ -115,12 +125,29 @@ export function SiteFooter() {
 
       <div className="border-t border-white/15">
         <div className="mx-auto flex max-w-[1200px] flex-col gap-2 px-6 py-6 text-[12px] text-white/70 sm:flex-row sm:items-center sm:justify-between sm:px-10">
+          {/* The year moves on its own; nobody has to remember in January. */}
           <span>
-            © {new Date().getFullYear()} Memories in Prints. All rights
-            reserved.
+            ©{new Date().getFullYear()} Memories in Prints&trade; — A brand of{" "}
+            {STUDIO.legalEntity}. All rights reserved
           </span>
-          <span>
-            {STUDIO.email} · {STUDIO.phone}
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="text-white/60">{STUDIO.domain}</span>
+            <a href={`mailto:${STUDIO.email}`} className="hover:text-white">
+              {STUDIO.email}
+            </a>
+            <a href={`tel:${STUDIO.phone.replace(/\s+/g, "")}`} className="hover:text-white">
+              {STUDIO.phone}
+            </a>
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                `Memories in Prints, ${STUDIO.city}, UK`,
+              )}`}
+              target="_blank"
+              rel="noreferrer"
+              className="font-semibold hover:text-white"
+            >
+              View Map
+            </a>
           </span>
         </div>
       </div>

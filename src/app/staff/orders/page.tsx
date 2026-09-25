@@ -253,7 +253,7 @@ export default async function StaffOrdersPage({
             hrefFor={(row) => `/staff/orders/${row.id}`}
             empty={
               <>
-                <h2 className="font-display text-lg">No orders here</h2>
+                <h2 className="font-display text-lg">No Orders Here</h2>
                 <p className="mt-2 text-sm text-ink-muted">
                   {query
                     ? `Nothing matches “${query}”. Try an order reference or a customer's name.`

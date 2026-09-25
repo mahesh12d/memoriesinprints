@@ -69,7 +69,7 @@ export async function OrderFormSummary({ orderId }: { orderId: string }) {
   if (!form) {
     return (
       <section className="rounded-md border border-line bg-card p-6">
-        <h2 className="font-display text-lg">Order form</h2>
+        <h2 className="font-display text-lg">Order Form</h2>
         <p className="mt-2 text-sm leading-relaxed text-ink-muted">
           The customer has not started their order form yet, so there are no
           details to work from.
@@ -121,7 +121,7 @@ export async function OrderFormSummary({ orderId }: { orderId: string }) {
   return (
     <section className="rounded-md border border-line bg-card p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-display text-lg">Order form</h2>
+        <h2 className="font-display text-lg">Order Form</h2>
         <StatusPill tone={sent ? "good" : "pending"}>
           {sent
             ? `Sent ${dateFormat.format(form.submittedAt as Date)}`
@@ -206,7 +206,7 @@ export async function OrderFormSummary({ orderId }: { orderId: string }) {
       {products.length > 0 && (
         <div className="mt-5">
           <h3 className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-quiet">
-            Other pieces
+            Other Pieces
           </h3>
           <ul className="mt-2 flex flex-col gap-1.5">
             {products.map((product, index) => (

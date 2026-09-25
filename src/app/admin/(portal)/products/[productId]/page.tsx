@@ -92,7 +92,7 @@ export default async function AdminProductDetailPage({
           <aside className="flex h-fit flex-col gap-6">
             <section className="overflow-hidden rounded-md border border-line bg-card">
               <div className="border-b border-line-soft px-6 py-4">
-                <h2 className="font-display text-lg">Current photograph</h2>
+                <h2 className="font-display text-lg">Current Photograph</h2>
               </div>
               {imageUrl ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
@@ -109,7 +109,7 @@ export default async function AdminProductDetailPage({
             </section>
 
             <section className="rounded-md border border-line bg-card p-6">
-              <h2 className="font-display text-lg">Address on the site</h2>
+              <h2 className="font-display text-lg">Address on the Site</h2>
               <p className="mt-2 break-all text-[13px] text-ink-muted">
                 /products/{product.slug}
               </p>

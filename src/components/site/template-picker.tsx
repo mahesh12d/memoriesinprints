@@ -81,7 +81,7 @@ export function TemplatePicker({
   return (
     <div className="flex flex-col gap-2.5">
       <h3 className="text-[13px] font-semibold text-ink-soft">
-        Filter by template number
+        Filter by Template Number
       </h3>
 
       <details ref={detailsRef} className="group relative w-fit">

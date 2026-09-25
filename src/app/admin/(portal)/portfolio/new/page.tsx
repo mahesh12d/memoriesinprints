@@ -10,7 +10,7 @@ export default async function NewPortfolioItemPage() {
   return (
     <>
       <PortalHeader
-        title="Add a piece"
+        title="Add a Piece"
         actions={
           <Link
             href="/admin/portfolio"

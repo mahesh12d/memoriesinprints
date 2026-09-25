@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 export default function SignupPage() {
   return (
     <AuthCard
-      title="Create an account"
+      title="Create an Account"
       intro="So you can follow an order and approve proofs in your own time."
       footer={
         <>

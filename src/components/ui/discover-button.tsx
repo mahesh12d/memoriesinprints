@@ -29,6 +29,7 @@ export type DiscoverGroup = {
 export function DiscoverButton({
   groups,
   activeId,
+  showSearch = true,
   searchAction = "/products",
   searchPlaceholder = "Search order of service, invitations…",
   searchLabel = "Search products",
@@ -38,6 +39,8 @@ export function DiscoverButton({
   groups: readonly DiscoverGroup[];
   /** Drives the active tab from the URL. Omit for local tab state. */
   activeId?: string;
+  /** Leave out to drop the search box entirely. */
+  showSearch?: boolean;
   searchAction?: string;
   searchPlaceholder?: string;
   /** The accessible name for the search field and its submit button. */
@@ -68,6 +71,7 @@ export function DiscoverButton({
   return (
     <div className={cn("flex flex-col gap-4", className)}>
       <div className="flex flex-wrap items-stretch gap-3">
+        {showSearch && (
         <motion.form
           layout
           transition={spring}
@@ -148,6 +152,7 @@ export function DiscoverButton({
             </button>
           )}
         </motion.form>
+        )}
 
         {/* The tabs stay live while the search is open: fading them out would
             leave a dead, still-visible control sitting in the row. */}

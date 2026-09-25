@@ -129,7 +129,7 @@ export default async function AccountDashboardPage({
             </div>
           ) : (
             <div className="rounded-md border border-line bg-card p-8">
-              <h2 className="text-lg">Nothing needs you right now</h2>
+              <h2 className="text-lg">Nothing Needs You Right Now</h2>
               <p className="mt-2 max-w-[62ch] text-sm leading-relaxed text-ink-muted">
                 We&rsquo;ll email you and put a note here the moment a proof is
                 ready to look at.

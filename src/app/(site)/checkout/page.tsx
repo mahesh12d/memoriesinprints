@@ -54,7 +54,7 @@ export default async function CheckoutPage() {
           the right where it belongs.
         */}
         <aside className="-order-1 flex h-fit flex-col gap-5 rounded-md border border-line bg-card p-7 lg:order-none">
-          <h2 className="font-display text-lg">Your order</h2>
+          <h2 className="font-display text-lg">Your Order</h2>
 
           <ul className="flex flex-col divide-y divide-line-soft border-y border-line-soft">
             {cart.lines.map((line) => (

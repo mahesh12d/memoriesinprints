@@ -17,7 +17,7 @@ export default async function ResetPasswordPage({
   if (!token) {
     return (
       <AuthCard
-        title="That link is incomplete"
+        title="That Link Is Incomplete"
         intro="Please use the link from your email, or ask for a new one."
       >
         <Link
@@ -32,7 +32,7 @@ export default async function ResetPasswordPage({
 
   return (
     <AuthCard
-      title="Choose a new password"
+      title="Choose a New Password"
       intro="Signing you out of every device once it's saved."
     >
       <ResetPasswordForm token={token} />

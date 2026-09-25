@@ -71,7 +71,7 @@ export default async function LegalPage({
         </p>
 
         <div className="mt-4 rounded-md border border-pending-deep/25 bg-pending-tint p-6">
-          <h2 className="font-display text-lg">Not yet written</h2>
+          <h2 className="font-display text-lg">Not Yet Written</h2>
           <p className="mt-2 text-[14px] leading-relaxed text-ink-soft">
             This wording needs to come from the studio, and the privacy notice
             should be checked against what the site actually collects before

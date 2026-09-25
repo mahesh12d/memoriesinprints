@@ -22,7 +22,7 @@ export default async function NewProductionOrderPage() {
   return (
     <>
       <PortalHeader
-        title="Raise an order"
+        title="Raise an Order"
         actions={
           <Link
             href="/admin/orders"

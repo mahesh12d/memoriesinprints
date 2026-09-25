@@ -12,7 +12,7 @@ export default function AdminLoginPage() {
     <AuthCard
       dark
       badge="Admin"
-      title="Admin sign in"
+      title="Admin Sign In"
       intro="Separate from customer and staff accounts."
     >
       <AdminLoginForm />

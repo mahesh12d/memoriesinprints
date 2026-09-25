@@ -224,7 +224,7 @@ export default async function AdminOrderDetailPage({
             {order.paymentStatus !== "paid" && (
               <section className="rounded-md border border-line bg-card p-7">
                 <h2 className="font-display text-lg">
-                  Record a payment taken elsewhere
+                  Record a Payment Taken Elsewhere
                 </h2>
                 <p className="mb-5 mt-1 max-w-[58ch] text-[13px] leading-relaxed text-ink-muted">
                   A bank transfer, the card machine in the shop, cash at the

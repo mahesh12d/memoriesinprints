@@ -161,7 +161,7 @@ export function ProofReviewer({
         {pending && !readOnly && (
           <div className="flex flex-col gap-3 rounded-md border border-blue/30 bg-blue-tint p-5">
             <h3 className="text-[13px] font-semibold text-ink-soft">
-              What should change here?
+              What Should Change Here?
             </h3>
             <textarea
               value={draft}
@@ -273,7 +273,7 @@ export function ProofReviewer({
           ? decision
           : !decided && (
           <div className="flex flex-col gap-3 rounded-md border border-line bg-card p-6">
-            <h3 className="font-display text-[15px]">Ready to decide?</h3>
+            <h3 className="font-display text-[15px]">Ready to Decide?</h3>
             <p className="text-[13px] leading-relaxed text-ink-muted">
               Nothing is printed until you approve. If something isn&rsquo;t
               right, mark it on the proof and send it back — there&rsquo;s no

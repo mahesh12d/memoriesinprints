@@ -142,7 +142,7 @@ export default async function AdminEnquiriesPage({
             hrefFor={(row) => `/admin/enquiries/${row.id}`}
             empty={
               <>
-                <h2 className="font-display text-lg">Nothing here</h2>
+                <h2 className="font-display text-lg">Nothing Here</h2>
                 <p className="mt-2 text-sm text-ink-muted">
                   {known === "all"
                     ? "No one has sent an enquiry yet."

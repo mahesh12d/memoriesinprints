@@ -1,16 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, asc, eq, ne } from "drizzle-orm";
+import { and, asc, eq, isNotNull, ne } from "drizzle-orm";
 import { db } from "@/db";
-import { productPrices, productSizes, products } from "@/db/schema";
+import { portfolioItems, productPrices, productSizes, products } from "@/db/schema";
 import { CATEGORY_LABEL } from "@/lib/catalogue";
 import { ProductPurchase, type SizeOption } from "./product-purchase";
+import { TemplateChoicePicker, type TemplateChoice } from "./template-choice";
 import { TURNAROUND_NOTE } from "@/lib/studio";
 import { Breadcrumb, Section } from "@/components/site/section";
 import { ImagePlaceholder } from "@/components/site/image-placeholder";
 import { SaveButton } from "@/components/site/save-button";
-import { resolveImageUrl } from "@/lib/storage/image-url";
+import { resolveImageUrl, resolveImageUrls } from "@/lib/storage/image-url";
 import { loadSavedProductIds } from "@/lib/saved/queries";
 
 async function loadProduct(slug: string) {
@@ -50,6 +51,41 @@ export default async function ProductDetailPage({
   if (!product) notFound();
 
   const heroImage = await resolveImageUrl(product.heroImageUrl);
+
+  /**
+   * Every design the studio has, offered against this product.
+   *
+   * The same artwork goes on a memorial card as on the booklet, so there is
+   * one set of templates rather than a set per product — the picker below
+   * points at the design, it does not duplicate it.
+   */
+  const designs = await db
+    .select({
+      number: portfolioItems.templateNumber,
+      title: portfolioItems.title,
+      slug: portfolioItems.slug,
+      imageUrl: portfolioItems.imageUrl,
+    })
+    .from(portfolioItems)
+    .where(
+      and(
+        eq(portfolioItems.isPublished, true),
+        eq(portfolioItems.category, product.category),
+        isNotNull(portfolioItems.templateNumber),
+      ),
+    )
+    .orderBy(asc(portfolioItems.templateNumber));
+
+  const templates: TemplateChoice[] = (
+    await resolveImageUrls(designs.map((one) => one.imageUrl))
+  ).map((src, index) => ({
+    number: designs[index].number!,
+    // The catalogue number is already on the front of the title; showing it
+    // twice in the dropdown reads as a stutter.
+    title: designs[index].title.replace(/^\s*\d+\s*-\s*/, ""),
+    slug: designs[index].slug,
+    src,
+  }));
   const saved = await loadSavedProductIds();
 
   const [sizes, prices, related] = await Promise.all([
@@ -160,6 +196,8 @@ export default async function ProductDetailPage({
             </p>
           )}
 
+          <TemplateChoicePicker templates={templates} />
+
           <ProductPurchase
             slug={product.slug}
             sizes={sizeOptions}
@@ -175,7 +213,7 @@ export default async function ProductDetailPage({
           />
 
           <div className="rounded-md border border-line bg-card p-6">
-            <h2 className="font-display text-lg">Before anything is printed</h2>
+            <h2 className="font-display text-lg">Before Anything Is Printed</h2>
             <p className="mt-2 text-[14px] leading-relaxed text-ink-muted">
               A proof comes to you for approval first, whichever way you order.
               Need something bespoke, or a quantity outside the usual range?{" "}
@@ -194,7 +232,7 @@ export default async function ProductDetailPage({
 
       {related.length > 0 && (
         <div className="mt-20">
-          <h2 className="mb-8 text-[24px]">You may also need</h2>
+          <h2 className="mb-8 text-[24px]">You May Also Need</h2>
           <ul className="grid gap-6 sm:grid-cols-3">
             {related.map((item) => (
               <li key={item.slug}>

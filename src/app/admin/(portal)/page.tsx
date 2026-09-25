@@ -150,7 +150,7 @@ export default async function AdminDashboardPage() {
 
   return (
     <>
-      <PortalHeader title="Business dashboard" />
+      <PortalHeader title="Business Dashboard" />
 
       <PortalBody>
         <div className="flex flex-col gap-7">
@@ -204,7 +204,7 @@ export default async function AdminDashboardPage() {
             </section>
 
             <section className="rounded-md border border-line bg-card p-6">
-              <h2 className="font-display text-[15px]">Enquiry pipeline</h2>
+              <h2 className="font-display text-[15px]">Enquiry Pipeline</h2>
               <ul className="mt-4 flex flex-col gap-2.5">
                 {pipeline.length === 0 && (
                   <li className="text-[13px] text-ink-muted">
@@ -227,7 +227,7 @@ export default async function AdminDashboardPage() {
                 })}
               </ul>
 
-              <h2 className="mt-6 font-display text-[15px]">Orders open</h2>
+              <h2 className="mt-6 font-display text-[15px]">Orders Open</h2>
               <ul className="mt-4 flex flex-col gap-2.5">
                 {openByStatus.length === 0 && (
                   <li className="text-[13px] text-ink-muted">
@@ -254,7 +254,7 @@ export default async function AdminDashboardPage() {
 
           <section className="overflow-hidden rounded-md border border-line bg-card">
             <div className="border-b border-line-soft px-6 py-4">
-              <h2 className="font-display text-[15px]">Recent activity</h2>
+              <h2 className="font-display text-[15px]">Recent Activity</h2>
             </div>
             {recent.length === 0 ? (
               <p className="px-6 py-5 text-sm text-ink-muted">

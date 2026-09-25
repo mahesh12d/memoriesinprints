@@ -160,7 +160,7 @@ export default async function CheckoutOrderPage({
 
         {isStub && (
           <div className="rounded-md border border-pending-deep/25 bg-pending-tint p-6">
-            <h2 className="font-display text-lg">Payment isn&rsquo;t live yet</h2>
+            <h2 className="font-display text-lg">Payment Isn&rsquo;t Live Yet</h2>
             <p className="mt-2 text-[14px] leading-relaxed text-ink-soft">
               The order is recorded and sitting as awaiting payment. The{" "}
               {provider === "paypal" ? "PayPal" : "Razorpay"} keys haven&rsquo;t
@@ -175,7 +175,7 @@ export default async function CheckoutOrderPage({
           <div className="flex flex-col gap-6">
             {proof && (
               <section className="rounded-md border border-line bg-card p-6">
-                <h2 className="font-display text-lg">The design you approved</h2>
+                <h2 className="font-display text-lg">The Design You Approved</h2>
                 <p className="mt-1 text-[13px] text-ink-muted">
                   Version {proof.versionNumber} &mdash; this is exactly what
                   goes to print.
@@ -204,7 +204,7 @@ export default async function CheckoutOrderPage({
             )}
 
             <section className="rounded-md border border-line bg-card p-6">
-              <h2 className="font-display text-lg">What you ordered</h2>
+              <h2 className="font-display text-lg">What You Ordered</h2>
 
               <ul className="mt-4 flex flex-col divide-y divide-line-soft border-y border-line-soft">
                 {items.map((item) => (

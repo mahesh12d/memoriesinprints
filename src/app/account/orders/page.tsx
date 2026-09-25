@@ -371,7 +371,7 @@ export default async function AccountOrdersPage({
       <PortalBody>
         {total === 0 ? (
           <div className="rounded-md border border-line bg-card p-10 text-center">
-            <h2 className="font-display text-lg">No orders yet</h2>
+            <h2 className="font-display text-lg">No Orders Yet</h2>
             <p className="mx-auto mt-2 max-w-[46ch] text-sm leading-relaxed text-ink-muted">
               Anything you order appears here, and you&rsquo;ll be able to
               follow it from proof through to delivery.
@@ -429,7 +429,7 @@ export default async function AccountOrdersPage({
 
             {rows.length === 0 ? (
               <div className="rounded-md border border-line bg-card p-10 text-center">
-                <h2 className="font-display text-lg">Nothing here</h2>
+                <h2 className="font-display text-lg">Nothing Here</h2>
                 <p className="mx-auto mt-2 max-w-[48ch] text-sm leading-relaxed text-ink-muted">
                   {query
                     ? `No order of yours matches “${query}”. Check the reference, or clear the search to see them all.`

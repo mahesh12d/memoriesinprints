@@ -66,7 +66,7 @@ export default async function ProofReviewPage({
         <PortalHeader title={`Proof — ${order.reference}`} />
         <PortalBody>
           <div className="rounded-md border border-line bg-card p-10 text-center">
-            <h2 className="font-display text-lg">No proof yet</h2>
+            <h2 className="font-display text-lg">No Proof Yet</h2>
             <p className="mx-auto mt-2 max-w-[46ch] text-sm leading-relaxed text-ink-muted">
               The studio is working on it. We&rsquo;ll email you the moment
               there&rsquo;s something to look at.

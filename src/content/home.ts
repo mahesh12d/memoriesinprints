@@ -5,28 +5,6 @@
  * without touching layout — and so it's one file to hand to a copywriter.
  */
 
-/** Grouped so the discover bar can show one occasion at a time. */
-export const QUICK_LINKS = [
-  {
-    id: "funeral",
-    label: "Funeral",
-    links: [
-      { label: "Order of Service", href: "/products?category=funeral" },
-      { label: "Memorial Cards", href: "/products?category=funeral" },
-      { label: "Memory Boxes", href: "/products?category=funeral" },
-      { label: "Attendance Cards", href: "/products?category=funeral" },
-    ],
-  },
-  {
-    id: "wedding",
-    label: "Wedding",
-    links: [
-      { label: "Save the Dates", href: "/products?category=wedding" },
-      { label: "Wedding Invitations", href: "/products?category=wedding" },
-    ],
-  },
-];
-
 export const CASE_STUDY_STEPS = [
   {
     label: "01 · The brief",
@@ -195,7 +173,7 @@ export const ARTICLES = [
   {
     slug: "choosing-paper-for-an-order-of-service",
     tag: "Paper",
-    title: "Choosing paper for an order of service",
+    title: "Choosing Paper for an Order of Service",
     excerpt:
       "Why weight matters more than brightness, and how the fold changes what a booklet feels like in the hand.",
     date: "August 2026",
@@ -205,7 +183,7 @@ export const ARTICLES = [
   {
     slug: "what-to-include-in-a-funeral-booklet",
     tag: "Planning",
-    title: "What to include in a funeral booklet",
+    title: "What to Include in a Funeral Booklet",
     excerpt:
       "A gentle checklist for families: the readings, the photographs, and the details people most often forget.",
     date: "July 2026",
@@ -215,7 +193,7 @@ export const ARTICLES = [
   {
     slug: "how-long-wedding-stationery-really-takes",
     tag: "Planning",
-    title: "How long wedding stationery really takes",
+    title: "How Long Wedding Stationery Really Takes",
     excerpt:
       "Working backwards from the date, so save the dates and invitations land when they should.",
     date: "June 2026",

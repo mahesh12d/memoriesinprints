@@ -5,7 +5,7 @@ import { Breadcrumb, Section, SectionHeading } from "@/components/site/section";
 import { ImagePlaceholder } from "@/components/site/image-placeholder";
 
 export const metadata: Metadata = {
-  title: "About us",
+  title: "About Us",
   description:
     "An independent UK print studio handling funeral and wedding stationery with the same attention to detail.",
 };
@@ -15,12 +15,12 @@ export default function AboutPage() {
     <>
       <Section>
         <Breadcrumb
-          trail={[{ href: "/", label: "Home" }, { label: "About us" }]}
+          trail={[{ href: "/", label: "Home" }, { label: "About Us" }]}
         />
 
         <div className="flex max-w-[62ch] flex-col gap-4">
           <h1 className="text-[40px] leading-tight">
-            A small studio, run with care
+            A Studio Run with Care
           </h1>
           <p className="text-[15px] leading-relaxed text-ink-muted">
             Memories in Prints is an independent print studio handling funeral
@@ -36,7 +36,7 @@ export default function AboutPage() {
             <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent-text">
               Our story
             </span>
-            <h2 className="text-[32px] leading-tight">Why we started</h2>
+            <h2 className="text-[32px] leading-tight">Why We Started</h2>
             <p className="text-[15px] leading-relaxed text-ink-muted">
               Memories in Prints began with a simple frustration: funeral
               stationery that felt like an afterthought, and wedding stationery
@@ -67,7 +67,7 @@ export default function AboutPage() {
               Meet the studio
             </span>
             <h2 className="text-[32px] leading-tight">
-              The people behind the print
+              The People Behind the Design &amp; Print
             </h2>
             <p className="text-[15px] leading-relaxed text-ink-muted">
               Every proof that leaves the studio is designed, checked and
@@ -85,7 +85,7 @@ export default function AboutPage() {
         <SectionHeading
           tone="light"
           eyebrow="What we stand by"
-          title="Where craft meets care"
+          title="Where Craft Meets Care"
         />
         <ul className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
           {STUDIO_VALUES.map((value) => (

@@ -1,20 +1,25 @@
 import Link from "next/link";
 import {
   CASE_STUDY_STEPS,
-  FAQS,
-  QUICK_LINKS,
   STUDIO_VALUES,
   TESTIMONIALS,
   TRUSTED_BY,
 } from "@/content/home";
-import { Section, SectionHeading } from "@/components/site/section";
+import { CtaBand, Section, SectionHeading } from "@/components/site/section";
 import { ImagePlaceholder } from "@/components/site/image-placeholder";
 import { ImageAutoSlider } from "@/components/ui/image-auto-slider";
-import { DiscoverButton } from "@/components/ui/discover-button";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
 import { portfolioItems } from "@/db/schema";
 import { resolveImageUrls } from "@/lib/storage/image-url";
+
+/**
+ * How many pieces the moving strip wants.
+ *
+ * It shows about four at a time and duplicates the set to loop, so anything
+ * under roughly this many is visibly the same handful coming round again.
+ */
+const STRIP_LENGTH = 12;
 
 export default async function HomePage() {
   /**
@@ -25,48 +30,51 @@ export default async function HomePage() {
    * studio's own work. Ticking "popular" on a portfolio piece now puts it
    * here, which is what that tick was always supposed to mean.
    *
-   * Falling back to the newest published work rather than to nothing: a studio
-   * that has not got round to flagging anything should still show its
-   * portfolio, and an empty strip under that heading looks broken.
+   * Nothing else gets in. The strip repeats its contents to loop, so a short
+   * list shows the same piece coming round again — the fix for that is to
+   * flag more work, not for this to pad it out with something else.
    */
   const popular = await db
     .select({
       slug: portfolioItems.slug,
       title: portfolioItems.title,
       imageUrl: portfolioItems.imageUrl,
+      templateNumber: portfolioItems.templateNumber,
     })
     .from(portfolioItems)
     .where(
       and(
         eq(portfolioItems.isPublished, true),
         eq(portfolioItems.isPopular, true),
+        isNotNull(portfolioItems.imageUrl),
       ),
     )
     .orderBy(asc(portfolioItems.sortOrder))
-    .limit(12);
+    .limit(STRIP_LENGTH);
 
-  const shown =
-    popular.length > 0
-      ? popular
-      : await db
-          .select({
-            slug: portfolioItems.slug,
-            title: portfolioItems.title,
-            imageUrl: portfolioItems.imageUrl,
-          })
-          .from(portfolioItems)
-          .where(eq(portfolioItems.isPublished, true))
-          .orderBy(desc(portfolioItems.createdAt))
-          .limit(12);
+  /*
+    Only what the studio has pinned.
+
+    No topping up from recent work: the strip sits under "Our popular
+    designs", and quietly filling it with whatever was added last would make
+    that heading untrue. An empty strip renders nothing, which is the honest
+    answer until something is flagged.
+  */
+  const shown = popular;
 
   const slides = (await resolveImageUrls(shown.map((item) => item.imageUrl)))
     .map((src, index) =>
       src
         ? {
-            src,
-            alt: shown[index].title,
-            href: `/portfolio/${shown[index].slug}`,
-          }
+          src,
+          alt: shown[index].title,
+          title: shown[index].title,
+          meta:
+            shown[index].templateNumber === null
+              ? undefined
+              : `Template no. ${shown[index].templateNumber}`,
+          href: `/portfolio/${shown[index].slug}`,
+        }
         : null,
     )
     // A piece with no photograph yet would be an empty tile in a moving
@@ -125,10 +133,10 @@ export default async function HomePage() {
         <div className="relative mx-auto w-full max-w-[1200px] px-6 pb-20 pt-[calc(73px+4rem)] sm:px-10">
           <div className="flex max-w-[620px] flex-col gap-6">
             <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/80">
-              Independent print studio · Funeral Service Association member
+              Independent print studio
             </span>
             <h1 className="text-[38px] leading-[1.12] text-white sm:text-[48px] lg:text-[58px]">
-              Stationery that holds a life, and a love, with care.
+              Stationery That Holds a Life, and a Love, with Care.
             </h1>
             <p className="max-w-[52ch] text-[16px] leading-relaxed text-white/85 sm:text-[17px]">
               We design and print funeral stationery for directors and families,
@@ -158,7 +166,7 @@ export default async function HomePage() {
         <div className="grid items-center gap-12 lg:grid-cols-2">
           <div className="flex flex-col gap-5">
             <h2 className="text-[32px] leading-tight sm:text-[38px]">
-              We are here to help you
+              We Are Here to Help You
             </h2>
             <p className="max-w-[56ch] text-[15px] leading-relaxed text-ink-muted">
               Whatever brings you to us — arranging a funeral, planning a
@@ -167,6 +175,12 @@ export default async function HomePage() {
               you before it goes to print, and delivered to the timeline you
               need.
             </p>
+            <Link
+              href="/about"
+              className="mt-2 w-fit rounded-[2px] border border-field-line px-7 py-3.5 text-sm font-semibold text-ink-soft hover:border-brand hover:text-blue"
+            >
+              Our Story
+            </Link>
           </div>
           <ImagePlaceholder
             caption="[Photograph — a member of the studio team proofing a printed piece by hand]"
@@ -176,15 +190,19 @@ export default async function HomePage() {
         </div>
       </Section>
 
-      {/* POPULAR DESIGNS */}
-      <Section>
+      {/*
+        POPULAR DESIGNS
+
+        Its own tinted band, between two white sections. The strip was sitting
+        on the same background as the prose above and below it, so a hundred
+        thousand pounds of the studio's own work read as one more paragraph.
+      */}
+      <Section tone="grey">
         <SectionHeading
-          title="Our popular designs"
-          intro="We offer a wide range of personalised services and printed materials to help you honour, remember and celebrate meaningful moments."
+          eyebrow="Chosen by the studio"
+          title="Our Popular Designs"
           action={{ href: "/portfolio", label: "View full portfolio →" }}
         />
-
-        <DiscoverButton groups={QUICK_LINKS} className="mb-10" />
 
         <ImageAutoSlider images={slides} />
       </Section>
@@ -193,7 +211,7 @@ export default async function HomePage() {
       <Section tone="white">
         <SectionHeading
           eyebrow="Featured project"
-          title="From brief to finished booklet"
+          title="From Brief to Finished Booklet"
           intro="One order of service, from first conversation to the printed piece — a look at how every project moves through the studio."
         />
 
@@ -220,7 +238,7 @@ export default async function HomePage() {
       <Section tone="blue">
         <SectionHeading
           tone="light"
-          title="Where craft meets care"
+          title="Where Craft Meets Care"
           eyebrow="How we work"
         />
 
@@ -242,9 +260,6 @@ export default async function HomePage() {
       {/* TRUSTED BY */}
       <Section tone="grey">
         <div className="flex flex-col items-center gap-8 text-center">
-          <span className="rounded-full bg-good-tint px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-good-deep">
-            FSA Member — Funeral Service Association
-          </span>
           <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-quiet">
             As trusted by
           </span>
@@ -285,7 +300,7 @@ export default async function HomePage() {
         <div className="grid items-center gap-12 lg:grid-cols-2">
           <div className="flex flex-col gap-5">
             <h2 className="text-[32px] leading-tight">
-              Wherever you are, we can reach you
+              Wherever You Are, We Can Reach You
             </h2>
             <p className="max-w-[54ch] text-[15px] leading-relaxed text-ink-muted">
               Alongside our studio clients, we design, print and ship funeral
@@ -297,7 +312,7 @@ export default async function HomePage() {
               href="/contact"
               className="mt-2 w-fit rounded-[2px] bg-brand px-7 py-3.5 text-sm font-semibold text-on-accent hover:bg-band-deep"
             >
-              Get a quote, wherever you are
+              Get a quote
             </Link>
           </div>
           <ImagePlaceholder
@@ -308,27 +323,11 @@ export default async function HomePage() {
         </div>
       </Section>
 
-      {/* FAQ PREVIEW */}
-      <Section>
-        <SectionHeading
-          title="Common questions"
-          action={{ href: "/guide#faq", label: "View full FAQ →" }}
-        />
-
-        <dl className="divide-y divide-line border-y border-line">
-          {FAQS.slice(0, 4).map((faq) => (
-            <div
-              key={faq.q}
-              className="grid gap-3 py-7 lg:grid-cols-[1fr_1.4fr]"
-            >
-              <dt className="font-display text-lg">{faq.q}</dt>
-              <dd className="text-[15px] leading-relaxed text-ink-muted">
-                {faq.a}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </Section>
+      <CtaBand
+        title="Print Products for Your Business & Families You Served"
+        body="Order of service, memorial cards, attendance cards and keepsakes — designed, proofed and printed by one studio, to the date you are working towards."
+        primary={{ href: "/contact", label: "Contact Us" }}
+      />
     </>
   );
 }

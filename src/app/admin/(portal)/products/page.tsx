@@ -105,7 +105,7 @@ export default async function AdminProductsPage() {
           hrefFor={(row) => `/admin/products/${row.id}`}
           empty={
             <>
-              <h2 className="font-display text-lg">Nothing in the catalogue</h2>
+              <h2 className="font-display text-lg">Nothing in the Catalogue</h2>
               <p className="mt-2 text-sm text-ink-muted">
                 Add the first product and it appears on the website straight
                 away.

@@ -25,7 +25,7 @@ export function TurnaroundSparkline({
   if (withData.length < 2) {
     return (
       <div className="flex flex-col gap-2">
-        <h2 className="font-display text-[15px]">Turnaround, last 8 weeks</h2>
+        <h2 className="font-display text-[15px]">Turnaround, Last 8 Weeks</h2>
         <p className="text-[13px] text-ink-muted">
           Not enough approvals yet to show a trend.
         </p>
@@ -61,7 +61,7 @@ export function TurnaroundSparkline({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between gap-4">
-        <h2 className="font-display text-[15px]">Turnaround, last 8 weeks</h2>
+        <h2 className="font-display text-[15px]">Turnaround, Last 8 Weeks</h2>
         <span className="text-[13px] text-ink-muted">
           <strong className="font-semibold text-blue">
             {latest.days.toFixed(1)} days
