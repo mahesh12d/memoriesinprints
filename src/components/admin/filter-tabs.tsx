@@ -13,6 +13,7 @@ export type FilterOption = {
  */
 export function FilterTabs({
   basePath,
+  label,
   param = "status",
   current,
   options,
@@ -20,6 +21,14 @@ export function FilterTabs({
   alwaysSetParam = false,
 }: {
   basePath: string;
+  /**
+   * What this row of pills filters on.
+   *
+   * Two unlabelled rows of pills one above the other say nothing about which
+   * is which — "Paid" and "Delivered" look like the same kind of answer to
+   * the same unasked question.
+   */
+  label?: string;
   param?: string;
   current: string;
   options: FilterOption[];
@@ -46,7 +55,7 @@ export function FilterTabs({
     return query ? `${basePath}?${query}` : basePath;
   }
 
-  return (
+  const pills = (
     <div className="flex flex-wrap gap-1.5">
       {options.map((option) => {
         const active = option.value === current;
@@ -72,6 +81,17 @@ export function FilterTabs({
           </Link>
         );
       })}
+    </div>
+  );
+
+  if (!label) return pills;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-quiet">
+        {label}
+      </span>
+      {pills}
     </div>
   );
 }

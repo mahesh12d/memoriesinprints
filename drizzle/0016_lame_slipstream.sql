@@ -1,0 +1,1 @@
+ALTER TYPE "public"."proof_status" ADD VALUE 'draft' BEFORE 'awaiting_proofreading';

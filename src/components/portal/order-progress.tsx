@@ -17,6 +17,12 @@ type OrderStatus =
   | "cancelled";
 
 type ProofStatus =
+  /*
+    Never reaches a customer's screen — their queries only take versions that
+    have been sent to them — but the column can hold it, so the type says so
+    rather than making the page lie to the compiler about what it fetched.
+  */
+  | "draft"
   | "awaiting_proofreading"
   | "returned_to_designer"
   | "awaiting_customer"
@@ -49,6 +55,26 @@ const CURRENT_STEP: Record<Exclude<OrderStatus, "cancelled">, number> = {
   // Past the last index, so every step reads as done.
   delivered: STEPS.length,
 };
+
+
+/**
+ * Whether this order is still waiting on its form before anything can start.
+ *
+ * Not simply "the form has not been sent". An order whose proof has reached
+ * the customer, or that is already being printed, plainly got its details
+ * some other way — usually over the phone with the studio. Treating those as
+ * outstanding put a delivered order on step one and offered a "fill in your
+ * order form" button next to a finished job.
+ */
+export function awaitingOrderForm(
+  status: OrderStatus,
+  proofStatus: ProofStatus | null | undefined,
+  formSubmitted: boolean,
+): boolean {
+  if (formSubmitted || status === "cancelled") return false;
+  if (proofStatus) return false;
+  return CURRENT_STEP[status] <= 1;
+}
 
 /**
  * One plain sentence about what is happening now, and whether anything is
@@ -114,10 +140,10 @@ export function OrderProgress({
 
   /**
    * Nothing moves until the details are in. A designer cannot draw an order
-   * of service without the name and the date, so an order whose form has not
-   * been sent sits on the first step however far the rest has got.
+   * of service without the name and the date, so an order still waiting on
+   * its form sits on the first step.
    */
-  if (!formSubmitted) {
+  if (awaitingOrderForm(status, proofStatus, formSubmitted)) {
     return (
       <ProgressSteps
         steps={STEPS}

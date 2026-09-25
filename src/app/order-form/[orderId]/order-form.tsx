@@ -121,8 +121,11 @@ export function OrderForm({
   addressDefaults,
   saved,
   products,
+  alreadySent = false,
 }: {
   orderId: string;
+  /** Sent once already, so the buttons say so rather than asking again. */
+  alreadySent?: boolean;
   /** The account's address, so the delivery block starts filled in. */
   addressDefaults: {
     shippingName: string;
@@ -419,41 +422,6 @@ export function OrderForm({
         title="Print specification"
         intro="The design, the paper it is printed on, and how many."
       >
-        {/*
-          Codes read off the studio's printed catalogue. An arranger sitting
-          with a family has it open in front of them, and copying the code is
-          quicker and less error-prone than finding the same design again in a
-          list on screen.
-        */}
-        <Row
-          label="Cover design code"
-          name="coverDesignCode"
-          error={errors.coverDesignCode}
-          hint="From the catalogue, if you have it to hand."
-        >
-          <input
-            id="coverDesignCode"
-            name="coverDesignCode"
-            maxLength={60}
-            defaultValue={saved?.coverDesignCode ?? ""}
-            className={`w-[200px] ${inputClass} ${errors.coverDesignCode ? errorClass : ""}`}
-          />
-        </Row>
-
-        <Row
-          label="Inside pages code"
-          name="insidePagesCode"
-          error={errors.insidePagesCode}
-        >
-          <input
-            id="insidePagesCode"
-            name="insidePagesCode"
-            maxLength={60}
-            defaultValue={saved?.insidePagesCode ?? ""}
-            className={`w-[200px] ${inputClass} ${errors.insidePagesCode ? errorClass : ""}`}
-          />
-        </Row>
-
         <input type="hidden" name="photoOption" value={photoOption} />
         <Row label="A photograph on the cover" name="photoOption" error={errors.photoOption}>
           <div className="grid gap-2.5 sm:grid-cols-3">
@@ -1077,7 +1045,7 @@ export function OrderForm({
           value="submit"
           className="rounded-[2px] bg-brand px-7 py-3.5 text-sm font-semibold text-on-accent hover:bg-brand-deep hover:text-white"
         >
-          Send the form
+          {alreadySent ? "Send the changes" : "Send the form"}
         </button>
 
         <button
@@ -1090,7 +1058,9 @@ export function OrderForm({
         </button>
 
         <p className="text-[13px] text-ink-quiet">
-          Nothing is final until you send it.
+          {alreadySent
+            ? "Your changes reach the design team as soon as you send them."
+            : "Nothing is final until you send it."}
         </p>
       </div>
     </form>

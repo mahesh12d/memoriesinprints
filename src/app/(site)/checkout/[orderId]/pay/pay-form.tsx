@@ -1,9 +1,14 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { beginPaymentAction } from "@/lib/payments/checkout";
-import { emptyFormState } from "@/lib/auth/form-state";
+import { useActionState, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  beginPaymentAction,
+  confirmPaymentAction,
+} from "@/lib/payments/checkout";
+import { openRazorpaySheet } from "@/lib/payments/razorpay-sheet";
 import { FormMessage, SubmitButton } from "@/components/ui/form";
+import type { BeginPaymentState } from "@/lib/payments/intent";
 
 /**
  * Choosing how to pay.
@@ -67,15 +72,96 @@ export function PayForm({
   amount: string;
   providers: { name: string; configured: boolean }[];
 }) {
-  const [state, formAction] = useActionState(beginPaymentAction, emptyFormState);
+  const [state, formAction] = useActionState<BeginPaymentState, FormData>(
+    beginPaymentAction,
+    { ok: false },
+  );
   const [provider, setProvider] = useState(providers[0]?.name ?? "razorpay");
+  const [sheetError, setSheetError] = useState<string | null>(null);
+  const [settling, setSettling] = useState(false);
+  const router = useRouter();
 
   const anyConfigured = providers.some((option) => option.configured);
+
+  /**
+   * The action hands back an intent; this opens the window it describes.
+   *
+   * Opening a popup is a side effect of a server round trip, which is the one
+   * place an effect is the right tool — it cannot happen during render, and
+   * the action itself has no access to the browser.
+   *
+   * Guarded on the provider order id so React's double-invoked effects in
+   * development, or a re-render while the sheet is up, cannot open it twice.
+   */
+  const opened = useRef<string | null>(null);
+  const intent = state.intent;
+
+  useEffect(() => {
+    if (!intent) return;
+    if (opened.current === intent.providerOrderId) return;
+    opened.current = intent.providerOrderId;
+
+    setSheetError(null);
+
+    void openRazorpaySheet(intent, {
+      onPaid(response) {
+        setSettling(true);
+        void confirmPaymentAction(orderId, "razorpay", { ...response }).then(
+          (result) => {
+            if (result.ok) {
+              // The order page is what says "paid", and it reads the row this
+              // just wrote rather than anything the browser is holding.
+              router.replace(`/checkout/${orderId}`);
+              router.refresh();
+              return;
+            }
+
+            setSettling(false);
+            setSheetError(result.message);
+          },
+        );
+      },
+      onDismiss() {
+        // Closing the window is not a failure. The attempt stays open and the
+        // same one is reopened next time, so nothing is duplicated.
+        opened.current = null;
+      },
+      onFailed(message) {
+        opened.current = null;
+        setSheetError(message);
+      },
+    }).catch((error: unknown) => {
+      opened.current = null;
+      setSheetError(
+        error instanceof Error
+          ? error.message
+          : "The payment window could not be opened.",
+      );
+    });
+  }, [intent, orderId, router]);
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
       <input type="hidden" name="orderId" value={orderId} />
       <FormMessage state={state} />
+
+      {settling && (
+        <p
+          role="status"
+          className="rounded-[4px] bg-good-tint px-[14px] py-3 text-[13px] font-medium text-good-deep"
+        >
+          Payment taken — confirming it with your order…
+        </p>
+      )}
+
+      {sheetError && (
+        <p
+          role="alert"
+          className="rounded-[4px] bg-alert-tint px-[14px] py-3 text-[13px] font-medium text-alert"
+        >
+          {sheetError}
+        </p>
+      )}
 
       {!anyConfigured && (
         <p className="rounded-[4px] bg-pending-tint px-[14px] py-3 text-[13px] leading-relaxed text-pending-deep">
@@ -136,14 +222,15 @@ export function PayForm({
       <SubmitButton pendingLabel="Opening payment…">Pay {amount}</SubmitButton>
 
       {/*
-        Said plainly, because the next thing that happens is a page they did
+        Said plainly, because the next thing that happens is a window they did
         not design opening and asking for a card number — which is exactly the
         moment a careful person stops and wonders whether they should.
       */}
       <p className="text-[12px] leading-relaxed text-ink-quiet">
-        Your card details are entered on{" "}
-        {provider === "paypal" ? "PayPal" : "Razorpay"}&rsquo;s own secure page,
-        never here. We only ever see whether the payment succeeded.
+        {provider === "paypal" ? "PayPal" : "Razorpay"} opens its own secure
+        window over this page to take your card. The details are typed into
+        theirs, never into ours, and we only ever see whether the payment
+        succeeded.
       </p>
     </form>
   );

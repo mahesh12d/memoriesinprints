@@ -35,6 +35,7 @@ export const PAYMENT_STATUS = {
 } satisfies Record<string, Label>;
 
 export const PROOF_STATUS = {
+  draft: { label: "Draft — with the designer", tone: "neutral" },
   awaiting_proofreading: { label: "Needs proofreading", tone: "pending" },
   returned_to_designer: { label: "Returned to designer", tone: "alert" },
   awaiting_customer: { label: "With the customer", tone: "neutral" },

@@ -22,6 +22,8 @@ export function PortfolioFilters({
   styles,
   templateNumbers,
   popularCount,
+  facets,
+  chosen,
   style,
   template,
   popular,
@@ -32,6 +34,10 @@ export function PortfolioFilters({
   styles: FilterOption[];
   templateNumbers: { number: number; count: number }[];
   popularCount: number;
+  /** Colour, religion and anything else the pieces are filed under. */
+  facets: { key: string; options: FilterOption[] }[];
+  /** The value picked in each of those, where one has been. */
+  chosen: Record<string, string>;
   style: string;
   template: number | null;
   popular: boolean;
@@ -40,11 +46,20 @@ export function PortfolioFilters({
   resetHref: string;
   matchCount: number;
 }) {
-  if (styles.length === 0 && templateNumbers.length === 0 && popularCount === 0) {
+  if (
+    styles.length === 0 &&
+    templateNumbers.length === 0 &&
+    popularCount === 0 &&
+    facets.length === 0
+  ) {
     return null;
   }
 
-  const isFiltered = Boolean(style) || template !== null || popular;
+  const isFiltered =
+    Boolean(style) ||
+    template !== null ||
+    popular ||
+    Object.keys(chosen).length > 0;
 
   /**
    * The current URL with one filter set, or cleared when it already holds
@@ -61,6 +76,7 @@ export function PortfolioFilters({
       style,
       template: template === null ? "" : String(template),
       popular: popular ? "1" : "",
+      ...chosen,
     };
 
     for (const [key, value] of Object.entries({ ...current, ...changed })) {
@@ -137,6 +153,41 @@ export function PortfolioFilters({
           </ul>
         </div>
       )}
+
+      {/*
+        One group per dimension the pieces are actually filed under. These
+        came across with the catalogue — colour, religion, children — and are
+        read from the data rather than listed here, so a new one needs no
+        code.
+      */}
+      {facets.map((facet) => (
+        <div key={facet.key} className="flex flex-col gap-2.5">
+          <h3 className="text-[13px] font-semibold text-ink-soft">
+            {/* Only the key is capitalised — `capitalize` on the whole line
+                turned this into "Filter By Colour". */}
+            Filter by <span className="capitalize">{facet.key}</span>
+          </h3>
+
+          <ul className="flex flex-wrap gap-2.5">
+            {facet.options.map((option) => {
+              const active = chosen[facet.key] === option.value;
+
+              return (
+                <li key={option.value}>
+                  <Chip
+                    href={hrefWith({
+                      [facet.key]: active ? null : option.value,
+                    })}
+                    active={active}
+                  >
+                    {option.value}
+                  </Chip>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
 
       <div className="flex flex-wrap items-end gap-x-8 gap-y-5">
         {templateNumbers.length > 0 && (

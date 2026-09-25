@@ -77,3 +77,52 @@ export async function countPopular(
 
   return row?.count ?? 0;
 }
+
+/**
+ * Everything else a piece is filed under, read out of the `filters` column.
+ *
+ * The catalogue came across carrying colour, religion and whether a design is
+ * for a child — three dimensions the old site could filter on and this one
+ * could not, because only `style` had a column. Rather than a migration per
+ * dimension, the keys are whatever the data holds: a piece tagged "fabric"
+ * tomorrow puts a Fabric group on the page with no code change.
+ *
+ * Style is excluded because it has a group of its own above.
+ */
+export async function loadFacets(
+  category: Category | undefined,
+): Promise<{ key: string; options: FilterOption[] }[]> {
+  const rows = await db
+    .select({
+      key: sql<string>`entry.key`,
+      value: sql<string>`option.value`,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(portfolioItems)
+    .innerJoin(
+      sql`jsonb_each(${portfolioItems.filters}) as entry(key, value)`,
+      sql`true`,
+    )
+    .innerJoin(
+      sql`jsonb_array_elements_text(entry.value) as option(value)`,
+      sql`true`,
+    )
+    .where(
+      and(
+        eq(portfolioItems.isPublished, true),
+        category ? eq(portfolioItems.category, category) : undefined,
+        sql`entry.key <> 'style'`,
+      ),
+    )
+    .groupBy(sql`entry.key`, sql`option.value`)
+    .orderBy(sql`entry.key`, sql`option.value`);
+
+  const grouped = new Map<string, FilterOption[]>();
+  for (const row of rows) {
+    const options = grouped.get(row.key) ?? [];
+    options.push({ value: row.value, count: row.count });
+    grouped.set(row.key, options);
+  }
+
+  return [...grouped.entries()].map(([key, options]) => ({ key, options }));
+}

@@ -84,6 +84,15 @@ export const insidePagesStyle = pgEnum("inside_pages_style", [
 ]);
 
 export const proofStatus = pgEnum("proof_status", [
+  /**
+   * Uploaded, and nobody else's problem yet.
+   *
+   * A proof used to go straight into the proofreader's queue the moment the
+   * files landed, so a wrong file or a page in the wrong order was someone
+   * else's to find. The designer checks it against the previous version
+   * first and then hands it on.
+   */
+  "draft",
   "awaiting_proofreading",
   "returned_to_designer",
   "awaiting_customer",
@@ -272,6 +281,20 @@ export const portfolioItems = pgTable(
      */
     style: varchar("style", { length: 60 }),
 
+    /**
+     * The rest of what a piece is filed under — colour, religion, and whether
+     * it is a child's design.
+     *
+     * `style` has a column of its own because the chips on /portfolio are
+     * built from it. These came across with the catalogue and are kept whole
+     * rather than thrown away: adding a "Religious" or "Blue" filter later is
+     * then a UI change, not a re-import.
+     */
+    filters: jsonb("filters")
+      .$type<Record<string, string[]>>()
+      .notNull()
+      .default({}),
+
     /** Pinned by the studio as a design worth showing first. */
     isPopular: boolean("is_popular").notNull().default(false),
 
@@ -426,8 +449,6 @@ export const orderForms = pgTable(
      * reads the code from it — asking them to find the same design again in a
      * web list is slower and gets it wrong.
      */
-    coverDesignCode: varchar("cover_design_code", { length: 60 }),
-    insidePagesCode: varchar("inside_pages_code", { length: 60 }),
     photoOption: photoOption("photo_option"),
     numberOfPages: integer("number_of_pages"),
     insidePagesStyle: insidePagesStyle("inside_pages_style"),

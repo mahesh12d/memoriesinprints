@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { orderForms, orders } from "@/db/schema";
@@ -10,6 +10,7 @@ import { requireUser } from "@/lib/auth/guards";
 import { fail, type FormState } from "@/lib/auth/form-state";
 import {
   additionalProductSchema,
+  canEditOrderForm,
   MAX,
   missingForSubmission,
   orderFormSchema,
@@ -70,6 +71,17 @@ export async function saveOrderFormAction(
     return fail("We couldn't find that order.");
   }
 
+  /*
+    Once the order has shipped the form is the record of what was printed,
+    not instructions for what to print. The list stops offering the edit at
+    the same point; this is the half that cannot be got round with a link.
+  */
+  if (!canEditOrderForm(order.status)) {
+    return fail(
+      "This order has already left the studio, so its form can't be changed. Call us if something is wrong with it.",
+    );
+  }
+
   const submitting = formData.get("intent") === "submit";
 
   const parsed = orderFormSchema.safeParse({
@@ -85,8 +97,6 @@ export async function saveOrderFormAction(
     funeralTime: formData.get("funeralTime") ?? "",
     venueName: formData.get("venueName") ?? "",
 
-    coverDesignCode: formData.get("coverDesignCode") ?? "",
-    insidePagesCode: formData.get("insidePagesCode") ?? "",
     photoOption: formData.get("photoOption") ?? "",
     numberOfPages: formData.get("numberOfPages") ?? "",
     insidePagesStyle: formData.get("insidePagesStyle") ?? "",
@@ -160,8 +170,16 @@ export async function saveOrderFormAction(
         ...values,
         bespokeDetails,
         callbackPhone,
-        status: submitting ? "submitted" : "draft",
-        submittedAt: submitting ? now : null,
+        /*
+          A form that has been sent stays sent.
+
+          Writing "draft" here unconditionally meant pressing "save and
+          finish later" on a form already with the studio quietly took it
+          back off them — the job would sit waiting for details that had
+          been sent days ago.
+        */
+        status: submitting ? "submitted" : sql`${orderForms.status}`,
+        submittedAt: submitting ? now : sql`${orderForms.submittedAt}`,
         updatedAt: now,
       },
     });

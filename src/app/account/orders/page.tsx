@@ -1,11 +1,24 @@
 import Link from "next/link";
-import { and, desc, eq, exists, ilike, inArray, ne, not, or, sql } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  exists,
+  ilike,
+  inArray,
+  isNotNull,
+  ne,
+  not,
+  or,
+  sql,
+} from "drizzle-orm";
 import { db } from "@/db";
 import { orderForms, orderItems, orders, proofVersions } from "@/db/schema";
 import { requireUser } from "@/lib/auth/guards";
 import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
 import { type PillTone } from "@/components/portal/status-pill";
 import { OrderCard } from "@/components/portal/order-card";
+import { awaitingOrderForm } from "@/components/portal/order-progress";
 import { FilterTabs } from "@/components/admin/filter-tabs";
 import { OrderSearch } from "@/components/portal/order-search";
 import { Pagination } from "@/components/portal/pagination";
@@ -186,9 +199,20 @@ export default async function AccountOrdersPage({
         })
         .from(proofVersions)
         .where(
-          inArray(
-            proofVersions.orderId,
-            rows.map((row) => row.id),
+          and(
+            inArray(
+              proofVersions.orderId,
+              rows.map((row) => row.id),
+            ),
+            /*
+              Only versions that have been sent to them.
+
+              Without this the newest version counted whatever its state, so
+              a draft still with the proofreader, or one the proofreader had
+              bounced back to the designer, put a "see the proof" button in
+              front of the customer for artwork nobody had checked yet.
+            */
+            isNotNull(proofVersions.sentToCustomerAt),
           ),
         )
         .orderBy(proofVersions.orderId, sql`${proofVersions.versionNumber} desc`)
@@ -451,11 +475,22 @@ export default async function AccountOrdersPage({
                         payHref={canPay ? `/checkout/${row.id}` : null}
                         formSubmitted={formSent.has(row.id)}
                         orderFormHref={
-                          formSent.has(row.id)
-                            ? null
-                            : `/order-form/${row.id}`
+                          awaitingOrderForm(
+                            row.status,
+                            proofStatus,
+                            formSent.has(row.id),
+                          )
+                            ? `/order-form/${row.id}`
+                            : null
                         }
-                        needsYou={waitingOnCustomer(row) || !formSent.has(row.id)}
+                        needsYou={
+                          waitingOnCustomer(row) ||
+                          awaitingOrderForm(
+                            row.status,
+                            proofStatus,
+                            formSent.has(row.id),
+                          )
+                        }
                         statusLabel={STATUS[row.status]?.label ?? row.status}
                         statusTone={STATUS[row.status]?.tone ?? "neutral"}
                         paymentLabel={

@@ -96,3 +96,27 @@ export async function sendMail(mail: Mail): Promise<void> {
   await mailer.sendMail({ from, ...mail });
 }
 
+
+/**
+ * For mail that follows work already finished.
+ *
+ * A confirmation that cannot be sent must not undo the thing it confirms. The
+ * enquiry is already in the database, the payment is already settled, the
+ * proof is already uploaded — and an exception here reaches the customer as a
+ * failed submission for something that worked. The reason is logged, where
+ * the studio can see it and fix the provider.
+ *
+ * Mail that IS the deliverable — a verification link, a password reset —
+ * still goes through sendMail and still fails loudly, because a silent
+ * failure there leaves someone waiting for a link that will never arrive.
+ */
+export async function notifyByMail(mail: Mail): Promise<void> {
+  try {
+    await sendMail(mail);
+  } catch (error) {
+    console.error(
+      `[mail] could not send "${mail.subject}" to ${mail.to}:`,
+      error instanceof Error ? error.message : error,
+    );
+  }
+}

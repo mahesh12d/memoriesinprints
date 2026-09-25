@@ -15,7 +15,7 @@ import {
   signupSchema,
 } from "@/lib/validation";
 import { LIMITS, rateLimit } from "@/lib/rate-limit";
-import { sendMail } from "@/lib/mail/mailer";
+import { notifyByMail, sendMail } from "@/lib/mail/mailer";
 import {
   passwordChangedMail,
   resetPasswordMail,
@@ -369,7 +369,7 @@ export async function resetPasswordAction(
   // A reset is a recovery action: sign every device out, including this one.
   await revokeAllSessions(result.userId);
 
-  if (user) await sendMail(passwordChangedMail(user.email, user.name));
+  if (user) await notifyByMail(passwordChangedMail(user.email, user.name));
 
   redirect("/login?reset=1");
 }
@@ -421,7 +421,9 @@ export async function changePasswordAction(
 
   // Keep this device, drop the rest.
   await revokeOtherSessions(session.user.id, session.id);
-  await sendMail(passwordChangedMail(session.user.email, session.user.name));
+  await notifyByMail(
+    passwordChangedMail(session.user.email, session.user.name),
+  );
 
   revalidatePath("/account/security");
   return {

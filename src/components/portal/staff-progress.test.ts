@@ -101,3 +101,12 @@ test("every stage says something, whatever it is handed", () => {
     }
   }
 });
+
+test("a draft reads as artwork still in hand, not as checked", () => {
+  const draft = stage("awaiting_proof", "draft", true, true);
+  const sent = stage("awaiting_proof", "awaiting_proofreading", true, true);
+
+  assert.equal(draft.current, sent.current - 1);
+  assert.match(draft.note, /designer is checking it/);
+  assert.match(sent.note, /proofreader/);
+});

@@ -32,3 +32,21 @@ export function canUploadProofs(role: UserRole): boolean {
 export function canSeeAllOrders(role: UserRole): boolean {
   return role !== "designer";
 }
+
+/**
+ * Whether this person may open a given order's proof at all.
+ *
+ * The customer it belongs to, the designer it is assigned to, and anyone who
+ * routes work. Nobody else — a designer holding a proof id for another
+ * designer's job is refused, because the row behind it carries the customer's
+ * name and email as well as the artwork.
+ */
+export function mayOpenProof(
+  viewer: { id: string; role: UserRole },
+  order: { ownerId: string; assignedDesignerId: string | null },
+): boolean {
+  if (order.ownerId === viewer.id) return true;
+  if (viewer.role === "customer") return false;
+  if (canSeeAllOrders(viewer.role)) return true;
+  return order.assignedDesignerId === viewer.id;
+}

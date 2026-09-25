@@ -5,6 +5,7 @@ import { orderForms, orders } from "@/db/schema";
 import { requireUser } from "@/lib/auth/guards";
 import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
 import { StatusPill } from "@/components/portal/status-pill";
+import { canEditOrderForm } from "@/lib/order-form/schema";
 
 const dateFormat = new Intl.DateTimeFormat("en-GB", {
   day: "numeric",
@@ -72,16 +73,9 @@ export default async function AccountOrderFormsPage() {
                 const sent = row.submittedAt !== null;
                 const started = row.formStatus !== null;
 
-                /**
-                 * A sent form can still be edited while the order is being
-                 * worked on. A name is spelled wrong, a time changes — it
-                 * should not need a phone call. Once it has shipped the form
-                 * is a record of what was printed, so editing stops.
-                 */
-                const editable =
-                  row.orderStatus !== "shipped" &&
-                  row.orderStatus !== "delivered" &&
-                  row.orderStatus !== "cancelled";
+                // The same rule the form page itself enforces, so this
+                // button cannot offer an edit that page then refuses.
+                const editable = canEditOrderForm(row.orderStatus);
 
                 return (
                   <li

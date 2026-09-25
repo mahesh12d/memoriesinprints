@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
-import { notifications, orders, proofComments, proofVersions, users } from "@/db/schema";
+import { notifications, orders, proofVersions } from "@/db/schema";
 import { requireUser } from "@/lib/auth/guards";
-import { signedReadUrl } from "@/lib/storage/storage";
+import { loadPins, signSheets } from "@/lib/proofs/sheets";
 import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
 import { ProofReviewer } from "@/components/proofs/proof-reviewer";
 import { isUuid } from "@/lib/utils";
@@ -42,7 +42,21 @@ export default async function ProofReviewPage({
       status: proofVersions.status,
     })
     .from(proofVersions)
-    .where(eq(proofVersions.orderId, orderId))
+    .where(
+      and(
+        eq(proofVersions.orderId, orderId),
+        /*
+          Only what has been sent to them.
+
+          The newest version was shown whatever its state, so a proof still
+          with the proofreader — or one they had returned to the designer to
+          fix — was readable by the customer at this URL before anyone in the
+          studio had checked it. An unsent version falls through to the "no
+          proof yet" message below, which is the truth from where they sit.
+        */
+        isNotNull(proofVersions.sentToCustomerAt),
+      ),
+    )
     .orderBy(desc(proofVersions.versionNumber))
     .limit(1);
 
@@ -69,40 +83,13 @@ export default async function ProofReviewPage({
     );
   }
 
-  const rows = await db
-    .select({
-      id: proofComments.id,
-      body: proofComments.body,
-      sheetIndex: proofComments.sheetIndex,
-      xPct: proofComments.xPct,
-      yPct: proofComments.yPct,
-      pinNumber: proofComments.pinNumber,
-      authorId: proofComments.authorId,
-      authorName: users.name,
-    })
-    .from(proofComments)
-    .leftJoin(users, eq(users.id, proofComments.authorId))
-    .where(eq(proofComments.proofVersionId, version.id))
-    .orderBy(asc(proofComments.pinNumber));
-
-  /**
-   * Every sheet of this proof, signed for reading.
-   *
-   * A proof saved before it had sheets has only its single storageKey, so
-   * that becomes a one-sheet proof rather than an empty one.
-   */
-  const stored =
-    version.sheets.length > 0
-      ? version.sheets
-      : [{ key: version.storageKey, name: "Proof", width: 0, height: 0 }];
-
-  const sheets = await Promise.all(
-    stored.map(async (sheet) => ({
-      key: sheet.key,
-      name: sheet.name,
-      url: await signedReadUrl(sheet.key),
-    })),
-  );
+  // Both of these are shared with the studio's own screens, so a proofreader
+  // reads exactly what the customer reads.
+  const [sheets, pins] = await Promise.all([
+    signSheets(version),
+    // Their own marks only — the studio's are internal working.
+    loadPins(version.id, session.user.id, session.user.id),
+  ]);
 
   const fileUrl = sheets[0]?.url ?? "";
 
@@ -137,16 +124,7 @@ export default async function ProofReviewPage({
           downloadUrl={fileUrl}
           status={version.status}
           versionNumber={version.versionNumber}
-          comments={rows.map((row) => ({
-            id: row.id,
-            body: row.body,
-            sheetIndex: row.sheetIndex,
-            xPct: row.xPct,
-            yPct: row.yPct,
-            pinNumber: row.pinNumber,
-            authorName: row.authorName ?? "Someone",
-            isMine: row.authorId === session.user.id,
-          }))}
+          comments={pins}
         />
       </PortalBody>
     </>

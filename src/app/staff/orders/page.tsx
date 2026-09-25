@@ -54,25 +54,35 @@ export default async function StaffOrdersPage({
 
   const designer = alias(users, "designer");
 
+  // A designer's list is their own work, whether or not they asked for it.
+  const scoped = canSeeAllOrders(session.user.role);
+  const showMoney = canSeeMoney(session.user.role);
+
+  /**
+   * The tab counts are scoped the same way the rows are.
+   *
+   * Counted across the whole studio, the tabs told a designer how much
+   * unassigned work was sitting there and then showed them a shorter list
+   * when they clicked — the number was both a leak and a lie.
+   */
+  const mineOnly = !scoped || onlyMine
+    ? eq(orders.assignedDesignerId, session.user.id)
+    : undefined;
+
   const counts = await db
     .select({ status: orders.status, value: sql<number>`count(*)::int` })
     .from(orders)
+    .where(mineOnly)
     .groupBy(orders.status);
 
   const byStatus = new Map(counts.map((row) => [row.status as string, row.value]));
   const total = counts.reduce((sum, row) => sum + row.value, 0);
 
-  // A designer's list is their own work, whether or not they asked for it.
-  const scoped = canSeeAllOrders(session.user.role);
-  const showMoney = canSeeMoney(session.user.role);
-
   const filters = [
     known === "all"
       ? undefined
       : eq(orders.status, known as keyof typeof ORDER_STATUS),
-    !scoped || onlyMine
-      ? eq(orders.assignedDesignerId, session.user.id)
-      : undefined,
+    mineOnly,
     query
       ? or(ilike(orders.reference, `%${query}%`), ilike(users.name, `%${query}%`))
       : undefined,

@@ -47,6 +47,10 @@ export const paypal: PaymentProvider = {
     return Boolean(clientId && clientSecret);
   },
 
+  publicKey() {
+    return credentials().clientId ?? null;
+  },
+
   async createOrder({ orderReference, amountMinor, currency }) {
     const { clientId, base } = credentials();
 

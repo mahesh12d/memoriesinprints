@@ -5,6 +5,7 @@ import {
   assignDesignerAction,
   returnProofToDesignerAction,
   sendProofToCustomerAction,
+  submitProofAction,
   uploadProofAction,
 } from "@/lib/proofs/actions";
 import { emptyFormState } from "@/lib/auth/form-state";
@@ -41,6 +42,33 @@ export function UploadProofForm({ orderId }: { orderId: string }) {
 
       <SubmitButton className="self-start" pendingLabel="Uploading…">
         Upload proof
+      </SubmitButton>
+    </form>
+  );
+}
+
+/**
+ * The designer's hand-off.
+ *
+ * Separate from uploading on purpose: the files land as a draft, the person
+ * who made them compares them against the previous version, and this is the
+ * button that puts the work in someone else's queue.
+ */
+export function SubmitProofForm({
+  orderId,
+  versionNumber,
+}: {
+  orderId: string;
+  versionNumber: number;
+}) {
+  const [state, action] = useActionState(submitProofAction, emptyFormState);
+
+  return (
+    <form action={action} className="flex flex-col gap-3">
+      <FormMessage state={state} />
+      <input type="hidden" name="orderId" value={orderId} />
+      <SubmitButton className="self-start" pendingLabel="Sending…">
+        Send version {versionNumber} for proofreading
       </SubmitButton>
     </form>
   );

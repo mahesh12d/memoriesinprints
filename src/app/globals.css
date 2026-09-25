@@ -192,6 +192,28 @@
     body {
       transition: none;
     }
+
+    /*
+      The portfolio card lifts and its artwork grows a little on hover. Both
+      are movement for its own sake — the border and the label say the same
+      thing without it — so they are dropped for anyone who has asked their
+      system for less of it.
+    */
+    .portfolio-card,
+    .portfolio-card img {
+      transition: none;
+    }
+
+    /*
+      `translate` and `scale`, not `transform`: Tailwind v4 emits the
+      standalone properties, so a guard written against `transform` would
+      look right and cancel nothing.
+    */
+    .portfolio-card:hover,
+    .portfolio-card:hover img {
+      translate: none;
+      scale: none;
+    }
   }
 
   h1,

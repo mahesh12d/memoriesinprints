@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, notInArray, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { orders, users } from "@/db/schema";
@@ -39,12 +39,17 @@ type Row = {
 type OrderStatusValue = keyof typeof ORDER_STATUS;
 type PaymentStatusValue = keyof typeof PAYMENT_STATUS;
 
+/** Gone from the studio: nothing left to do, so not part of "open". */
+const CLOSED: OrderStatusValue[] = ["shipped", "delivered", "cancelled"];
+const OPEN = "open";
+
 export default async function AdminOrdersPage({
   searchParams,
 }: {
   searchParams: Promise<{
     status?: string;
     payment?: string;
+    sort?: string;
     q?: string;
     page?: string;
   }>;
@@ -53,14 +58,27 @@ export default async function AdminOrdersPage({
   const {
     status = "all",
     payment = "all",
+    sort,
     q,
     page: pageParam,
   } = await searchParams;
   const page = Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1);
   const query = q?.trim() ?? "";
 
-  const knownStatus = status in ORDER_STATUS ? status : "all";
+  /**
+   * "Open" is the view the studio actually works in.
+   *
+   * It is not a status on the order — it is everything that has not left the
+   * building. Without it, seeing the live book meant clicking through four
+   * separate status pills and holding the totals in your head.
+   */
+  const knownStatus =
+    status === OPEN || status in ORDER_STATUS ? status : "all";
   const knownPayment = payment in PAYMENT_STATUS ? payment : "all";
+
+  // Newest first unless asked otherwise: the order placed this morning is the
+  // one being asked about on the phone.
+  const oldestFirst = sort === "oldest";
 
   // The same table twice in one query: once as the customer, once as the
   // designer the order is assigned to.
@@ -85,11 +103,16 @@ export default async function AdminOrdersPage({
     paymentCounts.map((row) => [row.paymentStatus as string, row.value]),
   );
   const total = counts.reduce((sum, row) => sum + row.value, 0);
+  const openCount = counts
+    .filter((row) => !CLOSED.includes(row.status as OrderStatusValue))
+    .reduce((sum, row) => sum + row.value, 0);
 
   const filters = [
     knownStatus === "all"
       ? undefined
-      : eq(orders.status, knownStatus as OrderStatusValue),
+      : knownStatus === OPEN
+        ? notInArray(orders.status, CLOSED)
+        : eq(orders.status, knownStatus as OrderStatusValue),
     knownPayment === "all"
       ? undefined
       : eq(orders.paymentStatus, knownPayment as PaymentStatusValue),
@@ -133,9 +156,22 @@ export default async function AdminOrdersPage({
     .innerJoin(users, eq(users.id, orders.userId))
     .leftJoin(designer, eq(designer.id, orders.assignedDesignerId))
     .where(where)
-    .orderBy(desc(orders.createdAt))
+    /*
+      Placed date, newest at the top, with the reference as the tiebreak so
+      two orders taken in the same minute keep a stable order between pages —
+      without it, a row can appear on page one and page two of the same list.
+    */
+    .orderBy(
+      oldestFirst ? asc(orders.createdAt) : desc(orders.createdAt),
+      oldestFirst ? asc(orders.reference) : desc(orders.reference),
+    )
     .limit(PAGE_SIZE)
     .offset((currentPage - 1) * PAGE_SIZE);
+
+  const stageLabel =
+    knownStatus === OPEN
+      ? "open"
+      : describe(ORDER_STATUS, knownStatus).label;
 
   const columns: Column<Row>[] = [
     { header: "Reference", cell: (row) => row.reference },
@@ -154,8 +190,9 @@ export default async function AdminOrdersPage({
       cell: (row) => row.designerName ?? "Unassigned",
     },
     {
+      // Never hidden: it is what the list is sorted by, and a sort you
+      // cannot see is indistinguishable from no sort at all.
       header: "Placed",
-      hideBelow: "md",
       cell: (row) => dateFormat.format(row.createdAt),
     },
     {
@@ -200,51 +237,147 @@ export default async function AdminOrdersPage({
 
       <PortalBody>
         <div className="flex flex-col gap-5">
-          <OrderSearch
-            basePath="/admin/orders"
-            query={query}
-            placeholder="Reference, customer or email"
-            keep={{
-              status: knownStatus === "all" ? undefined : knownStatus,
-              payment: knownPayment === "all" ? undefined : knownPayment,
-            }}
-            liveTarget="admin-orders-list"
-          />
+          {/*
+            One panel, three labelled parts: what to search, which stage, and
+            everything else folded away. It used to be a search box and two
+            unlabelled rows of pills, where "Paid" and "Delivered" read as
+            alternatives to each other.
+          */}
+          <div className="flex flex-col gap-5 rounded-md border border-line bg-card p-5">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div className="min-w-[260px] flex-1">
+                <OrderSearch
+                  basePath="/admin/orders"
+                  query={query}
+                  placeholder="Reference, customer or email"
+                  keep={{
+                    status: knownStatus === "all" ? undefined : knownStatus,
+                    payment: knownPayment === "all" ? undefined : knownPayment,
+                    sort: oldestFirst ? "oldest" : undefined,
+                  }}
+                  liveTarget="admin-orders-list"
+                />
+              </div>
 
-          <FilterTabs
-            basePath="/admin/orders"
-            current={knownStatus}
-            extraParams={{
-              payment: knownPayment === "all" ? undefined : knownPayment,
-              q: query || undefined,
-            }}
-            options={[
-              { value: "all", label: "All", count: total },
-              ...Object.entries(ORDER_STATUS).map(([value, label]) => ({
-                value,
-                label: label.label,
-                count: byStatus.get(value) ?? 0,
-              })),
-            ]}
-          />
+              {/*
+                A plain GET form, so the sort is in the URL like every other
+                filter and survives a reload or a link sent to a colleague.
+              */}
+              <form
+                action="/admin/orders"
+                className="flex items-center gap-2"
+              >
+                {knownStatus !== "all" && (
+                  <input type="hidden" name="status" value={knownStatus} />
+                )}
+                {knownPayment !== "all" && (
+                  <input type="hidden" name="payment" value={knownPayment} />
+                )}
+                {query && <input type="hidden" name="q" value={query} />}
 
-          <FilterTabs
-            basePath="/admin/orders"
-            param="payment"
-            current={knownPayment}
-            extraParams={{
-              status: knownStatus === "all" ? undefined : knownStatus,
-              q: query || undefined,
-            }}
-            options={[
-              { value: "all", label: "Any payment" },
-              ...Object.entries(PAYMENT_STATUS).map(([value, label]) => ({
-                value,
-                label: label.label,
-                count: byPayment.get(value) ?? 0,
-              })),
-            ]}
-          />
+                <label
+                  htmlFor="sort"
+                  className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-quiet"
+                >
+                  Sort
+                </label>
+                <select
+                  id="sort"
+                  name="sort"
+                  defaultValue={oldestFirst ? "oldest" : "newest"}
+                  className="rounded-[3px] border border-field-line bg-surface px-3 py-2 text-[13px]"
+                >
+                  <option value="newest">Newest placed first</option>
+                  <option value="oldest">Oldest placed first</option>
+                </select>
+                <button
+                  type="submit"
+                  className="rounded-[2px] border border-field-line px-4 py-2 text-[13px] font-semibold text-ink-soft hover:border-brand hover:text-blue"
+                >
+                  Apply
+                </button>
+              </form>
+            </div>
+
+            <FilterTabs
+              basePath="/admin/orders"
+              label="Stage"
+              current={knownStatus}
+              extraParams={{
+                payment: knownPayment === "all" ? undefined : knownPayment,
+                q: query || undefined,
+                sort: oldestFirst ? "oldest" : undefined,
+              }}
+              options={[
+                { value: "all", label: "All", count: total },
+                { value: OPEN, label: "Open", count: openCount },
+                ...Object.entries(ORDER_STATUS).map(([value, label]) => ({
+                  value,
+                  label: label.label,
+                  count: byStatus.get(value) ?? 0,
+                })),
+              ]}
+            />
+
+            {/*
+              Payment is a second question about the same order, not another
+              answer to the first, so it sits behind its own heading — open
+              already when it is in use, so a filter can never be on and out
+              of sight.
+            */}
+            <details open={knownPayment !== "all"} className="group">
+              <summary className="w-fit cursor-pointer text-[13px] font-semibold text-accent-text">
+                Payment
+              </summary>
+              <div className="pt-3">
+                <FilterTabs
+                  basePath="/admin/orders"
+                  param="payment"
+                  current={knownPayment}
+                  extraParams={{
+                    status: knownStatus === "all" ? undefined : knownStatus,
+                    q: query || undefined,
+                    sort: oldestFirst ? "oldest" : undefined,
+                  }}
+                  options={[
+                    { value: "all", label: "Any payment" },
+                    ...Object.entries(PAYMENT_STATUS).map(([value, label]) => ({
+                      value,
+                      label: label.label,
+                      count: byPayment.get(value) ?? 0,
+                    })),
+                  ]}
+                />
+              </div>
+            </details>
+          </div>
+
+          {/*
+            What is actually on screen, in words. With filters, a sort and a
+            pager all in play, "25 rows" on its own does not say which 25.
+          */}
+          <p className="flex flex-wrap items-center gap-x-2 text-[13px] text-ink-muted">
+            <span>
+              {matchingCount === 0
+                ? "No orders match"
+                : `${rows.length} of ${matchingCount} ${matchingCount === 1 ? "order" : "orders"}`}
+              {knownStatus === "all" ? "" : ` · ${stageLabel}`}
+              {knownPayment === "all"
+                ? ""
+                : ` · ${describe(PAYMENT_STATUS, knownPayment).label}`}
+              {query ? ` · matching “${query}”` : ""}
+              {" · "}
+              {oldestFirst ? "oldest placed first" : "newest placed first"}
+            </span>
+            {(knownStatus !== "all" || knownPayment !== "all" || query) && (
+              <Link
+                href="/admin/orders"
+                className="font-semibold text-accent-text"
+              >
+                Clear filters
+              </Link>
+            )}
+          </p>
 
           <RecordTable
             rows={rows}
@@ -275,6 +408,7 @@ export default async function AdminOrdersPage({
               status: knownStatus === "all" ? undefined : knownStatus,
               payment: knownPayment === "all" ? undefined : knownPayment,
               q: query || undefined,
+              sort: oldestFirst ? "oldest" : undefined,
             }}
           />
         </div>

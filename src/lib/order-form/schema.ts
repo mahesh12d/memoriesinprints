@@ -25,7 +25,6 @@ export const MAX = {
   photoQty: 1000,
   products: 50,
   productQuantity: 10_000,
-  designCode: 60,
   attachments: 40,
   addressLine: 200,
   city: 120,
@@ -90,8 +89,6 @@ export const orderFormSchema = z.object({
   funeralTime: optionalText(MAX.time),
   venueName: optionalText(MAX.venue),
 
-  coverDesignCode: optionalText(MAX.designCode),
-  insidePagesCode: optionalText(MAX.designCode),
   photoOption: optionalEnum(PHOTO_OPTIONS),
   numberOfPages: z
     .union([z.literal(""), z.coerce.number().int()])
@@ -192,3 +189,17 @@ export function missingForSubmission(
 }
 
 export type OrderFormValues = z.infer<typeof orderFormSchema>;
+
+/**
+ * Whether the form can still be changed.
+ *
+ * A sent form is not a closed one. Names get spelled wrong and service times
+ * move right up to the week itself, and a correction should not need a phone
+ * call. Once the order has left the studio the form stops being instructions
+ * and becomes the record of what was printed, so editing stops there.
+ */
+const LOCKED = ["shipped", "delivered", "cancelled"] as const;
+
+export function canEditOrderForm(orderStatus: string): boolean {
+  return !(LOCKED as readonly string[]).includes(orderStatus);
+}

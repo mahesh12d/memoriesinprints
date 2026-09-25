@@ -14,7 +14,7 @@ import {
 import {
   canSeeAllOrders,
   canUploadProofs,
-  isStaff,
+  mayOpenProof,
   requireStaff,
   requireUser,
 } from "@/lib/auth/guards";
@@ -145,7 +145,15 @@ export async function uploadProofAction(
     mimeType: chosen[0].type,
     sizeBytes: chosen.reduce((total, one) => total + one.size, 0),
     uploadedById: session.user.id,
-    status: "awaiting_proofreading",
+    /*
+      A draft, not a submission.
+
+      Uploading used to hand the work straight to the proofreader, so a page
+      in the wrong order or last week's file was someone else's to catch. It
+      sits with whoever uploaded it until they have compared it against the
+      previous version and pressed send.
+    */
+    status: "draft",
   });
 
   await pruneOldVersions(orderId);
@@ -167,7 +175,7 @@ export async function uploadProofAction(
     orderId,
     actorId: session.user.id,
     type: "proof_uploaded",
-    summary: `${session.user.name} uploaded a proof for ${order.reference} (${chosen.length} page${chosen.length === 1 ? "" : "s"})`,
+    summary: `${session.user.name} uploaded a draft proof for ${order.reference} (${chosen.length} page${chosen.length === 1 ? "" : "s"})`,
   });
 
   revalidatePath(`/staff/orders/${orderId}`);
@@ -176,7 +184,7 @@ export async function uploadProofAction(
 
   return {
     ok: true,
-    message: `${chosen.length} page${chosen.length === 1 ? "" : "s"} uploaded and sent for proofreading.`,
+    message: `${chosen.length} page${chosen.length === 1 ? "" : "s"} uploaded. Check them against the previous version, then send it for proofreading.`,
   };
 }
 
@@ -235,6 +243,69 @@ async function latestVersion(orderId: string) {
   return version ?? null;
 }
 
+/**
+ * A draft becomes work for the proofreader.
+ *
+ * The deliberate gap between uploading and this: the person who made the
+ * artwork looks at it against the version before it, with the wipe, and only
+ * then puts it in someone else's queue. Nothing is sent to the customer here
+ * — that is still the proofreader's call.
+ */
+export async function submitProofAction(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const session = await requireStaff();
+
+  const orderId = String(formData.get("orderId") ?? "");
+  if (!orderId) return fail("Missing order.");
+
+  const [order] = await db
+    .select({
+      id: orders.id,
+      reference: orders.reference,
+      assignedDesignerId: orders.assignedDesignerId,
+    })
+    .from(orders)
+    .where(eq(orders.id, orderId))
+    .limit(1);
+
+  if (!order) return fail("That order no longer exists.");
+
+  // Their own job, or someone who routes the work.
+  if (
+    !canSeeAllOrders(session.user.role) &&
+    order.assignedDesignerId !== session.user.id
+  ) {
+    return fail("That order is assigned to another designer.");
+  }
+
+  const version = await latestVersion(orderId);
+  if (!version) return fail("There's nothing uploaded to send.");
+
+  if (version.status !== "draft") {
+    return fail("That version has already been sent for proofreading.");
+  }
+
+  await db
+    .update(proofVersions)
+    .set({ status: "awaiting_proofreading" })
+    .where(eq(proofVersions.id, version.id));
+
+  await db.insert(activityEvents).values({
+    orderId,
+    actorId: session.user.id,
+    type: "proof_submitted",
+    summary: `${session.user.name} sent version ${version.versionNumber} of ${order.reference} for proofreading`,
+  });
+
+  revalidatePath(`/staff/orders/${orderId}`);
+  revalidatePath("/staff");
+  revalidatePath("/staff/queue");
+
+  return { ok: true, message: "Sent for proofreading." };
+}
+
 export async function sendProofToCustomerAction(
   _prev: FormState,
   formData: FormData,
@@ -248,6 +319,17 @@ export async function sendProofToCustomerAction(
   const orderId = String(formData.get("orderId") ?? "");
   const version = await latestVersion(orderId);
   if (!version) return fail("There's no proof to send yet.");
+
+  /*
+    The newest proof is not necessarily one anyone has offered up. A designer
+    can be mid-upload, and that version is theirs until they send it on — it
+    must not be possible to forward it to the family from here.
+  */
+  if (version.status === "draft") {
+    return fail(
+      "The designer is still working on the newest version and has not sent it for checking.",
+    );
+  }
 
   const [order] = await db
     .select({
@@ -428,6 +510,7 @@ async function proofForViewer(proofVersionId: string) {
       status: proofVersions.status,
       versionNumber: proofVersions.versionNumber,
       ownerId: orders.userId,
+      assignedDesignerId: orders.assignedDesignerId,
       reference: orders.reference,
       // Needed when approving: whether there is still anything to pay, and
       // what to ask for.
@@ -445,8 +528,16 @@ async function proofForViewer(proofVersionId: string) {
 
   if (!row) return null;
 
+  /*
+    Staff, but only the staff this job belongs to.
+
+    isStaff alone let any designer read and comment on any proof they had an
+    id for — the customer's name and email come back in this row, and the
+    comment would have gone onto another designer's artwork. Proofreaders and
+    admin still see everything, because routing the work requires it.
+  */
   const isOwner = row.ownerId === session.user.id;
-  if (!isOwner && !isStaff(session.user.role)) return null;
+  if (!mayOpenProof(session.user, row)) return null;
 
   return { ...row, session, isOwner };
 }

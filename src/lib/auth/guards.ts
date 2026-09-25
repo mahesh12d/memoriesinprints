@@ -9,6 +9,7 @@ export {
   canSeeAllOrders,
   canSeeMoney,
   canUploadProofs,
+  mayOpenProof,
 } from "./capabilities";
 
 export const STAFF_ROLES: UserRole[] = ["designer", "proofreader"];

@@ -13,6 +13,12 @@ type OrderStatus =
   | "cancelled";
 
 type ProofStatus =
+  /*
+    Never reaches a customer's screen — their queries only take versions that
+    have been sent to them — but the column can hold it, so the type says so
+    rather than making the page lie to the compiler about what it fetched.
+  */
+  | "draft"
   | "awaiting_proofreading"
   | "returned_to_designer"
   | "awaiting_customer"

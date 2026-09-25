@@ -20,6 +20,8 @@ import {
 } from "@/lib/admin/labels";
 import { formatMoney, QUOTED_INDIVIDUALLY } from "@/lib/pricing/money";
 import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
+import { ActivityTimeline } from "@/components/portal/activity-timeline";
+import { OrderFormSummary } from "@/components/portal/order-form-summary";
 import { StatusPill } from "@/components/portal/status-pill";
 import { StaffProgress } from "@/components/portal/staff-progress";
 import { OrderDetailForm, RecordPaymentForm } from "./order-forms";
@@ -156,6 +158,9 @@ export default async function AdminOrderDetailPage({
 
         <div className="grid gap-7 lg:grid-cols-[1.5fr_1fr]">
           <div className="flex flex-col gap-6">
+            {/* What the customer sent, which is what the job is. */}
+            <OrderFormSummary orderId={order.id} />
+
             <section className="rounded-md border border-line bg-card p-7">
               <div className="mb-5 flex flex-wrap items-center gap-2">
                 <StatusPill tone={status.tone}>{status.label}</StatusPill>
@@ -335,23 +340,7 @@ export default async function AdminOrderDetailPage({
               )}
             </section>
 
-            {activity.length > 0 && (
-              <section className="rounded-md border border-line bg-card p-6">
-                <h2 className="font-display text-lg">History</h2>
-                <ul className="mt-3 flex flex-col gap-3">
-                  {activity.map((event) => (
-                    <li key={event.id} className="flex flex-col gap-0.5">
-                      <span className="text-[13px] leading-relaxed">
-                        {event.summary}
-                      </span>
-                      <span className="text-[11px] text-ink-quiet">
-                        {dateTimeFormat.format(event.createdAt)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
+            <ActivityTimeline entries={activity} />
           </aside>
         </div>
       </PortalBody>

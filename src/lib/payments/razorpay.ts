@@ -25,6 +25,10 @@ export const razorpay: PaymentProvider = {
     return Boolean(keyId && keySecret);
   },
 
+  publicKey() {
+    return credentials().keyId ?? null;
+  },
+
   async createOrder({ orderReference, amountMinor, currency }) {
     const { keyId, keySecret } = credentials();
 

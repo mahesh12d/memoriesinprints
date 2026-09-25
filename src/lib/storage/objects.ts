@@ -145,18 +145,37 @@ export async function signedUploadUrl(
 /**
  * A short-lived link to read one object. In development this points at the
  * route that serves from disk instead.
+ *
+ * `downloadAs` asks for the file to be saved rather than displayed, under
+ * that name. The HTML `download` attribute cannot do this on its own: these
+ * links point at R2, and a browser ignores `download` on another origin. The
+ * instruction has to come from the response, so it is signed into the URL.
  */
-export async function signedReadUrl(storageKey: string): Promise<string> {
+export async function signedReadUrl(
+  storageKey: string,
+  downloadAs?: string,
+): Promise<string> {
   if (!isRemoteStorageConfigured()) {
     // Each segment is encoded separately: a single encodeURIComponent would
     // turn the slashes into %2F, which some servers refuse outright.
     const segments = storageKey.split("/").map(encodeURIComponent).join("/");
-    return `/api/uploads/${segments}`;
+    const route = `/api/uploads/${segments}`;
+    return downloadAs
+      ? `${route}?download=${encodeURIComponent(downloadAs)}`
+      : route;
   }
 
   return getSignedUrl(
     s3(),
-    new GetObjectCommand({ Bucket: config().bucket, Key: storageKey }),
+    new GetObjectCommand({
+      Bucket: config().bucket,
+      Key: storageKey,
+      ResponseContentDisposition: downloadAs
+        ? // Quotes doubled up rather than stripped, so a file called
+          // Mum"s photo.jpg cannot break out of the header.
+          `attachment; filename="${downloadAs.replace(/"/g, "'")}"`
+        : undefined,
+    }),
     { expiresIn: SIGNED_URL_TTL_SECONDS },
   );
 }

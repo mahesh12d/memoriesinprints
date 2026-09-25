@@ -12,6 +12,7 @@ import {
 } from "@/db/schema";
 import { requireUser } from "@/lib/auth/guards";
 import { STUDIO } from "@/lib/studio";
+import { canEditOrderForm } from "@/lib/order-form/schema";
 import { OrderForm } from "./order-form";
 import type { OrderFormRow, ProductChoice } from "./types";
 
@@ -47,6 +48,7 @@ export default async function OrderFormPage({
       id: orders.id,
       reference: orders.reference,
       orderedFor: orders.orderedFor,
+      status: orders.status,
     })
     .from(orders)
     .where(and(eq(orders.id, orderId), eq(orders.userId, session.user.id)))
@@ -130,7 +132,17 @@ export default async function OrderFormPage({
     byProduct.set(row.slug, entry);
   }
 
-  if (saved?.status === "submitted") {
+  /**
+   * A sent form reopens for changes; a shipped one does not.
+   *
+   * This used to stop at "submitted", which made the "check or change the
+   * details" button on the order-forms list a dead end — it landed on a
+   * thank-you page with nothing to change. The form is the studio's
+   * instructions until the order leaves, so it stays editable that long.
+   */
+  const sent = saved?.status === "submitted";
+
+  if (sent && !canEditOrderForm(order.status)) {
     return <Received reference={order.reference} at={saved.submittedAt} />;
   }
 
@@ -146,8 +158,6 @@ export default async function OrderFormPage({
         funeralDate: saved.funeralDate,
         funeralTime: saved.funeralTime,
         venueName: saved.venueName,
-        coverDesignCode: saved.coverDesignCode,
-        insidePagesCode: saved.insidePagesCode,
         photoOption: saved.photoOption,
         numberOfPages: saved.numberOfPages,
         insidePagesStyle: saved.insidePagesStyle,
@@ -172,9 +182,9 @@ export default async function OrderFormPage({
       <header className="flex flex-col gap-4">
         <h1 className="text-[34px] leading-tight">Your order of service</h1>
         <p className="max-w-[62ch] text-[16px] leading-relaxed text-ink-muted">
-          Whatever you can tell us helps the design team make a start. There is
-          no need to finish it in one go — save it and the link will bring you
-          back to what you have written.
+          {sent
+            ? "You have already sent this. Everything you wrote is below — change what you need to and send it again, and the design team will work from the new version."
+            : "Whatever you can tell us helps the design team make a start. There is no need to finish it in one go — save it and the link will bring you back to what you have written."}
         </p>
         <p className="text-[13px] text-ink-quiet">
           Order {order.reference}. If anything here is difficult, call us on{" "}
@@ -184,6 +194,7 @@ export default async function OrderFormPage({
 
       <OrderForm
         orderId={order.id}
+        alreadySent={sent}
         addressDefaults={addressDefaults}
         saved={values}
         products={[...byProduct.values()]}

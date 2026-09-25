@@ -32,6 +32,13 @@ export type VerificationResult = {
 export interface PaymentProvider {
   readonly name: ProviderName;
   isConfigured(): boolean;
+  /**
+   * The publishable key, or null when the provider has no credentials.
+   *
+   * Needed on its own so an attempt that is already open with the provider
+   * can be reopened without creating a second one just to learn the key.
+   */
+  publicKey(): string | null;
   createOrder(input: {
     orderReference: string;
     amountMinor: number;

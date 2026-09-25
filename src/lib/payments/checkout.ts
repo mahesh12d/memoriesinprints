@@ -15,6 +15,7 @@ import { razorpay } from "./razorpay";
 import { paypal } from "./paypal";
 import { markOrderPaid } from "./settle";
 import type { PaymentProvider, ProviderName } from "./provider";
+import type { BeginPaymentState } from "./intent";
 
 const PROVIDERS: Record<ProviderName, PaymentProvider> = {
   razorpay,
@@ -176,9 +177,9 @@ export async function placeOrderAction(
  * they have not agreed to.
  */
 export async function beginPaymentAction(
-  _prev: FormState,
+  _prev: BeginPaymentState,
   formData: FormData,
-): Promise<FormState> {
+): Promise<BeginPaymentState> {
   const session = await requireUser();
 
   const providerName = String(formData.get("provider") ?? "") as ProviderName;
@@ -210,35 +211,95 @@ export async function beginPaymentAction(
     return fail("This order hasn't been priced yet.");
   }
 
-  let providerOrder;
-  try {
-    providerOrder = await provider.createOrder({
-      orderReference: order.reference,
+  /**
+   * An attempt already open with the provider is reopened, not replaced.
+   *
+   * Every click used to mint a fresh provider order, so one £40 payment left
+   * a trail of them — and a customer who closed the sheet and tried again was
+   * paying against a different order id each time. Razorpay orders stay open
+   * until they are paid, so the right thing is to hand the same one back.
+   *
+   * Only while the amount is unchanged: a reprice has to start a new attempt,
+   * or the sheet would collect the old total.
+   */
+  const publicKey = provider.publicKey();
+
+  const [open] = publicKey
+    ? await db
+        .select({ providerOrderId: payments.providerOrderId })
+        .from(payments)
+        .where(
+          and(
+            eq(payments.orderId, order.id),
+            eq(payments.provider, providerName),
+            eq(payments.status, "created"),
+            eq(payments.amountMinor, order.totalMinor),
+            eq(payments.currency, order.currency),
+          ),
+        )
+        .limit(1)
+    : [];
+
+  let providerOrderId = open?.providerOrderId ?? null;
+  let isStub = false;
+
+  if (!providerOrderId) {
+    let providerOrder;
+    try {
+      providerOrder = await provider.createOrder({
+        orderReference: order.reference,
+        amountMinor: order.totalMinor,
+        currency: order.currency,
+      });
+    } catch (error) {
+      console.error("[payments] createOrder failed", error);
+      return fail(
+        "We couldn't reach the payment provider. Your order is safe — please try again.",
+      );
+    }
+
+    providerOrderId = providerOrder.providerOrderId;
+    isStub = providerOrder.isStub;
+
+    await db.insert(payments).values({
+      orderId: order.id,
+      provider: providerName,
+      providerOrderId,
       amountMinor: order.totalMinor,
       currency: order.currency,
+      status: "created",
     });
-  } catch (error) {
-    console.error("[payments] createOrder failed", error);
-    return fail(
-      "We couldn't reach the payment provider. Your order is safe — please try again.",
-    );
+
+    revalidatePath("/account/orders");
   }
 
-  await db.insert(payments).values({
-    orderId: order.id,
-    provider: providerName,
-    providerOrderId: providerOrder.providerOrderId,
-    amountMinor: order.totalMinor,
-    currency: order.currency,
-    status: "created",
-  });
-
-  revalidatePath("/account/orders");
+  /**
+   * Razorpay opens in the browser; everything else still goes to the order
+   * page.
+   *
+   * The sheet is Razorpay's own overlay, so the card number is typed into
+   * their window and never into this app — which is what keeps this codebase
+   * out of PCI scope. PayPal has no client integration yet, so it lands back
+   * on the order with its attempt recorded, exactly as before.
+   */
+  if (providerName === "razorpay" && publicKey && !isStub) {
+    return {
+      ok: true,
+      intent: {
+        provider: "razorpay",
+        publicKey,
+        providerOrderId,
+        amountMinor: order.totalMinor,
+        currency: order.currency,
+        orderReference: order.reference,
+        customerName: session.user.name,
+        customerEmail: session.user.email,
+      },
+    };
+  }
 
   redirect(
-    `/checkout/${order.id}?provider=${providerName}${
-      providerOrder.isStub ? "&stub=1" : ""
-    }`,
+    `/checkout/${order.id}?provider=${providerName}${isStub ? "&stub=1" : ""}`,
   );
 }
 

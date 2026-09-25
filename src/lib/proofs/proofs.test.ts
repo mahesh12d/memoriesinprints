@@ -189,3 +189,22 @@ test("pins are numbered in the order they were left", () => {
     ],
   );
 });
+
+/* -------------------------------------------------------------------------- */
+/* A draft belongs to whoever uploaded it                                     */
+/* -------------------------------------------------------------------------- */
+
+test("a draft waits on its designer, not on the proofreader", () => {
+  const draft = item({ proofStatus: "draft" });
+
+  assert.equal(groupFor(draft, DESIGNER), "awaiting_you");
+  // Not in the proofreader's pile: it has not been handed to them yet.
+  assert.notEqual(groupFor(draft, PROOFREADER), "awaiting_you");
+});
+
+test("sending it on moves it to the proofreader", () => {
+  const sent = item({ proofStatus: "awaiting_proofreading" });
+
+  assert.equal(groupFor(sent, PROOFREADER), "awaiting_you");
+  assert.notEqual(groupFor(sent, DESIGNER), "awaiting_you");
+});

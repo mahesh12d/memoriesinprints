@@ -4,8 +4,8 @@ import { useState } from "react";
 
 export type CompareVersion = {
   versionNumber: number;
-  fileUrl: string;
-  fileName: string | null;
+  /** Every page of that version, in order. */
+  sheets: { key: string; url: string; name: string }[];
 };
 
 /**
@@ -16,21 +16,21 @@ export type CompareVersion = {
  * version — on a twelve-page booklet, the one page least likely to have
  * changed.
  */
-function Sheet({
-  version,
-  label,
-}: {
-  version: CompareVersion;
-  label: string;
-}) {
+function Sheet({ url, label }: { url: string | null; label: string }) {
+  if (!url) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-surface-grey px-6 text-center">
+        <span className="text-[12px] leading-relaxed text-ink-quiet">
+          {label} has no page here — this version has fewer pages.
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full w-full bg-card">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={version.fileUrl}
-        alt={label}
-        className="h-full w-full object-contain"
-      />
+      <img src={url} alt={label} className="h-full w-full object-contain" />
     </div>
   );
 }
@@ -58,6 +58,19 @@ export function ProofCompare({
   const [position, setPosition] = useState(50);
   const [stacked, setStacked] = useState(true);
 
+  /**
+   * Which page is being compared.
+   *
+   * Both versions used to be reduced to their first sheet, so on a twelve
+   * page booklet this compared the one page least likely to have changed.
+   * The pages line up by position: page three against page three.
+   */
+  const [sheetIndex, setSheetIndex] = useState(0);
+  const pageCount = Math.max(previous.sheets.length, current.sheets.length);
+
+  const previousUrl = previous.sheets[sheetIndex]?.url ?? null;
+  const currentUrl = current.sheets[sheetIndex]?.url ?? null;
+
   const previousLabel = `Version ${previous.versionNumber}`;
   const currentLabel = `Version ${current.versionNumber}`;
 
@@ -78,17 +91,40 @@ export function ProofCompare({
         </button>
       </div>
 
+      {pageCount > 1 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-quiet">
+            Page
+          </span>
+          {Array.from({ length: pageCount }, (_, index) => (
+            <button
+              key={index}
+              type="button"
+              onClick={() => setSheetIndex(index)}
+              aria-current={index === sheetIndex ? "true" : undefined}
+              className={`size-8 rounded-[3px] text-[13px] font-semibold ${
+                index === sheetIndex
+                  ? "bg-band text-white"
+                  : "border border-line text-ink-muted hover:bg-surface-grey"
+              }`}
+            >
+              {index + 1}
+            </button>
+          ))}
+        </div>
+      )}
+
       {stacked ? (
         <div className="relative aspect-[1/1.414] w-full overflow-hidden rounded-md border border-line">
           <div className="absolute inset-0">
-            <Sheet version={previous} label={previousLabel} />
+            <Sheet url={previousUrl} label={previousLabel} />
           </div>
 
           <div
             className="absolute inset-0"
             style={{ clipPath: `inset(0 0 0 ${position}%)` }}
           >
-            <Sheet version={current} label={currentLabel} />
+            <Sheet url={currentUrl} label={currentLabel} />
           </div>
 
           {/* The seam. Purely visual — the range input below carries the interaction. */}
@@ -123,16 +159,16 @@ export function ProofCompare({
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {[
-            { version: previous, label: previousLabel },
-            { version: current, label: currentLabel },
-          ].map(({ version, label }) => (
-            <figure key={version.versionNumber} className="flex flex-col gap-2">
+            { url: previousUrl, label: previousLabel, n: previous.versionNumber },
+            { url: currentUrl, label: currentLabel, n: current.versionNumber },
+          ].map(({ url, label, n }) => (
+            <figure key={n} className="flex flex-col gap-2">
               <div className="aspect-[1/1.414] overflow-hidden rounded-md border border-line">
-                <Sheet version={version} label={label} />
+                <Sheet url={url} label={label} />
               </div>
               <figcaption className="text-[12px] text-ink-quiet">
                 {label}
-                {version.fileName ? ` · ${version.fileName}` : ""}
+                {pageCount > 1 ? ` · page ${sheetIndex + 1}` : ""}
               </figcaption>
             </figure>
           ))}

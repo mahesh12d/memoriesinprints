@@ -22,6 +22,8 @@ export function ProofReviewer({
   comments,
   status,
   versionNumber,
+  decision,
+  audience = "customer",
 }: {
   proofVersionId: string;
   sheets: ProofSheet[];
@@ -29,6 +31,18 @@ export function ProofReviewer({
   comments: ProofComment[];
   status: string;
   versionNumber: number;
+  /**
+   * What to do once it has been read.
+   *
+   * The customer approves or asks for changes. The proofreader sends it on or
+   * returns it to the designer — a different pair of buttons against the same
+   * artwork, so the panel is passed in rather than decided here. Left out, the
+   * proof is readable and markable but nothing can be concluded from it, which
+   * is what a designer looking at their own work should get.
+   */
+  decision?: React.ReactNode;
+  /** Whose screen this is, which is all that changes in the words. */
+  audience?: "customer" | "studio";
 }) {
   const [pending, setPending] = useState<Pin | null>(null);
   const [draft, setDraft] = useState("");
@@ -54,6 +68,7 @@ export function ProofReviewer({
     setSeenSheets((current) => new Set(current).add(index));
   }
 
+  const studio = audience === "studio";
   const decided = status === "approved" || status === "changes_requested";
   const readOnly = decided;
   const allSeen = seenSheets.size >= sheets.length;
@@ -110,17 +125,27 @@ export function ProofReviewer({
           </span>
           <h2 className="font-display text-lg">
             {status === "approved"
-              ? "You approved this proof"
+              ? studio
+                ? "Approved by the customer"
+                : "You approved this proof"
               : status === "changes_requested"
                 ? "Changes requested"
-                : "Your proof is ready"}
+                : studio
+                  ? "Ready to check"
+                  : "Your proof is ready"}
           </h2>
           <p className="text-[14px] leading-relaxed text-ink-muted">
             {decided
               ? status === "approved"
-                ? "Nothing more to do — we've started printing."
-                : "The studio has your comments and will send a new version."
-              : "Check the wording, the dates and the spellings. Click anywhere on the proof to point at something."}
+                ? studio
+                  ? "Approved, so it is on its way to print."
+                  : "Nothing more to do — we've started printing."
+                : studio
+                  ? "The customer has asked for changes. Their marks are on the proof."
+                  : "The studio has your comments and will send a new version."
+              : studio
+                ? "Read every page against the order form — names, dates, spellings. Click anywhere on the proof to mark something for the designer."
+                : "Check the wording, the dates and the spellings. Click anywhere on the proof to point at something."}
           </p>
           <a
             href={downloadUrl}
@@ -181,7 +206,9 @@ export function ProofReviewer({
             <p className="px-5 py-6 text-[13px] leading-relaxed text-ink-muted">
               {readOnly
                 ? "No comments were left on this version."
-                : "Nothing marked yet. If everything reads correctly, approve it below."}
+                : studio
+                  ? "Nothing marked yet. Anything you pin here goes to the designer, not to the customer."
+                  : "Nothing marked yet. If everything reads correctly, approve it below."}
             </p>
           ) : (
             <ul>
@@ -233,8 +260,18 @@ export function ProofReviewer({
           )}
         </div>
 
-        {/* The decision */}
-        {!decided && (
+        {/*
+          The decision, and whose it is.
+
+          `decision` is the studio's panel. Falling through to the customer's
+          when it was absent put "Approve this proof" and "Request changes" in
+          front of a designer looking at their own artwork — their own work,
+          approved on the customer's behalf, in one click. The customer's
+          panel is now tied to the customer's screen and nothing else.
+        */}
+        {studio
+          ? decision
+          : !decided && (
           <div className="flex flex-col gap-3 rounded-md border border-line bg-card p-6">
             <h3 className="font-display text-[15px]">Ready to decide?</h3>
             <p className="text-[13px] leading-relaxed text-ink-muted">
@@ -277,7 +314,7 @@ export function ProofReviewer({
               </button>
             </div>
           </div>
-        )}
+            )}
       </aside>
     </div>
   );

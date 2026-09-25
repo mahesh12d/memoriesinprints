@@ -24,6 +24,7 @@ type OrderStatus =
   | "cancelled";
 
 type ProofStatus =
+  | "draft"
   | "awaiting_proofreading"
   | "returned_to_designer"
   | "awaiting_customer"
@@ -98,6 +99,12 @@ export function stage(
   }
 
   switch (proofStatus) {
+    case "draft":
+      // Uploaded, but still the designer's until they send it on.
+      return {
+        current: ARTWORK,
+        note: "Uploaded — the designer is checking it before it goes for proofreading.",
+      };
     case "awaiting_proofreading":
       return {
         current: CHECKED,

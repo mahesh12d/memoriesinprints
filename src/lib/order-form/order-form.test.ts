@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  canEditOrderForm,
   MAX,
   MIN_QUANTITY,
   missingForSubmission,
@@ -24,8 +25,6 @@ const blank = {
   funeralDate: "",
   funeralTime: "",
   venueName: "",
-  coverDesignCode: "",
-  insidePagesCode: "",
   photoOption: "",
   numberOfPages: "",
   insidePagesStyle: "",
@@ -234,4 +233,14 @@ test("line 2 and country are not insisted on", () => {
 
   assert.equal(values.shippingLine2, null);
   assert.deepEqual(missingForSubmission(values), {});
+});
+
+test("a sent form stays editable until the order leaves the studio", () => {
+  assert.equal(canEditOrderForm("awaiting_proof"), true);
+  assert.equal(canEditOrderForm("awaiting_payment"), true);
+  assert.equal(canEditOrderForm("in_production"), true);
+
+  assert.equal(canEditOrderForm("shipped"), false);
+  assert.equal(canEditOrderForm("delivered"), false);
+  assert.equal(canEditOrderForm("cancelled"), false);
 });

@@ -16,16 +16,20 @@ import {
   requireStaff,
 } from "@/lib/auth/guards";
 import { loadDesigners } from "@/lib/proofs/staff-queries";
-import { signedReadUrl } from "@/lib/storage/storage";
 import { formatMoney } from "@/lib/pricing/money";
 import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
+import { ActivityTimeline } from "@/components/portal/activity-timeline";
+import { OrderFormSummary } from "@/components/portal/order-form-summary";
 import { StatusPill, type PillTone } from "@/components/portal/status-pill";
 import { StaffProgress } from "@/components/portal/staff-progress";
 import { ProofCompare } from "@/components/proofs/proof-compare";
+import { ProofReviewer } from "@/components/proofs/proof-reviewer";
+import { loadPins, signSheets } from "@/lib/proofs/sheets";
 import { isUuid } from "@/lib/utils";
 import {
   AssignDesignerForm,
   ProofreaderActions,
+  SubmitProofForm,
   UploadProofForm,
 } from "./proof-actions";
 
@@ -97,6 +101,7 @@ export default async function StaffOrderDetailPage({
         versionNumber: proofVersions.versionNumber,
         status: proofVersions.status,
         storageKey: proofVersions.storageKey,
+        sheets: proofVersions.sheets,
         fileName: proofVersions.fileName,
         mimeType: proofVersions.mimeType,
         createdAt: proofVersions.createdAt,
@@ -147,10 +152,22 @@ export default async function StaffOrderDetailPage({
 
   const previous = versions[1] ?? null;
 
-  const [currentFileUrl, previousFileUrl] = await Promise.all([
-    current ? signedReadUrl(current.storageKey) : null,
-    previous ? signedReadUrl(previous.storageKey) : null,
+  /**
+   * The current proof as pages, with whatever is already pinned to it.
+   *
+   * The studio used to get a link to the raw file — a Cloudflare URL opening
+   * in a new tab — which meant the person whose job is to catch mistakes
+   * could only look, never mark. They read the same artwork with the same
+   * tools the customer gets, so a wrong middle name is pinned to the place it
+   * appears rather than described in a note.
+   */
+  const [currentSheets, previousSheets, pins] = await Promise.all([
+    current ? signSheets(current) : Promise.resolve([]),
+    previous ? signSheets(previous) : Promise.resolve([]),
+    current ? loadPins(current.id, session.user.id) : Promise.resolve([]),
   ]);
+
+  const currentFileUrl = currentSheets[0]?.url ?? null;
 
 
   const canProofread =
@@ -187,6 +204,13 @@ export default async function StaffOrderDetailPage({
 
         <div className="grid gap-8 lg:grid-cols-[1.5fr_1fr]">
           <div className="flex flex-col gap-6">
+            {/*
+              What the family asked for, above the tools for making it. The
+              designer cannot start without the name, the dates and the
+              photographs, so this is the first thing on the page.
+            */}
+            <OrderFormSummary orderId={order.id} />
+
             {canUpload && (
               <section className="rounded-md border border-line bg-card p-6">
                 <h2 className="font-display text-lg">Upload a proof</h2>
@@ -198,35 +222,112 @@ export default async function StaffOrderDetailPage({
               </section>
             )}
 
-            {current && previous && currentFileUrl && previousFileUrl && (
+            {current && currentSheets.length > 0 && (
               <section className="rounded-md border border-line bg-card p-6">
                 <h2 className="font-display text-lg">
-                  What changed since version {previous.versionNumber}
+                  Version {current.versionNumber}
                 </h2>
                 <div className="mt-4">
-                  <ProofCompare
-                    previous={{
-                      versionNumber: previous.versionNumber,
-                      fileUrl: previousFileUrl,
-                      fileName: previous.fileName,
-                    }}
-                    current={{
-                      versionNumber: current.versionNumber,
-                      fileUrl: currentFileUrl,
-                      fileName: current.fileName,
-                    }}
+                  <ProofReviewer
+                    proofVersionId={current.id}
+                    sheets={currentSheets}
+                    comments={pins}
+                    status={current.status}
+                    versionNumber={current.versionNumber}
+                    downloadUrl={currentSheets[0].url}
+                    audience="studio"
+                    /*
+                      The proofreader's two buttons, in the slot where the
+                      customer gets approve and request-changes. A designer
+                      looking at their own work gets neither: they can read it
+                      and mark it, which is all their part of this is.
+                    */
+                    decision={
+                      /*
+                        Three different jobs against the same artwork: the
+                        person who uploaded it hands it on, the proofreader
+                        decides where it goes next, and everyone else just
+                        reads it.
+                      */
+                      current.status === "draft" ? (
+                        canUpload ? (
+                          <div className="flex flex-col gap-3 rounded-md border border-brand-line bg-brand-tint p-6">
+                            <h3 className="font-display text-[15px]">
+                              Not sent yet
+                            </h3>
+                            <p className="text-[13px] leading-relaxed text-ink-soft">
+                              Nobody else can see this version. Compare it
+                              against the previous one below, check every
+                              page, then send it to be proofread.
+                            </p>
+                            <SubmitProofForm
+                              orderId={order.id}
+                              versionNumber={current.versionNumber}
+                            />
+                          </div>
+                        ) : (
+                          <div className="rounded-md border border-line bg-card p-6">
+                            <p className="text-[13px] leading-relaxed text-ink-muted">
+                              The designer is still checking this version. It
+                              will come to you when they send it.
+                            </p>
+                          </div>
+                        )
+                      ) : canProofread &&
+                        current.status === "awaiting_proofreading" ? (
+                        <div className="flex flex-col gap-3 rounded-md border border-line bg-card p-6">
+                          <h3 className="font-display text-[15px]">
+                            Checked it?
+                          </h3>
+                          <p className="text-[13px] leading-relaxed text-ink-muted">
+                            Send it on to the customer, or return it to the
+                            designer with what needs changing.
+                          </p>
+                          <ProofreaderActions orderId={order.id} />
+                        </div>
+                      ) : undefined
+                    }
                   />
                 </div>
               </section>
             )}
 
-            {current && canProofread && current.status === "awaiting_proofreading" && (
+            {/*
+              The comparison, and why it is not here.
+
+              With one version there is nothing to wipe between, and the whole
+              section used to vanish — which reads as a missing feature rather
+              than as an empty one. It says which it is.
+            */}
+            {current && currentSheets.length > 0 && (
               <section className="rounded-md border border-line bg-card p-6">
-                <h2 className="font-display text-lg">Proofread version {current.versionNumber}</h2>
-                <p className="mb-5 mt-1 text-[13px] text-ink-muted">
-                  Check it, then either send it on or return it.
-                </p>
-                <ProofreaderActions orderId={order.id} />
+                <h2 className="font-display text-lg">
+                  {previous
+                    ? `What changed since version ${previous.versionNumber}`
+                    : "Compare with the previous version"}
+                </h2>
+
+                {previous && previousSheets.length > 0 ? (
+                  <div className="mt-4">
+                    <ProofCompare
+                      previous={{
+                        versionNumber: previous.versionNumber,
+                        sheets: previousSheets,
+                      }}
+                      current={{
+                        versionNumber: current.versionNumber,
+                        sheets: currentSheets,
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <p className="mt-2 max-w-[62ch] text-[13px] leading-relaxed text-ink-muted">
+                    Version {current.versionNumber} is the only one there is,
+                    so there is nothing to compare it against yet. Upload the
+                    next version and the two appear here, one on top of the
+                    other, with a divider to drag across them page by page.
+                  </p>
+                )}
               </section>
             )}
 
@@ -343,9 +444,11 @@ export default async function StaffOrderDetailPage({
               {currentFileUrl && (
                 <a
                   href={currentFileUrl}
+                  target="_blank"
+                  rel="noreferrer"
                   className="mt-4 inline-flex text-[13px] font-semibold text-accent-text"
                 >
-                  Open the current proof
+                  Open the file on its own
                 </a>
               )}
             </section>
@@ -369,23 +472,7 @@ export default async function StaffOrderDetailPage({
               </div>
             </section>
 
-            {activity.length > 0 && (
-              <section className="rounded-md border border-line bg-card p-6">
-                <h2 className="font-display text-lg">Recent activity</h2>
-                <ul className="mt-3 flex flex-col gap-3">
-                  {activity.map((event) => (
-                    <li key={event.id} className="flex flex-col gap-0.5">
-                      <span className="text-[13px] leading-relaxed">
-                        {event.summary}
-                      </span>
-                      <span className="text-[11px] text-ink-quiet">
-                        {dateFormat.format(event.createdAt)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
+            <ActivityTimeline entries={activity} />
           </aside>
         </div>
       </PortalBody>

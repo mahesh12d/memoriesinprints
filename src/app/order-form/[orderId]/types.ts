@@ -17,8 +17,6 @@ export type OrderFormRow = {
   funeralDate: string | null;
   funeralTime: string | null;
   venueName: string | null;
-  coverDesignCode: string | null;
-  insidePagesCode: string | null;
   photoOption: string | null;
   numberOfPages: number | null;
   insidePagesStyle: string | null;

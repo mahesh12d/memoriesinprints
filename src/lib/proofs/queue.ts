@@ -42,6 +42,8 @@ export function groupFor(item: QueueItem, viewer: Viewer): QueueGroup {
 
   if (viewer.role === "proofreader" || viewer.role === "admin") {
     if (status === "awaiting_proofreading") return "awaiting_you";
+    // A draft is not theirs to check yet — the designer still has it.
+    if (status === "draft") return "needs_work";
     if (status === "returned_to_designer" || status === "changes_requested") {
       return "needs_work";
     }
@@ -57,6 +59,8 @@ export function groupFor(item: QueueItem, viewer: Viewer): QueueGroup {
   if (
     (status === "returned_to_designer" ||
       status === "changes_requested" ||
+      // Their own upload, waiting on them to check it and send it on.
+      status === "draft" ||
       status === null) &&
     isTheirs
   ) {

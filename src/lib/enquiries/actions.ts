@@ -7,7 +7,7 @@ import { enquiries, notifications } from "@/db/schema";
 import { getSession } from "@/lib/auth/session";
 import { LIMITS, rateLimit } from "@/lib/rate-limit";
 import { clientIp } from "@/lib/client-ip";
-import { sendMail } from "@/lib/mail/mailer";
+import { notifyByMail } from "@/lib/mail/mailer";
 import {
   enquiryReceivedMail,
   studioEnquiryMail,
@@ -104,20 +104,28 @@ export async function submitEnquiryAction(
     }
   }
 
-  // Confirmation to the sender, notification to the studio.
-  await Promise.all([
-    sendMail(enquiryReceivedMail(data.email, data.name, reference)),
-    sendMail(
-      studioEnquiryMail(STUDIO.enquiriesInbox, {
-        reference,
-        name: data.name,
-        email: data.email,
-        phone: data.phone || null,
-        subject: data.subject,
-        message: data.message,
-      }),
-    ),
-  ]);
+  /*
+    Confirmation to the sender, notification to the studio.
+
+    Neither can fail the enquiry. It is already saved and already has a
+    reference, and it shows in the studio queue whether or not the mail
+    provider was reachable — so throwing here only told the sender their
+    message had not gone through when it had.
+  */
+  // One after the other, not Promise.all: Resend allows two requests a second
+  // and firing both at once sits exactly on that limit for no gain — these
+  // are two small messages, not a batch.
+  await notifyByMail(enquiryReceivedMail(data.email, data.name, reference));
+  await notifyByMail(
+    studioEnquiryMail(STUDIO.enquiriesInbox, {
+      reference,
+      name: data.name,
+      email: data.email,
+      phone: data.phone || null,
+      subject: data.subject,
+      message: data.message,
+    }),
+  );
 
   // Signed-in customers see it in their account too.
   if (session) {

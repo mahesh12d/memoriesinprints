@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { and, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, exists, gte, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { activityEvents, orders, proofVersions, users } from "@/db/schema";
 import { requireStaff } from "@/lib/auth/guards";
+import { canSeeAllOrders } from "@/lib/auth/capabilities";
 import { loadQueue } from "@/lib/proofs/staff-queries";
 import { groupFor } from "@/lib/proofs/queue";
 import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
@@ -11,6 +12,21 @@ import {
   type TurnaroundPoint,
 } from "@/components/proofs/turnaround-sparkline";
 
+/** Proofs belonging to orders assigned to this designer, and no others. */
+function onOrdersOf(designerId: string) {
+  return exists(
+    db
+      .select({ one: sql`1` })
+      .from(orders)
+      .where(
+        and(
+          eq(orders.id, proofVersions.orderId),
+          eq(orders.assignedDesignerId, designerId),
+        ),
+      ),
+  );
+}
+
 const dateFormat = new Intl.DateTimeFormat("en-GB", {
   day: "numeric",
   month: "short",
@@ -18,8 +34,16 @@ const dateFormat = new Intl.DateTimeFormat("en-GB", {
   minute: "2-digit",
 });
 
-/** Average days from a proof reaching the customer to their decision. */
-async function turnaroundByWeek(): Promise<TurnaroundPoint[]> {
+/**
+ * Average days from a proof reaching the customer to their decision.
+ *
+ * `designerId` narrows it to one designer's own jobs. A designer is shown
+ * their own turnaround, not the studio's: the studio's is an average over
+ * work they are not allowed to look at.
+ */
+async function turnaroundByWeek(
+  designerId: string | null,
+): Promise<TurnaroundPoint[]> {
   const eightWeeksAgo = new Date(Date.now() - 8 * 7 * 86_400_000);
 
   const rows = await db
@@ -36,6 +60,7 @@ async function turnaroundByWeek(): Promise<TurnaroundPoint[]> {
         isNotNull(proofVersions.customerDecisionAt),
         isNotNull(proofVersions.sentToCustomerAt),
         gte(proofVersions.customerDecisionAt, eightWeeksAgo),
+        designerId ? onOrdersOf(designerId) : undefined,
       ),
     )
     .groupBy(sql`date_trunc('week', ${proofVersions.customerDecisionAt})`)
@@ -54,26 +79,39 @@ export default async function StaffDashboardPage() {
     role: session.user.role as "designer" | "proofreader",
   };
 
+  /**
+   * A designer is shown their own work and nothing else.
+   *
+   * The queue is already scoped for them, but this page was not: the workload
+   * panel named every other designer and their open count, and recent
+   * activity carried the reference of every order in the studio past them.
+   * Who else is busy, and what is happening on jobs they are not on, is for
+   * whoever routes the work.
+   */
+  const routes = canSeeAllOrders(session.user.role);
+
   const [items, workload, activity, approvedThisMonth, turnaround] =
     await Promise.all([
       loadQueue(session.user),
-      db
-        .select({
-          designerId: users.id,
-          name: users.name,
-          open: sql<number>`count(${orders.id})::int`,
-        })
-        .from(users)
-        .leftJoin(
-          orders,
-          and(
-            eq(orders.assignedDesignerId, users.id),
-            sql`${orders.status} not in ('delivered', 'shipped', 'cancelled')`,
-          ),
-        )
-        .where(eq(users.role, "designer"))
-        .groupBy(users.id, users.name)
-        .orderBy(desc(sql`count(${orders.id})`)),
+      routes
+        ? db
+            .select({
+              designerId: users.id,
+              name: users.name,
+              open: sql<number>`count(${orders.id})::int`,
+            })
+            .from(users)
+            .leftJoin(
+              orders,
+              and(
+                eq(orders.assignedDesignerId, users.id),
+                sql`${orders.status} not in ('delivered', 'shipped', 'cancelled')`,
+              ),
+            )
+            .where(eq(users.role, "designer"))
+            .groupBy(users.id, users.name)
+            .orderBy(desc(sql`count(${orders.id})`))
+        : Promise.resolve([]),
       db
         .select({
           id: activityEvents.id,
@@ -81,6 +119,23 @@ export default async function StaffDashboardPage() {
           createdAt: activityEvents.createdAt,
         })
         .from(activityEvents)
+        .where(
+          routes
+            ? undefined
+            : // Their own orders only. An event with no order attached is a
+              // studio-wide one, and is left out for the same reason.
+              exists(
+                db
+                  .select({ one: sql`1` })
+                  .from(orders)
+                  .where(
+                    and(
+                      eq(orders.id, activityEvents.orderId),
+                      eq(orders.assignedDesignerId, session.user.id),
+                    ),
+                  ),
+              ),
+        )
         .orderBy(desc(activityEvents.createdAt))
         .limit(8),
       db
@@ -93,9 +148,10 @@ export default async function StaffDashboardPage() {
               proofVersions.customerDecisionAt,
               new Date(new Date().getFullYear(), new Date().getMonth(), 1),
             ),
+            routes ? undefined : onOrdersOf(session.user.id),
           ),
         ),
-      turnaroundByWeek(),
+      turnaroundByWeek(routes ? null : session.user.id),
     ]);
 
   const counts = {
@@ -159,11 +215,14 @@ export default async function StaffDashboardPage() {
             ))}
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+          <div
+            className={`grid gap-6 ${routes ? "lg:grid-cols-[1.4fr_1fr]" : ""}`}
+          >
             <section className="rounded-md border border-line bg-card p-6">
               <TurnaroundSparkline points={turnaround} />
             </section>
 
+            {routes && (
             <section className="rounded-md border border-line bg-card p-6">
               <h2 className="font-display text-[15px]">Designer workload</h2>
               <ul className="mt-4 flex flex-col gap-3.5">
@@ -188,6 +247,7 @@ export default async function StaffDashboardPage() {
                 )}
               </ul>
             </section>
+            )}
           </div>
 
           <section className="overflow-hidden rounded-md border border-line bg-card">
