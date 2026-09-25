@@ -8,6 +8,7 @@ import {
 import { CtaBand, Section, SectionHeading } from "@/components/site/section";
 import { ImagePlaceholder } from "@/components/site/image-placeholder";
 import { ImageAutoSlider } from "@/components/ui/image-auto-slider";
+import { TestimonialSlider } from "@/components/ui/testimonial-slider";
 import { and, asc, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
 import { portfolioItems } from "@/db/schema";
@@ -277,21 +278,7 @@ export default async function HomePage() {
 
       {/* TESTIMONIALS */}
       <Section>
-        <ul className="grid gap-8 lg:grid-cols-3">
-          {TESTIMONIALS.map((quote, idx) => (
-            <li
-              key={`${quote.attribution}-${idx}`}
-              className="flex flex-col gap-5 rounded-md border border-line bg-card p-8"
-            >
-              <blockquote className="font-display text-[19px] leading-[1.5]">
-                “{quote.text}”
-              </blockquote>
-              <cite className="text-[13px] not-italic text-ink-quiet">
-                — {quote.attribution}
-              </cite>
-            </li>
-          ))}
-        </ul>
+        <TestimonialSlider quotes={TESTIMONIALS} />
       </Section>
 
       {/* INTERNATIONAL */}
@@ -307,12 +294,6 @@ export default async function HomePage() {
               approved online, so distance is never a reason to compromise on
               the details.
             </p>
-            <Link
-              href="/contact"
-              className="mt-2 w-fit rounded-[2px] bg-brand px-7 py-3.5 text-sm font-semibold text-on-accent hover:bg-band-deep"
-            >
-              Get a quote
-            </Link>
           </div>
           <ImagePlaceholder
             caption="[Illustration — world map with pins marking where orders have shipped]"

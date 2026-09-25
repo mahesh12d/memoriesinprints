@@ -19,7 +19,6 @@ import { loadDesigners } from "@/lib/proofs/staff-queries";
 import { formatMoney } from "@/lib/pricing/money";
 import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
 import { ActivityTimeline } from "@/components/portal/activity-timeline";
-import { OrderFormSummary } from "@/components/portal/order-form-summary";
 import { StatusPill, type PillTone } from "@/components/portal/status-pill";
 import { StaffProgress } from "@/components/portal/staff-progress";
 import { ProofCompare } from "@/components/proofs/proof-compare";
@@ -138,16 +137,16 @@ export default async function StaffOrderDetailPage({
 
   const comments = commentedOn
     ? await db
-        .select({
-          id: proofComments.id,
-          body: proofComments.body,
-          pinNumber: proofComments.pinNumber,
-          authorName: users.name,
-        })
-        .from(proofComments)
-        .leftJoin(users, eq(users.id, proofComments.authorId))
-        .where(eq(proofComments.proofVersionId, commentedOn.id))
-        .orderBy(asc(proofComments.pinNumber))
+      .select({
+        id: proofComments.id,
+        body: proofComments.body,
+        pinNumber: proofComments.pinNumber,
+        authorName: users.name,
+      })
+      .from(proofComments)
+      .leftJoin(users, eq(users.id, proofComments.authorId))
+      .where(eq(proofComments.proofVersionId, commentedOn.id))
+      .orderBy(asc(proofComments.pinNumber))
     : [];
 
   const previous = versions[1] ?? null;
@@ -202,15 +201,89 @@ export default async function StaffOrderDetailPage({
           />
         </section>
 
-        <div className="grid gap-8 lg:grid-cols-[1.5fr_1fr]">
-          <div className="flex flex-col gap-6">
-            {/*
-              What the family asked for, above the tools for making it. The
-              designer cannot start without the name, the dates and the
-              photographs, so this is the first thing on the page.
-            */}
-            <OrderFormSummary orderId={order.id} />
+        <div className="flex flex-col gap-8">
+          {/*
+            Everything that is reference rather than work, in one band across
+            the top.
 
+            These three sat in a right-hand column, which cost the workspace a
+            third of the page for panels nobody edits twice — and pushed the
+            proof itself into a narrow strip that had to be scrolled to reach.
+            The artwork gets the full width below; this row is what you glance
+            at on the way past.
+          */}
+          <div className="grid gap-6 lg:grid-cols-3">
+            <section className="rounded-md border border-line bg-card p-6">
+              <h2 className="font-display text-lg">Order</h2>
+              <dl className="mt-3 flex flex-col gap-2 text-[13px]">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-ink-muted">Customer</dt>
+                  <dd className="text-right font-semibold">
+                    {order.customerName}
+                  </dd>
+                </div>
+                {showMoney && (
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-ink-muted">Total</dt>
+                    <dd className="font-semibold">
+                      {order.totalMinor !== null
+                        ? formatMoney(order.totalMinor, order.currency)
+                        : "—"}
+                    </dd>
+                  </div>
+                )}
+                <div className="flex justify-between gap-4">
+                  <dt className="text-ink-muted">Payment</dt>
+                  <dd>
+                    <StatusPill
+                      tone={PAYMENT[order.paymentStatus]?.tone ?? "neutral"}
+                    >
+                      {PAYMENT[order.paymentStatus]?.label ??
+                        order.paymentStatus}
+                    </StatusPill>
+                  </dd>
+                </div>
+              </dl>
+
+              {/*
+                A second tab, deliberately. The details and the artwork are
+                read against each other — a name here, a date there — and one
+                page cannot show both at once.
+              */}
+              <a
+                href={`/staff/orders/${order.id}/order-form`}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-4 inline-flex w-fit items-center gap-2 rounded-[2px] bg-brand px-5 py-2.5 text-[13px] font-semibold text-on-accent hover:bg-brand-deep hover:text-white"
+              >
+                Open the order form
+                <svg viewBox="0 0 16 16" aria-hidden="true" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6.5 3H3v10h10V9.5" />
+                  <path d="M9.5 2.5H13.5V6.5" />
+                  <path d="M13 3 8 8" />
+                </svg>
+              </a>
+
+              {currentFileUrl && (
+                <a
+                  href={currentFileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-3 inline-flex text-[13px] font-semibold text-accent-text"
+                >
+                  Open the current proof file
+                </a>
+              )}
+            </section>
+
+            {/*
+              Three across, not two nested inside one.
+
+              Upload and history were in their own grid inside this row's
+              middle column, so they shared a third of the page between them
+              while the right-hand third stayed empty. They are siblings now:
+              each card gets a third and the row fills the width.
+            */}
             {canUpload && (
               <section className="rounded-md border border-line bg-card p-6">
                 <h2 className="font-display text-lg">Upload a Proof</h2>
@@ -221,6 +294,12 @@ export default async function StaffOrderDetailPage({
                 <UploadProofForm orderId={order.id} />
               </section>
             )}
+
+            <ActivityTimeline entries={activity} scrollable collapsible={false} />
+          </div>
+
+          <div className="flex flex-col gap-6">
+
 
             {current && currentSheets.length > 0 && (
               <section className="rounded-md border border-line bg-card p-6">
@@ -408,72 +487,6 @@ export default async function StaffOrderDetailPage({
             </section>
           </div>
 
-          <aside className="flex h-fit flex-col gap-6">
-            <section className="rounded-md border border-line bg-card p-6">
-              <h2 className="font-display text-lg">Order</h2>
-              <dl className="mt-3 flex flex-col gap-2 text-[13px]">
-                <div className="flex justify-between gap-4">
-                  <dt className="text-ink-muted">Customer</dt>
-                  <dd className="text-right font-semibold">
-                    {order.customerName}
-                  </dd>
-                </div>
-                {showMoney && (
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-ink-muted">Total</dt>
-                    <dd className="font-semibold">
-                      {order.totalMinor !== null
-                        ? formatMoney(order.totalMinor, order.currency)
-                        : "—"}
-                    </dd>
-                  </div>
-                )}
-                <div className="flex justify-between gap-4">
-                  <dt className="text-ink-muted">Payment</dt>
-                  <dd>
-                    <StatusPill
-                      tone={PAYMENT[order.paymentStatus]?.tone ?? "neutral"}
-                    >
-                      {PAYMENT[order.paymentStatus]?.label ??
-                        order.paymentStatus}
-                    </StatusPill>
-                  </dd>
-                </div>
-              </dl>
-
-              {currentFileUrl && (
-                <a
-                  href={currentFileUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-4 inline-flex text-[13px] font-semibold text-accent-text"
-                >
-                  Open the file on its own
-                </a>
-              )}
-            </section>
-
-            <section className="rounded-md border border-line bg-card p-6">
-              <h2 className="font-display text-lg">Assignment</h2>
-              <div className="mt-4">
-                {canProofread ? (
-                  <AssignDesignerForm
-                    orderId={order.id}
-                    designers={designers}
-                    currentDesignerId={order.assignedDesignerId}
-                  />
-                ) : (
-                  <p className="text-[13px] text-ink-muted">
-                    {designers.find((d) => d.id === order.assignedDesignerId)
-                      ?.name ?? "Unassigned"}
-                    . Only a proofreader or admin can change this.
-                  </p>
-                )}
-              </div>
-            </section>
-
-            <ActivityTimeline entries={activity} />
-          </aside>
         </div>
       </PortalBody>
     </>

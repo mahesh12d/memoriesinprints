@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, asc, eq, ne } from "drizzle-orm";
+import { and, asc, desc, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import {
   orderForms,
+  orderItems,
   orders,
   productSizes,
   products,
@@ -90,6 +91,21 @@ export default async function OrderFormPage({
     shippingPostcode: saved?.shippingPostcode ?? profile?.postcode ?? "",
     shippingCountry: saved?.shippingCountry ?? profile?.country ?? "United Kingdom",
   };
+
+  /**
+   * How many they put in the basket, as the starting print run.
+   *
+   * They have already said how many they want once, at checkout — asking
+   * again on the form invites two different numbers for one order. The
+   * largest line wins when there are several, and it stays editable, because
+   * a family often revises the head count after the order is placed.
+   */
+  const [ordered] = await db
+    .select({ quantity: orderItems.quantity })
+    .from(orderItems)
+    .where(eq(orderItems.orderId, orderId))
+    .orderBy(desc(orderItems.quantity))
+    .limit(1);
 
   // The picker offers what the studio actually prints today, not a list
   // frozen into the form when it was built.
@@ -195,6 +211,7 @@ export default async function OrderFormPage({
       <OrderForm
         orderId={order.id}
         alreadySent={sent}
+        orderedQuantity={ordered?.quantity ?? null}
         addressDefaults={addressDefaults}
         saved={values}
         products={[...byProduct.values()]}

@@ -25,28 +25,58 @@ export type ActivityEntry = {
 export function ActivityTimeline({
   entries,
   title = "History",
+  scrollable = false,
+  collapsible = true,
 }: {
   entries: ActivityEntry[];
   title?: string;
+  /**
+   * Caps the list and scrolls it instead of growing the page.
+   *
+   * For the places where this sits beside something being worked on rather
+   * than at the foot of the page — a job with forty events would otherwise
+   * push its neighbour off the screen.
+   */
+  scrollable?: boolean;
+  /**
+   * Whether it folds away.
+   *
+   * Beside the work it is reference you want on screen, so the disclosure is
+   * a click between you and it for no gain. At the foot of a page it is worth
+   * folding, which is what the default is for.
+   */
+  collapsible?: boolean;
 }) {
   if (entries.length === 0) return null;
 
+  // <details>/<summary> when it folds, plain boxes when it does not.
+  const Shell = collapsible ? "details" : "div";
+  const Head = collapsible ? "summary" : "div";
+
   return (
     <section className="rounded-md border border-line bg-card p-6">
-      <details className="group">
-        <summary className="flex cursor-pointer list-item items-center justify-between gap-3">
+      <Shell className="group">
+        <Head
+          className={`flex items-center justify-between gap-3 ${
+            collapsible ? "cursor-pointer list-item" : ""
+          }`}
+        >
           <span className="font-display text-lg">{title}</span>{" "}
           <span className="text-[12px] text-ink-quiet">
             {entries.length === 1 ? "1 entry" : `${entries.length} entries`}
           </span>
-        </summary>
+        </Head>
 
         {/*
           The line runs down the left of the list and the markers sit on it.
           It is decoration, so it is hidden from assistive technology — the
           list is already a list, and each entry already carries its own time.
         */}
-        <ol className="relative mt-4 flex flex-col gap-5 pl-5">
+        <ol
+          className={`relative mt-4 flex flex-col gap-5 pl-5 ${
+            scrollable ? "max-h-[320px] overflow-y-auto pr-2" : ""
+          }`}
+        >
           <span
             aria-hidden="true"
             className="absolute bottom-1 left-[3px] top-1.5 w-px bg-line"
@@ -74,7 +104,7 @@ export function ActivityTimeline({
             </li>
           ))}
         </ol>
-      </details>
+      </Shell>
     </section>
   );
 }

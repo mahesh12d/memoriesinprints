@@ -121,10 +121,13 @@ export function OrderForm({
   saved,
   products,
   alreadySent = false,
+  orderedQuantity = null,
 }: {
   orderId: string;
   /** Sent once already, so the buttons say so rather than asking again. */
   alreadySent?: boolean;
+  /** What they put in the basket, used as the run until they change it. */
+  orderedQuantity?: number | null;
   /** The account's address, so the delivery block starts filled in. */
   addressDefaults: {
     shippingName: string;
@@ -149,7 +152,9 @@ export function OrderForm({
   const [photoOption, setPhotoOption] = useState(saved?.photoOption ?? "");
   const [pages, setPages] = useState(saved?.numberOfPages ?? null);
   const [insideStyle, setInsideStyle] = useState(saved?.insidePagesStyle ?? "");
-  const [quantity, setQuantity] = useState(saved?.quantity ?? DEFAULT_QUANTITY);
+  const [quantity, setQuantity] = useState(
+    saved?.quantity ?? orderedQuantity ?? DEFAULT_QUANTITY,
+  );
   const [bespoke, setBespoke] = useState(saved?.bespokeDesign ?? false);
   const [callback, setCallback] = useState(saved?.callbackRequested ?? false);
 
@@ -308,8 +313,8 @@ export function OrderForm({
         <p
           role="status"
           className={`rounded-[4px] px-[18px] py-4 text-[14px] font-medium ${state.ok
-              ? "bg-good-tint text-good-deep"
-              : "bg-alert-tint text-alert"
+            ? "bg-good-tint text-good-deep"
+            : "bg-alert-tint text-alert"
             }`}
         >
           {state.message}
@@ -360,11 +365,11 @@ export function OrderForm({
             label="Age"
             name="ageOfDeceased"
             error={errors.ageOfDeceased}
-            hint="However you would like it written."
           >
             <input
               id="ageOfDeceased"
               name="ageOfDeceased"
+              placeholder="Optional"
               defaultValue={saved?.ageOfDeceased ?? ""}
               maxLength={MAX.age}
               className={`${inputClass} ${errors.ageOfDeceased ? errorClass : ""}`}
@@ -387,11 +392,11 @@ export function OrderForm({
             label="Time"
             name="funeralTime"
             error={errors.funeralTime}
-            hint="For example, 11.30am."
           >
             <input
               id="funeralTime"
               name="funeralTime"
+              placeholder="For example, 11.30am"
               defaultValue={saved?.funeralTime ?? ""}
               maxLength={MAX.time}
               className={`${inputClass} ${errors.funeralTime ? errorClass : ""}`}
@@ -445,8 +450,8 @@ export function OrderForm({
                 onClick={() => setPages(count)}
                 aria-pressed={pages === count}
                 className={`rounded-full border px-6 py-2.5 text-[14px] font-medium ${pages === count
-                    ? "border-brand bg-brand-tint text-blue"
-                    : "border-field-line text-ink-soft hover:border-brand"
+                  ? "border-brand bg-brand-tint text-blue"
+                  : "border-field-line text-ink-soft hover:border-brand"
                   }`}
               >
                 {count}
@@ -471,7 +476,11 @@ export function OrderForm({
           label="How many copies"
           name="quantity"
           error={errors.quantity}
-          hint={`The smallest run we print is ${MIN_QUANTITY}. Most families order a few more than the number expected.`}
+          hint={
+            orderedQuantity && !saved?.quantity
+              ? `Taken from your order of ${orderedQuantity}. Change it here if the number has moved.`
+              : `The smallest run we print is ${MIN_QUANTITY}. Most families order a few more than the number expected.`
+          }
         >
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap gap-2">
@@ -482,8 +491,8 @@ export function OrderForm({
                   onClick={() => setQuantity(preset)}
                   aria-pressed={quantity === preset}
                   className={`rounded-full border px-5 py-2 text-[14px] font-medium ${quantity === preset
-                      ? "border-brand bg-brand-tint text-blue"
-                      : "border-field-line text-ink-soft hover:border-brand"
+                    ? "border-brand bg-brand-tint text-blue"
+                    : "border-field-line text-ink-soft hover:border-brand"
                     }`}
                 >
                   {preset}
@@ -510,8 +519,8 @@ export function OrderForm({
         */}
         <label
           className={`flex cursor-pointer items-start gap-3 rounded-md border p-4 transition-colors ${bespoke
-              ? "border-brand bg-brand-tint"
-              : "border-line bg-card hover:border-field-line"
+            ? "border-brand bg-brand-tint"
+            : "border-line bg-card hover:border-field-line"
             }`}
         >
           <input
@@ -683,16 +692,6 @@ export function OrderForm({
         title="Photographs"
         intro="Add them below and they come straight through to the studio."
       >
-        {/*
-          The allowance, stated before the field that counts them.
-          It is on the studio's paper form and it is the one thing here that
-          changes the price, so someone should not have to be told afterwards.
-        */}
-        <p className="rounded-[4px] bg-surface-grey px-[14px] py-3 text-[13px] leading-relaxed text-ink-soft">
-          Two photographs are included in the price. Any more are &pound;5.00
-          each, and we will confirm the total with you before printing.
-        </p>
-
         <div>
           <Row
             label="How many photographs"
@@ -716,11 +715,11 @@ export function OrderForm({
           label="Anything we should know about them"
           name="photoInstructions"
           error={errors.photoInstructions}
-          hint="Which one belongs on the cover, who is who, anything to leave out."
         >
           <textarea
             id="photoInstructions"
             name="photoInstructions"
+            placeholder="Which one belongs on the cover, who is who, anything to leave out"
             rows={4}
             maxLength={MAX.instructions}
             defaultValue={saved?.photoInstructions ?? ""}
@@ -737,11 +736,11 @@ export function OrderForm({
           label="Notes for the design team"
           name="additionalNotes"
           error={errors.additionalNotes}
-          hint="Anything you want us to know that is not printed in the booklet."
         >
           <textarea
             id="additionalNotes"
             name="additionalNotes"
+            placeholder="Anything you want us to know that is not printed in the booklet"
             rows={4}
             maxLength={MAX.longText}
             defaultValue={saved?.additionalNotes ?? ""}
@@ -786,11 +785,11 @@ export function OrderForm({
           label="Wording for the back cover"
           name="backpageInformation"
           error={errors.backpageInformation}
-          hint="Thanks to those who came, where the wake is being held, any donations in lieu of flowers. This is printed in the booklet."
         >
           <textarea
             id="backpageInformation"
             name="backpageInformation"
+            placeholder="Thanks to those who came, where the wake is being held, any donations in lieu of flowers"
             rows={5}
             maxLength={MAX.longText}
             defaultValue={saved?.backpageInformation ?? ""}

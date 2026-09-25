@@ -91,7 +91,7 @@ export function QuoteForm({
           name="notes"
           rows={3}
           defaultValue={currentNotes ?? ""}
-          placeholder="100 order of service booklets on 170gsm silk, folded and stitched, one proof included."
+          placeholder="100 order of service booklets on 300gsm silk, folded and stitched, one proof included."
           className="w-full rounded-[3px] border border-field-line bg-card px-3 py-2.5 font-sans text-sm"
         />
         <span className="text-[12px] text-ink-quiet">
