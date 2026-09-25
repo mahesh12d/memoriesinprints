@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useFormStatus } from "react-dom";
 import type { ComponentProps, ReactNode } from "react";
 
@@ -17,6 +18,17 @@ export function Field({
   hint?: ReactNode;
   children?: ReactNode;
 } & Omit<ComponentProps<"input">, "name">) {
+  /**
+   * Password fields get an eye.
+   *
+   * Done here rather than per form so every one of them behaves the same —
+   * signing in, signing up, resetting, and changing it in the account. It
+   * starts hidden and the button says which way it is going, because the
+   * state of a field of dots is not otherwise obvious.
+   */
+  const isPassword = props.type === "password";
+  const [revealed, setRevealed] = useState(false);
+
   const describedBy = error
     ? `${name}-error`
     : hint
@@ -30,16 +42,45 @@ export function Field({
       </label>
 
       {children ?? (
-        <input
-          id={name}
-          name={name}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={describedBy}
-          className={`w-full rounded-[3px] border bg-card px-[15px] py-[13px] text-sm text-blue placeholder:text-placeholder ${
-            error ? "border-alert" : "border-field-line"
-          }`}
-          {...props}
-        />
+        <div className={isPassword ? "relative" : undefined}>
+          <input
+            id={name}
+            name={name}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={describedBy}
+            className={`w-full rounded-[3px] border bg-card px-[15px] py-[13px] text-sm text-blue placeholder:text-placeholder ${
+              error ? "border-alert" : "border-field-line"
+            } ${isPassword ? "pr-12" : ""}`}
+            {...props}
+            type={isPassword && revealed ? "text" : props.type}
+          />
+
+          {isPassword && (
+            <button
+              type="button"
+              onClick={() => setRevealed((shown) => !shown)}
+              aria-label={revealed ? "Hide password" : "Show password"}
+              aria-pressed={revealed}
+              className="absolute inset-y-0 right-0 flex w-12 items-center justify-center rounded-r-[3px] text-ink-quiet hover:text-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                className="size-[18px]"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z" />
+                <circle cx="12" cy="12" r="3" />
+                {/* The stroke through it is the whole signal at this size. */}
+                {revealed && <line x1="4" y1="20" x2="20" y2="4" />}
+              </svg>
+            </button>
+          )}
+        </div>
       )}
 
       {hint && !error && (

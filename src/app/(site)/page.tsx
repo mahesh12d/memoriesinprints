@@ -105,58 +105,57 @@ export default async function HomePage() {
         />
 
         {/*
-          Three scrims, each doing a different job.
-
-          Below lg the words run the width of the screen, so the whole
-          photograph is darkened evenly. From lg the words sit in the left
-          third, so the shading is a left-to-right gradient instead: heavy
-          enough to read against on the left, gone by the right, which leaves
-          most of the photograph showing at full strength.
-
-          The top band is for the nav, which sits over whatever happens to be
-          at the top of the picture.
+          Vintage 2-shade soft-focus blur over the photograph:
+          - Shade 1 (top): Darker antique ink (#161412) so nav items and logo are effortlessly readable.
+          - Shade 2 (bottom): Warm vintage sepia/umber (#26201a) for an authentic analog print feel.
+          - Soft blur: Gives a dreamy fine-art print soft-focus diffusion over the photo.
         */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-black/45 lg:hidden"
-        />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 hidden bg-gradient-to-r from-black/80 via-black/45 to-transparent lg:block"
-        />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 h-[200px] bg-gradient-to-b from-black/60 to-transparent"
+          className="pointer-events-none absolute inset-0 backdrop-blur-[1px] bg-gradient-to-b from-[#161412]/80 [#1a1613]/65 via-[#1a1613]/40 to-[#26201a]/30"
         />
 
-        {/* Same container as the header, so the heading lines up with the logo. */}
-        <div className="relative mx-auto w-full max-w-[1200px] px-6 pb-20 pt-[calc(73px+4rem)] sm:px-10">
-          <div className="flex max-w-[620px] flex-col gap-6">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/80">
-              Independent print studio
-            </span>
-            <h1 className="text-[38px] leading-[1.12] text-white sm:text-[48px] lg:text-[58px]">
-              Stationery That Holds a Life, and a Love, with Care.
-            </h1>
-            <p className="max-w-[52ch] text-[16px] leading-relaxed text-white/85 sm:text-[17px]">
-              We design and print funeral stationery for directors and families,
-              and wedding stationery for couples — every piece proofed, approved
-              and finished by hand before it reaches you.
-            </p>
-            <div className="mt-2 flex flex-wrap gap-3">
-              <Link
-                href="/contact"
-                className="rounded-[2px] bg-brand px-7 py-3.5 text-sm font-semibold text-on-accent hover:bg-band-deep"
-              >
-                Request a quote
-              </Link>
-              <Link
-                href="/portfolio"
-                className="rounded-[2px] border border-white/60 px-7 py-3.5 text-sm font-semibold text-white hover:bg-white/10"
-              >
-                View the portfolio
-              </Link>
-            </div>
+        <div className="relative mx-auto flex w-full max-w-[1200px] flex-col items-center px-6 pb-24 pt-[calc(73px+4rem)] text-center sm:px-10">
+
+          {/*
+            The hairlines are the whole trick of this composition: they give a
+            centred heading edges to sit between, which is what stops it
+            floating. They stop short of the text on purpose — a rule the full
+            width of the column reads as a divider, not as framing.
+          */}
+
+          <span
+            aria-hidden="true"
+            className="mt-2 h-px w-[min(250px,60%)] bg-gradient-to-r from-transparent via-white/90 to-transparent"
+          />
+
+          <h1 className="mt-2 max-w-[18ch] font-display text-[40px] font-normal leading-[1.08] tracking-[-0.01em] text-white [text-shadow:0_2px_14px_rgba(0,0,0,0.75),0_1px_3px_rgba(0,0,0,0.55)] sm:text-[58px] lg:text-[72px]">
+            Honoring Life
+          </h1>
+
+          <span
+            aria-hidden="true"
+            className="mt-5 h-px w-[min(250px,60%)] bg-gradient-to-r from-transparent via-white/90 to-transparent"
+          />
+
+          <p className="mt-8 max-w-[54ch] text-[16px] leading-relaxed text-white [text-shadow:0_1px_10px_rgba(0,0,0,0.8),0_1px_2px_rgba(0,0,0,0.6)] sm:text-[18px]">
+            Funeral stationery designed, proofed and finished by hand — every
+            piece approved by you before it is printed.
+          </p>
+
+          <div className="mt-10 flex flex-col items-center gap-5 sm:flex-row sm:gap-6">
+            <Link
+              href="/contact"
+              className="rounded-[2px] bg-brand px-10 py-4 text-[12px] font-semibold uppercase tracking-[0.12em] text-on-accent transition-colors hover:bg-brand-deep hover:text-white"
+            >
+              Get in Touch
+            </Link>
+            <Link
+              href="/portfolio"
+              className="text-[13px] font-semibold uppercase tracking-[0.12em] text-white [text-shadow:0_1px_8px_rgba(0,0,0,0.85)] underline-offset-[6px] hover:underline"
+            >
+              View the Designs
+            </Link>
           </div>
         </div>
       </section>
@@ -317,7 +316,7 @@ export default async function HomePage() {
           </div>
           <ImagePlaceholder
             caption="[Illustration — world map with pins marking where orders have shipped]"
-            fileName="shipping-map.svg"
+            fileName="shipping-map.webp"
             className="h-[300px] w-full rounded-md"
           />
         </div>

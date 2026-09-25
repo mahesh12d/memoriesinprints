@@ -53,10 +53,7 @@ export function googleConfigured(): boolean {
  * including the scheme and any port.
  */
 export function redirectUri(): string {
-  const base = (process.env.APP_URL ?? "http://localhost:3000").replace(
-    /\/$/,
-    "",
-  );
+  const base = (process.env.APP_URL ?? "").replace(/\/$/, "");
   return `${base}/api/auth/callback/google`;
 }
 

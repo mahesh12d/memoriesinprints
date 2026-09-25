@@ -30,7 +30,7 @@ export function HeaderShell({ children }: { children: ReactNode }) {
       className={`group/nav sticky top-0 z-40 border-b transition-colors duration-200 ${
         overlay
           ? "border-transparent bg-transparent"
-          : "border-line bg-surface/95 backdrop-blur"
+          : "border-line bg-surface"
       }`}
     >
       {children}

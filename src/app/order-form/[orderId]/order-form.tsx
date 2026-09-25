@@ -67,9 +67,8 @@ function Choice({
 }) {
   return (
     <label
-      className={`flex cursor-pointer items-center gap-3 rounded-[3px] border px-4 py-3 text-[15px] ${
-        checked ? "border-brand bg-brand-tint text-blue" : "border-field-line"
-      }`}
+      className={`flex cursor-pointer items-center gap-3 rounded-[3px] border px-4 py-3 text-[15px] ${checked ? "border-brand bg-brand-tint text-blue" : "border-field-line"
+        }`}
     >
       <input
         type="radio"
@@ -182,11 +181,11 @@ export function OrderForm({
     editAddress ||
     Boolean(
       errors.shippingName ||
-        errors.shippingLine1 ||
-        errors.shippingLine2 ||
-        errors.shippingCity ||
-        errors.shippingPostcode ||
-        errors.shippingCountry,
+      errors.shippingLine1 ||
+      errors.shippingLine2 ||
+      errors.shippingCity ||
+      errors.shippingPostcode ||
+      errors.shippingCountry,
     );
 
   const [rows, setRows] = useState(saved?.additionalProducts ?? []);
@@ -308,11 +307,10 @@ export function OrderForm({
       {state.message && (
         <p
           role="status"
-          className={`rounded-[4px] px-[18px] py-4 text-[14px] font-medium ${
-            state.ok
+          className={`rounded-[4px] px-[18px] py-4 text-[14px] font-medium ${state.ok
               ? "bg-good-tint text-good-deep"
               : "bg-alert-tint text-alert"
-          }`}
+            }`}
         >
           {state.message}
         </p>
@@ -446,11 +444,10 @@ export function OrderForm({
                 type="button"
                 onClick={() => setPages(count)}
                 aria-pressed={pages === count}
-                className={`rounded-full border px-6 py-2.5 text-[14px] font-medium ${
-                  pages === count
+                className={`rounded-full border px-6 py-2.5 text-[14px] font-medium ${pages === count
                     ? "border-brand bg-brand-tint text-blue"
                     : "border-field-line text-ink-soft hover:border-brand"
-                }`}
+                  }`}
               >
                 {count}
               </button>
@@ -484,11 +481,10 @@ export function OrderForm({
                   type="button"
                   onClick={() => setQuantity(preset)}
                   aria-pressed={quantity === preset}
-                  className={`rounded-full border px-5 py-2 text-[14px] font-medium ${
-                    quantity === preset
+                  className={`rounded-full border px-5 py-2 text-[14px] font-medium ${quantity === preset
                       ? "border-brand bg-brand-tint text-blue"
                       : "border-field-line text-ink-soft hover:border-brand"
-                  }`}
+                    }`}
                 >
                   {preset}
                 </button>
@@ -513,11 +509,10 @@ export function OrderForm({
           something left undone.
         */}
         <label
-          className={`flex cursor-pointer items-start gap-3 rounded-md border p-4 transition-colors ${
-            bespoke
+          className={`flex cursor-pointer items-start gap-3 rounded-md border p-4 transition-colors ${bespoke
               ? "border-brand bg-brand-tint"
               : "border-line bg-card hover:border-field-line"
-          }`}
+            }`}
         >
           <input
             type="checkbox"
@@ -589,11 +584,11 @@ export function OrderForm({
                         current.map((item, at) =>
                           at === index
                             ? {
-                                ...item,
-                                slug: event.target.value,
-                                title: product?.name ?? "",
-                                size: product?.sizes[0] ?? "",
-                              }
+                              ...item,
+                              slug: event.target.value,
+                              title: product?.name ?? "",
+                              size: product?.sizes[0] ?? "",
+                            }
                             : item,
                         ),
                       );
@@ -970,71 +965,71 @@ export function OrderForm({
           form, so the address still posts whether or not anyone opened this.
         */}
         <div className={showAddressFields ? "flex flex-col gap-6" : "hidden"}>
-        <Row label="Addressed to" name="shippingName" error={errors.shippingName}>
-          <input
-            id="shippingName"
-            name="shippingName"
-            autoComplete="name"
-            maxLength={200}
-            defaultValue={addressDefaults.shippingName}
-            className={`${inputClass} ${errors.shippingName ? errorClass : ""}`}
-          />
-        </Row>
+          <Row label="Addressed to" name="shippingName" error={errors.shippingName}>
+            <input
+              id="shippingName"
+              name="shippingName"
+              autoComplete="name"
+              maxLength={200}
+              defaultValue={addressDefaults.shippingName}
+              className={`${inputClass} ${errors.shippingName ? errorClass : ""}`}
+            />
+          </Row>
 
-        <Row label="Address" name="shippingLine1" error={errors.shippingLine1}>
-          <input
-            id="shippingLine1"
-            name="shippingLine1"
-            autoComplete="address-line1"
-            maxLength={200}
-            defaultValue={addressDefaults.shippingLine1}
-            className={`${inputClass} ${errors.shippingLine1 ? errorClass : ""}`}
-          />
-        </Row>
+          <Row label="Address" name="shippingLine1" error={errors.shippingLine1}>
+            <input
+              id="shippingLine1"
+              name="shippingLine1"
+              autoComplete="address-line1"
+              maxLength={200}
+              defaultValue={addressDefaults.shippingLine1}
+              className={`${inputClass} ${errors.shippingLine1 ? errorClass : ""}`}
+            />
+          </Row>
 
-        <Row label="Address line 2" name="shippingLine2" error={errors.shippingLine2}>
-          <input
-            id="shippingLine2"
-            name="shippingLine2"
-            autoComplete="address-line2"
-            maxLength={200}
-            defaultValue={addressDefaults.shippingLine2}
-            className={`${inputClass} ${errors.shippingLine2 ? errorClass : ""}`}
-          />
-        </Row>
+          <Row label="Address line 2" name="shippingLine2" error={errors.shippingLine2}>
+            <input
+              id="shippingLine2"
+              name="shippingLine2"
+              autoComplete="address-line2"
+              maxLength={200}
+              defaultValue={addressDefaults.shippingLine2}
+              className={`${inputClass} ${errors.shippingLine2 ? errorClass : ""}`}
+            />
+          </Row>
 
-        <Row label="Town or city" name="shippingCity" error={errors.shippingCity}>
-          <input
-            id="shippingCity"
-            name="shippingCity"
-            autoComplete="address-level2"
-            maxLength={120}
-            defaultValue={addressDefaults.shippingCity}
-            className={`w-[320px] ${inputClass} ${errors.shippingCity ? errorClass : ""}`}
-          />
-        </Row>
+          <Row label="Town or city" name="shippingCity" error={errors.shippingCity}>
+            <input
+              id="shippingCity"
+              name="shippingCity"
+              autoComplete="address-level2"
+              maxLength={120}
+              defaultValue={addressDefaults.shippingCity}
+              className={`w-[320px] ${inputClass} ${errors.shippingCity ? errorClass : ""}`}
+            />
+          </Row>
 
-        <Row label="Postcode" name="shippingPostcode" error={errors.shippingPostcode}>
-          <input
-            id="shippingPostcode"
-            name="shippingPostcode"
-            autoComplete="postal-code"
-            maxLength={20}
-            defaultValue={addressDefaults.shippingPostcode}
-            className={`w-[200px] ${inputClass} ${errors.shippingPostcode ? errorClass : ""}`}
-          />
-        </Row>
+          <Row label="Postcode" name="shippingPostcode" error={errors.shippingPostcode}>
+            <input
+              id="shippingPostcode"
+              name="shippingPostcode"
+              autoComplete="postal-code"
+              maxLength={20}
+              defaultValue={addressDefaults.shippingPostcode}
+              className={`w-[200px] ${inputClass} ${errors.shippingPostcode ? errorClass : ""}`}
+            />
+          </Row>
 
-        <Row label="Country" name="shippingCountry" error={errors.shippingCountry}>
-          <input
-            id="shippingCountry"
-            name="shippingCountry"
-            autoComplete="country-name"
-            maxLength={120}
-            defaultValue={addressDefaults.shippingCountry}
-            className={`w-[320px] ${inputClass} ${errors.shippingCountry ? errorClass : ""}`}
-          />
-        </Row>
+          <Row label="Country" name="shippingCountry" error={errors.shippingCountry}>
+            <input
+              id="shippingCountry"
+              name="shippingCountry"
+              autoComplete="country-name"
+              maxLength={120}
+              defaultValue={addressDefaults.shippingCountry}
+              className={`w-[320px] ${inputClass} ${errors.shippingCountry ? errorClass : ""}`}
+            />
+          </Row>
         </div>
       </Section>
 

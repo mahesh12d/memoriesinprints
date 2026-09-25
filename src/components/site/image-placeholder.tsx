@@ -1,3 +1,6 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
+
 /**
  * An image slot that shows the real photograph when there is one.
  *
@@ -6,6 +9,26 @@
  * approved design. Once a photograph is uploaded against a product or a
  * portfolio piece, passing its `src` here is all that's needed.
  */
+/**
+ * Whether the studio has supplied this one yet.
+ *
+ * `fileName` used to be a label and nothing more — it said which picture the
+ * slot was waiting for, but nothing ever looked for it, so dropping the file
+ * into public/images changed nothing on the page. It is looked up now, and a
+ * slot fills itself the moment its file lands.
+ *
+ * Checked per render rather than cached: it is one stat call against a small
+ * folder, and a cache would mean restarting the dev server every time a
+ * photograph is added, which is exactly when someone is looking at the page.
+ */
+function suppliedImage(fileName: string | undefined): string | null {
+  if (!fileName) return null;
+
+  return existsSync(path.join(process.cwd(), "public", "images", fileName))
+    ? `/images/${fileName}`
+    : null;
+}
+
 export function ImagePlaceholder({
   caption,
   src,
@@ -27,11 +50,13 @@ export function ImagePlaceholder({
   className?: string;
   tone?: "light" | "dark";
 }) {
-  if (src) {
+  const source = src ?? suppliedImage(fileName);
+
+  if (source) {
     return (
       /* eslint-disable-next-line @next/next/no-img-element */
       <img
-        src={src}
+        src={source}
         alt={caption}
         /*
           Lazy by default. The portfolio renders every piece it matches with no
