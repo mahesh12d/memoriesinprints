@@ -25,6 +25,7 @@ import { Pagination } from "@/components/portal/pagination";
 import { formatMoney } from "@/lib/pricing/money";
 import { loadOrdersWithLines, repriceOrders } from "@/lib/pricing/reprice";
 import { resolveItems } from "@/lib/pricing/resolve";
+import { getUnseenOrderIds } from "@/lib/notifications/watchers";
 
 const STATUS: Record<string, { label: string; tone: PillTone }> = {
   awaiting_price: { label: "Awaiting price", tone: "pending" },
@@ -186,6 +187,17 @@ export default async function AccountOrdersPage({
    * figures that actually moved are written back.
    */
   const lines = await loadOrdersWithLines(rows.map((row) => row.id));
+
+  /*
+    Which of this page's orders have moved since the customer last opened them.
+
+    Scoped to the page rather than to all their orders: they are looking at
+    twenty-five of them, and the other two hundred are not on screen to mark.
+  */
+  const unseenOrderIds = await getUnseenOrderIds(
+    session.user.id,
+    rows.map((row) => row.id),
+  );
 
   /**
    * The latest proof per order, so a row can say whether there is anything to
@@ -491,6 +503,7 @@ export default async function AccountOrdersPage({
                             formSent.has(row.id),
                           )
                         }
+                        unseen={unseenOrderIds.has(row.id)}
                         statusLabel={STATUS[row.status]?.label ?? row.status}
                         statusTone={STATUS[row.status]?.tone ?? "neutral"}
                         paymentLabel={

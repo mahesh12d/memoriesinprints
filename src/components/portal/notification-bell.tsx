@@ -1,40 +1,71 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { BellIcon } from "./icons";
-import type { NotificationRow } from "@/lib/notifications/types";
-
-const dateFormat = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric",
-  month: "short",
-  hour: "2-digit",
-  minute: "2-digit",
-});
+import { NotificationRow } from "./notification-row";
+import { agingLevel } from "@/lib/notifications/aging";
+import { useOrderUpdates } from "@/lib/realtime";
+import type { Digest, NotificationGroup } from "@/lib/notifications/types";
 
 /**
- * Sits in the sidebar so it follows the customer around the portal.
+ * The bell, in every layout — staff, admin and customer alike.
  *
- * Opening the panel is what marks things read — the count is about what they
- * have looked at, not about clicking a particular line. The badge clears
- * straight away rather than waiting for the server, because the round trip is
- * only bookkeeping.
+ * It used to exist only in the customer's sidebar, which meant the two people
+ * who hand work to each other all day, the designer and the proofreader, had no
+ * signal at all: a proof could come back with changes and the only way to find
+ * out was to be on the right page and notice a row had moved. Anyone in the loop
+ * can now be told from wherever they are.
+ *
+ * Opening the panel is what marks things read. The count is about what they have
+ * looked at, not about clicking a particular line, and the badge clears straight
+ * away rather than waiting for the server — the round trip is only bookkeeping.
  */
 export function NotificationBell({
   items,
   unreadCount,
   markRead,
+  markOneRead,
+  readDigest,
 }: {
-  items: NotificationRow[];
+  items: NotificationGroup[];
   unreadCount: number;
   markRead: () => Promise<void>;
+  markOneRead: (id: string) => Promise<void>;
+  /** The cheap poll, so the badge moves without a navigation. */
+  readDigest: () => Promise<Digest>;
 }) {
   const [open, setOpen] = useState(false);
   const [seen, setSeen] = useState(false);
+  const [cleared, setCleared] = useState<string[]>([]);
   const [, startTransition] = useTransition();
   const containerRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   const badge = seen ? 0 : unreadCount;
+
+  /*
+    Live without a refresh.
+
+    Everything the bell draws was decided when the page was built, so a proof
+    arriving while someone sits on their queue used to leave the badge at
+    whatever it said when they got there. The poll asks a two-aggregate question
+    and only refreshes the route when the answer has actually moved.
+  */
+  const onChange = useCallback(() => {
+    // New news means the badge is no longer what they have seen.
+    setSeen(false);
+    setCleared([]);
+    router.refresh();
+  }, [router]);
+
+  useOrderUpdates({
+    read: readDigest,
+    onChange,
+    since: { unreadCount, latestEventAt: items[0]?.createdAt
+      ? new Date(items[0].createdAt).getTime()
+      : null },
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -68,6 +99,18 @@ export function NotificationBell({
     }
   }
 
+  /*
+    Red rather than the house colour when something has gone cold.
+
+    A count on its own says how much is waiting, not whether any of it is late,
+    so a badge reading 3 looks the same whether all three arrived this minute or
+    one has sat since yesterday.
+  */
+  const urgent = items.some(
+    (group) =>
+      group.isUnread && agingLevel(new Date(group.createdAt)) === "overdue",
+  );
+
   return (
     <div ref={containerRef} className="relative">
       <button
@@ -85,12 +128,22 @@ export function NotificationBell({
         <span className="relative flex">
           <BellIcon />
           {badge > 0 && (
-            <span className="absolute -right-1.5 -top-1.5 size-2 rounded-full bg-brand-on-dark" />
+            <span
+              className={`absolute -right-1.5 -top-1.5 size-2 rounded-full ${
+                urgent ? "bg-alert" : "bg-brand-on-dark"
+              }`}
+            />
           )}
         </span>
         <span className="flex-1 text-left">Notifications</span>
         {badge > 0 && (
-          <span className="rounded-full bg-brand-on-dark px-1.5 py-0.5 text-[10px] font-bold text-blue-deep">
+          <span
+            className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+              urgent
+                ? "bg-alert text-white"
+                : "bg-brand-on-dark text-blue-deep"
+            }`}
+          >
             {badge}
           </span>
         )}
@@ -100,56 +153,84 @@ export function NotificationBell({
         <div
           role="dialog"
           aria-label="Notifications"
-          className="absolute left-0 top-full z-30 mt-1.5 w-[290px] overflow-hidden rounded-md border border-line bg-card shadow-lg"
+          className="absolute left-0 top-full z-30 mt-1.5 w-[320px] overflow-hidden rounded-md border border-line bg-card shadow-lg"
         >
+          <div className="flex items-center justify-between gap-3 border-b border-line-soft px-4 py-2.5">
+            <span className="text-[12px] font-semibold uppercase tracking-[0.06em] text-ink-quiet">
+              Notifications
+            </span>
+            {items.some((group) => group.isUnread) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSeen(true);
+                  setCleared(items.flatMap((group) => group.ids));
+                  startTransition(async () => {
+                    await markRead();
+                  });
+                }}
+                className="text-[12px] font-semibold text-accent-text hover:underline"
+              >
+                Mark all as read
+              </button>
+            )}
+          </div>
+
           {items.length === 0 ? (
             <p className="px-4 py-5 text-[13px] text-ink-muted">
-              Nothing yet. We&rsquo;ll let you know when your proof is ready.
+              Nothing needs you right now. We&rsquo;ll let you know the moment
+              something does.
             </p>
           ) : (
-            <ul className="max-h-[340px] overflow-y-auto">
-              {items.map((item) => {
-                const inner = (
-                  <span className="flex items-start gap-2">
-                    {item.isUnread && (
-                      <span
-                        aria-hidden="true"
-                        className="mt-1.5 size-1.5 shrink-0 rounded-full bg-brand-deep"
-                      />
-                    )}
-                    <span className="flex flex-col gap-0.5">
-                      <span className="text-[13px] font-semibold leading-snug">
-                        {item.title}
-                      </span>
-                      {item.body && (
-                        <span className="text-[12px] leading-relaxed text-ink-muted">
-                          {item.body}
-                        </span>
-                      )}
-                      <span className="text-[11px] text-ink-quiet">
-                        {dateFormat.format(new Date(item.createdAt))}
-                      </span>
-                    </span>
-                  </span>
-                );
+            <ul className="max-h-[380px] overflow-y-auto">
+              {items.map((group) => {
+                // Optimistically read, so a clicked line stops looking new
+                // before the server has caught up.
+                const shown = {
+                  ...group,
+                  isUnread:
+                    group.isUnread &&
+                    !seen &&
+                    !group.ids.every((id) => cleared.includes(id)),
+                };
 
                 return (
-                  <li
-                    key={item.id}
-                    className="border-b border-line-soft last:border-b-0"
-                  >
-                    {item.linkUrl ? (
-                      <Link
-                        href={item.linkUrl}
-                        onClick={() => setOpen(false)}
-                        className="block px-4 py-3 hover:bg-surface-grey"
-                      >
-                        {inner}
-                      </Link>
-                    ) : (
-                      <div className="px-4 py-3">{inner}</div>
-                    )}
-                  </li>
+                  <NotificationRow
+                    key={group.id}
+                    group={shown}
+                    onOpen={() => setOpen(false)}
+                    trailing={
+                      shown.isUnread ? (
+                        <button
+                          type="button"
+                          aria-label="Mark as read"
+                          title="Mark as read"
+                          onClick={() => {
+                            setCleared((was) => [...was, ...group.ids]);
+                            startTransition(async () => {
+                              // A folded line stands for several rows, so
+                              // clearing it has to clear all of them.
+                              await Promise.all(group.ids.map(markOneRead));
+                            });
+                          }}
+                          className="rounded-full p-1 text-ink-quiet hover:bg-surface-grey hover:text-ink"
+                        >
+                          <svg
+                            viewBox="0 0 16 16"
+                            aria-hidden="true"
+                            className="size-3.5"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M3 8.5 6.5 12 13 4.5" />
+                          </svg>
+                        </button>
+                      ) : undefined
+                    }
+                  />
                 );
               })}
             </ul>

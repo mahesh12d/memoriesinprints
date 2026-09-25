@@ -5,9 +5,13 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { activityEvents, enquiries, notifications, orders } from "@/db/schema";
+import { enquiries, notifications, orders } from "@/db/schema";
 import { nextOrderReference } from "@/lib/order-reference";
 import { requireAdmin } from "@/lib/auth/guards";
+import {
+  recordOrderEvent,
+  recordStudioEvent,
+} from "@/lib/notifications/events";
 import { fail, type FormState } from "@/lib/auth/form-state";
 import { majorToMinor } from "@/lib/pricing/money";
 
@@ -113,7 +117,9 @@ export async function quoteEnquiryAction(
     });
   }
 
-  await db.insert(activityEvents).values({
+  // No order exists yet, so there is nothing for this to be activity *on* —
+  // it goes on the studio's record rather than an order's timeline.
+  await recordStudioEvent({
     actorId: session.user.id,
     type: "enquiry_quoted",
     summary: `${session.user.name} quoted ${enquiry.reference}`,
@@ -191,19 +197,18 @@ export async function convertEnquiryAction(
     .set({ status: "converted", updatedAt: new Date() })
     .where(eq(enquiries.id, enquiryId));
 
-  await db.insert(activityEvents).values({
+  await recordOrderEvent({
     orderId: order.id,
     actorId: session.user.id,
-    type: "enquiry_converted",
+    type: "order_raised",
     summary: `${reference} raised from enquiry ${enquiry.reference}`,
-  });
-
-  await db.insert(notifications).values({
-    userId: enquiry.userId,
-    type: "order_status",
-    title: `Your order ${reference} is open`,
-    body: "We've turned your enquiry into an order. You can follow it from your account.",
-    linkUrl: "/account/orders",
+    meta: { enquiryId },
+    audience: "customer",
+    notify: {
+      title: `Your order ${reference} is open`,
+      body: "We've turned your enquiry into an order. You can follow it from your account.",
+      link: "/account/orders",
+    },
   });
 
   revalidatePath("/admin/enquiries");

@@ -2,8 +2,9 @@ import "server-only";
 
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { activityEvents, proofVersions } from "@/db/schema";
+import { proofVersions } from "@/db/schema";
 import { buildArchiveKey, copyObject } from "@/lib/storage/storage";
+import { recordOrderEvent } from "@/lib/notifications/events";
 
 /**
  * Files a completed order's final artwork into the archive.
@@ -56,11 +57,14 @@ export async function archiveFinalProof(
     .set({ archivedStorageKey, archivedAt: new Date() })
     .where(eq(proofVersions.id, latest.id));
 
-  await db.insert(activityEvents).values({
+  // A matter of record, so no audience: filing the artwork is not anyone's
+  // move and nobody needs a bell for it.
+  await recordOrderEvent({
     orderId,
     actorId,
     type: "proof_archived",
     summary: `Version ${latest.versionNumber} of ${reference} was archived`,
+    meta: { version: latest.versionNumber },
   });
 
   return { archived: true };

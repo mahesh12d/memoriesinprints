@@ -49,6 +49,30 @@ export async function requireProofreader(): Promise<ActiveSession> {
   return session;
 }
 
+/**
+ * Whoever is logged in, in whichever portal they are logged into.
+ *
+ * The two cookies are deliberately not interchangeable, and every guard above
+ * picks one — which is right for a page, because a page belongs to one portal.
+ * A handful of things belong to all of them: the notification bell is in the
+ * customer sidebar, the studio sidebar and the admin sidebar, and marking a row
+ * read must work from all three. Asking for the site session alone would send an
+ * admin who clicked their own bell to the customer login form.
+ *
+ * It grants nothing either cookie does not already grant: the caller still gets
+ * one identity, and everything it can reach is still scoped to that person.
+ * Where a scope genuinely matters, use the guard for it.
+ */
+export async function requireViewer(): Promise<ActiveSession> {
+  const site = await getSession("site");
+  if (site) return site;
+
+  const admin = await getSession("admin");
+  if (admin) return admin;
+
+  redirect("/login");
+}
+
 /** Admin runs off its own cookie, so this never accepts a customer session. */
 export async function requireAdmin(): Promise<ActiveSession> {
   const session = await getSession("admin");

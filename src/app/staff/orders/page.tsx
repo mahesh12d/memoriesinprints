@@ -2,12 +2,13 @@ import Link from "next/link";
 import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
-import { orders, users } from "@/db/schema";
+import { orders, orderWatchers, users } from "@/db/schema";
 import { canSeeAllOrders, canSeeMoney, requireStaff } from "@/lib/auth/guards";
 import { describe, ORDER_STATUS } from "@/lib/admin/labels";
 import { formatMoney, QUOTED_INDIVIDUALLY } from "@/lib/pricing/money";
 import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
 import { StatusPill } from "@/components/portal/status-pill";
+import { UnseenDot } from "@/components/portal/unseen";
 import { FilterTabs } from "@/components/admin/filter-tabs";
 import { OrderSearch } from "@/components/portal/order-search";
 import { Pagination } from "@/components/portal/pagination";
@@ -32,6 +33,9 @@ type Row = {
   totalMinor: number | null;
   currency: string;
   createdAt: Date;
+  lastActivityAt: Date;
+  /** Activity this viewer has not seen. */
+  unseen: boolean;
 };
 
 export default async function StaffOrdersPage({
@@ -41,11 +45,18 @@ export default async function StaffOrdersPage({
     status?: string;
     mine?: string;
     q?: string;
+    sort?: string;
     page?: string;
   }>;
 }) {
   const session = await requireStaff();
-  const { status = "all", mine, q, page: pageParam } = await searchParams;
+  const {
+    status = "all",
+    mine,
+    q,
+    sort,
+    page: pageParam,
+  } = await searchParams;
   const query = q?.trim() ?? "";
   const page = Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1);
 
@@ -105,6 +116,16 @@ export default async function StaffOrdersPage({
   const pageCount = Math.max(1, Math.ceil(matchingCount / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
 
+  /*
+    "Everything, but the urgent ones first" — which the status tabs could not
+    express, because they only ever narrowed the list to one exact status.
+
+    Unseen first, then whatever moved most recently. Done in SQL rather than
+    after the fetch: this is one page of twenty-five out of a busy month, so
+    sorting the page you already have would only reorder that page.
+  */
+  const byAttention = sort === "attention";
+
   const rows: Row[] = await db
     .select({
       id: orders.id,
@@ -116,17 +137,54 @@ export default async function StaffOrdersPage({
       totalMinor: orders.totalMinor,
       currency: orders.currency,
       createdAt: orders.createdAt,
+      lastActivityAt: orders.lastActivityAt,
+      unseen: sql<boolean>`(
+        ${orderWatchers.lastViewedAt} is null
+        or ${orders.lastActivityAt} > ${orderWatchers.lastViewedAt}
+      )`,
     })
     .from(orders)
     .innerJoin(users, eq(users.id, orders.userId))
     .leftJoin(designer, eq(designer.id, orders.assignedDesignerId))
+    .leftJoin(
+      orderWatchers,
+      and(
+        eq(orderWatchers.orderId, orders.id),
+        eq(orderWatchers.userId, session.user.id),
+      ),
+    )
     .where(where)
-    .orderBy(desc(orders.createdAt))
+    .orderBy(
+      ...(byAttention
+        ? [
+            desc(sql`(
+              ${orderWatchers.lastViewedAt} is null
+              or ${orders.lastActivityAt} > ${orderWatchers.lastViewedAt}
+            )`),
+            desc(orders.lastActivityAt),
+          ]
+        : [desc(orders.createdAt)]),
+    )
     .limit(PAGE_SIZE)
     .offset((currentPage - 1) * PAGE_SIZE);
 
   const columns: Column<Row>[] = [
-    { header: "Reference", cell: (row) => row.reference },
+    {
+      header: "Reference",
+      cell: (row) => (
+        <span className="flex items-center gap-2">
+          {/*
+            The same dot the queue uses, on the same rule: activity since this
+            person last opened the order. One signal in both places, so nobody
+            has to learn two.
+          */}
+          {row.unseen && <UnseenDot />}
+          <span className={row.unseen ? "font-semibold" : undefined}>
+            {row.reference}
+          </span>
+        </span>
+      ),
+    },
     {
       header: "Customer",
       cell: (row) => (
@@ -187,6 +245,7 @@ export default async function StaffOrdersPage({
             keep={{
               status: known === "all" ? undefined : known,
               mine: onlyMine ? "1" : undefined,
+              sort: byAttention ? "attention" : undefined,
             }}
             liveTarget="staff-orders-list"
           />
@@ -197,6 +256,7 @@ export default async function StaffOrdersPage({
             extraParams={{
               mine: onlyMine ? "1" : undefined,
               q: query || undefined,
+              sort: byAttention ? "attention" : undefined,
             }}
             options={[
               { value: "all", label: "All", count: total },
@@ -208,13 +268,56 @@ export default async function StaffOrdersPage({
             ]}
           />
 
+          {/*
+            Sorting, which is a different question from filtering.
+
+            The tabs answer "show me only the shipped ones"; this answers "show
+            me everything, with whatever needs me at the top". Conflating the two
+            is what made the urgent order impossible to find without knowing its
+            status first.
+          */}
+          <div className="flex gap-1.5">
+            {[
+              { value: undefined, label: "Newest first" },
+              { value: "attention", label: "Needs attention first" },
+            ].map((option) => {
+              const current = (sort === "attention" ? "attention" : undefined) === option.value;
+              const params = new URLSearchParams();
+              if (known !== "all") params.set("status", known);
+              if (onlyMine) params.set("mine", "1");
+              if (query) params.set("q", query);
+              if (option.value) params.set("sort", option.value);
+              const qs = params.toString();
+
+              return (
+                <Link
+                  key={option.label}
+                  href={qs ? `/staff/orders?${qs}` : "/staff/orders"}
+                  aria-current={current ? "page" : undefined}
+                  className={`rounded-full px-3.5 py-1.5 text-[13px] font-semibold ${
+                    current
+                      ? "bg-band text-white"
+                      : "border border-line text-ink-muted hover:bg-surface-grey"
+                  }`}
+                >
+                  {option.label}
+                </Link>
+              );
+            })}
+          </div>
+
           {/* A designer only has their own work, so there is nothing to switch. */}
           {scoped && (
           <div className="flex gap-1.5">
             <Link
-              href={
-                known === "all" ? "/staff/orders" : `/staff/orders?status=${known}`
-              }
+              href={`/staff/orders${
+                [
+                  known === "all" ? "" : `status=${known}`,
+                  byAttention ? "sort=attention" : "",
+                ]
+                  .filter(Boolean)
+                  .reduce((qs, part) => (qs ? `${qs}&${part}` : `?${part}`), "")
+              }`}
               aria-current={!onlyMine ? "page" : undefined}
               className={`rounded-full px-3.5 py-1.5 text-[13px] font-semibold ${
                 !onlyMine
@@ -225,11 +328,13 @@ export default async function StaffOrdersPage({
               Everyone&rsquo;s
             </Link>
             <Link
-              href={
-                known === "all"
-                  ? "/staff/orders?mine=1"
-                  : `/staff/orders?status=${known}&mine=1`
-              }
+              href={`/staff/orders?${[
+                known === "all" ? "" : `status=${known}`,
+                "mine=1",
+                byAttention ? "sort=attention" : "",
+              ]
+                .filter(Boolean)
+                .join("&")}`}
               aria-current={onlyMine ? "page" : undefined}
               className={`rounded-full px-3.5 py-1.5 text-[13px] font-semibold ${
                 onlyMine
@@ -271,6 +376,7 @@ export default async function StaffOrdersPage({
               status: known === "all" ? undefined : known,
               mine: onlyMine ? "1" : undefined,
               q: query || undefined,
+              sort: byAttention ? "attention" : undefined,
             }}
           />
         </div>

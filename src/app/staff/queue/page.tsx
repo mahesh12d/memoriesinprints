@@ -1,100 +1,104 @@
 import Link from "next/link";
 import { requireStaff } from "@/lib/auth/guards";
 import { loadQueue } from "@/lib/proofs/staff-queries";
-import { GROUP_LABEL, sortQueue } from "@/lib/proofs/queue";
+import { isSnoozed, type QueueGroup } from "@/lib/proofs/queue";
 import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
-import { StatusPill, type PillTone } from "@/components/portal/status-pill";
+import { MyQueueList } from "@/components/portal/my-queue";
 
-const PROOF_LABEL: Record<string, { label: string; tone: PillTone }> = {
-  awaiting_proofreading: { label: "Needs proofreading", tone: "pending" },
-  returned_to_designer: { label: "Returned to designer", tone: "alert" },
-  awaiting_customer: { label: "With the customer", tone: "neutral" },
-  approved: { label: "Approved", tone: "good" },
-  changes_requested: { label: "Changes requested", tone: "alert" },
+/** The buckets a dashboard tile can send someone straight into. */
+const BUCKETS: Record<string, QueueGroup> = {
+  awaiting_you: "awaiting_you",
+  needs_work: "needs_work",
+  awaiting_customer: "awaiting_customer",
+  done: "done",
 };
 
-function waitedFor(since: Date): string {
-  const days = Math.floor((Date.now() - since.getTime()) / 86_400_000);
-  if (days <= 0) return "today";
-  if (days === 1) return "1 day";
-  return `${days} days`;
-}
-
-export default async function StaffQueuePage() {
+export default async function StaffQueuePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ bucket?: string; snoozed?: string }>;
+}) {
   const session = await requireStaff();
+  const { bucket, snoozed } = await searchParams;
+
+  const only = bucket ? BUCKETS[bucket] : undefined;
+  const showSnoozed = snoozed === "1";
+
   const items = await loadQueue(session.user);
 
-  const groups = sortQueue(
-    items.map((item) => ({ ...item, waitingSince: item.waitingSince })),
-    { id: session.user.id, role: session.user.role as "designer" | "proofreader" },
-  );
+  /*
+    One clock for the whole render.
+
+    The sort and the badges both read how long each row has waited, and taking
+    the time twice can land either side of a threshold — which shows up as a row
+    lifted to the top of its bucket while its own badge still reads grey.
+  */
+  const now = new Date();
+
+  const viewer = {
+    id: session.user.id,
+    role: session.user.role as "designer" | "proofreader",
+  };
+
+  const setAside = items.filter((item) => isSnoozed(item, now)).length;
 
   return (
     <>
-      <PortalHeader title="Work Queue" />
+      <PortalHeader
+        title="Work Queue"
+        actions={
+          /*
+            A way back to what was set aside. Something snoozed and then
+            forgotten is worse than something never snoozed at all, so the count
+            stays on screen while any are hidden.
+          */
+          setAside > 0 ? (
+            <Link
+              href={
+                showSnoozed
+                  ? "/staff/queue"
+                  : "/staff/queue?snoozed=1"
+              }
+              className="text-[13px] font-semibold text-accent-text"
+            >
+              {showSnoozed
+                ? "Hide set aside"
+                : `Show ${setAside} set aside`}
+            </Link>
+          ) : undefined
+        }
+      />
+
       <PortalBody>
-        {groups.length === 0 ? (
-          <div className="rounded-md border border-line bg-card p-10 text-center">
-            <h2 className="font-display text-lg">Nothing in the Queue</h2>
-            <p className="mt-2 text-sm text-ink-muted">
-              Every order is either delivered or cancelled.
-            </p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-8">
-            {groups.map((group) => (
-              <section key={group.group} className="flex flex-col gap-3">
-                <h2 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-ink-quiet">
-                  {GROUP_LABEL[group.group]} ({group.items.length})
-                </h2>
+        <div className="flex flex-col gap-5">
+          {only && (
+            <div className="flex items-center gap-3">
+              <span className="text-[13px] text-ink-muted">
+                Showing one bucket only.
+              </span>
+              <Link
+                href="/staff/queue"
+                className="text-[13px] font-semibold text-accent-text"
+              >
+                Show everything
+              </Link>
+            </div>
+          )}
 
-                <div className="overflow-hidden rounded-md border border-line bg-card">
-                  <ul>
-                    {group.items.map((item) => {
-                      const proof = item.proofStatus
-                        ? PROOF_LABEL[item.proofStatus]
-                        : { label: "No proof yet", tone: "pending" as PillTone };
-
-                      return (
-                        <li
-                          key={item.orderId}
-                          className="flex flex-wrap items-center justify-between gap-4 border-b border-line-soft px-6 py-4 last:border-b-0"
-                        >
-                          <div className="flex min-w-0 flex-col gap-1">
-                            <Link
-                              href={`/staff/orders/${item.orderId}`}
-                              className="text-sm font-semibold hover:underline"
-                            >
-                              {item.reference}
-                            </Link>
-                            <span className="text-xs text-ink-quiet">
-                              {item.customerName}
-                              {item.designerName
-                                ? ` · ${item.designerName}`
-                                : " · unassigned"}
-                              {item.versionNumber
-                                ? ` · v${item.versionNumber}`
-                                : ""}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-4">
-                            <span className="text-xs text-ink-quiet">
-                              waiting {waitedFor(item.waitingSince)}
-                            </span>
-                            <StatusPill tone={proof.tone}>
-                              {proof.label}
-                            </StatusPill>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              </section>
-            ))}
-          </div>
-        )}
+          <MyQueueList
+            items={items}
+            viewer={viewer}
+            now={now}
+            only={only}
+            showSnoozed={showSnoozed}
+            emptyTitle={only ? "Nothing in That Bucket" : "Nothing in the Queue"}
+            emptyBody={
+              only
+                ? "Nothing of yours is at that step right now."
+                : "Every order is either delivered or cancelled."
+            }
+          />
+        </div>
       </PortalBody>
     </>
   );

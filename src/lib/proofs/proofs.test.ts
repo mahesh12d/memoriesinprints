@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { groupFor, sortQueue, type QueueItem, type Viewer } from "./queue";
+import {
+  groupFor,
+  reasonFor,
+  sortQueue,
+  type QueueItem,
+  type Viewer,
+} from "./queue";
 import { clampPin, numberPins, pinFromClick } from "./pins";
 
 const PROOFREADER: Viewer = { id: "reader-1", role: "proofreader" };
@@ -207,4 +213,203 @@ test("sending it on moves it to the proofreader", () => {
 
   assert.equal(groupFor(sent, PROOFREADER), "awaiting_you");
   assert.notEqual(groupFor(sent, DESIGNER), "awaiting_you");
+});
+
+/* -------------------------------------------------------------------------- */
+/* Role-aware ordering, aging and snooze                                      */
+/* -------------------------------------------------------------------------- */
+
+/** A fixed clock, so nothing here depends on when the suite is run. */
+const NOW = new Date("2026-09-20T12:00:00Z");
+
+function hoursAgo(hours: number): Date {
+  return new Date(NOW.getTime() - hours * 3_600_000);
+}
+
+test("a designer is shown what came back to them before anything else", () => {
+  const groups = sortQueue(
+    [
+      item({
+        reference: "NOT-STARTED",
+        proofStatus: null,
+        waitingSince: hoursAgo(2),
+      }),
+      item({
+        reference: "SENT-BACK",
+        proofStatus: "returned_to_designer",
+        waitingSince: hoursAgo(1),
+      }),
+      item({
+        reference: "OWN-DRAFT",
+        proofStatus: "draft",
+        waitingSince: hoursAgo(3),
+      }),
+    ],
+    DESIGNER,
+    { now: NOW },
+  );
+
+  assert.deepEqual(
+    groups[0].items.map((i) => i.reference),
+    ["SENT-BACK", "NOT-STARTED", "OWN-DRAFT"],
+    "blocking work first, even though it is the newest of the three",
+  );
+});
+
+test("a proofreader is shown what is waiting to be checked before anything else", () => {
+  const groups = sortQueue(
+    [
+      item({
+        reference: "BACK-FROM-CUSTOMER",
+        proofStatus: "changes_requested",
+        waitingSince: hoursAgo(1),
+      }),
+      item({
+        reference: "TO-CHECK",
+        proofStatus: "awaiting_proofreading",
+        waitingSince: hoursAgo(2),
+      }),
+    ],
+    PROOFREADER,
+    { now: NOW },
+  );
+
+  // Different buckets for a proofreader, so check each one's leader.
+  const flat = groups.flatMap((group) => group.items.map((i) => i.reference));
+  assert.equal(flat[0], "TO-CHECK");
+});
+
+test("the same data sorts differently for the two roles", () => {
+  const rows = [
+    item({
+      reference: "TO-CHECK",
+      proofStatus: "awaiting_proofreading",
+      waitingSince: hoursAgo(1),
+    }),
+    item({
+      reference: "SENT-BACK",
+      proofStatus: "returned_to_designer",
+      waitingSince: hoursAgo(2),
+    }),
+  ];
+
+  const forDesigner = sortQueue(rows, DESIGNER, { now: NOW })
+    .flatMap((group) => group.items)
+    .map((i) => i.reference);
+  const forProofreader = sortQueue(rows, PROOFREADER, { now: NOW })
+    .flatMap((group) => group.items)
+    .map((i) => i.reference);
+
+  assert.notDeepEqual(
+    forDesigner,
+    forProofreader,
+    "a designer's priorities are not a proofreader's",
+  );
+});
+
+test("something that has sat for a day is lifted above fresher work", () => {
+  const groups = sortQueue(
+    [
+      item({
+        reference: "FRESH-BLOCKER",
+        proofStatus: "returned_to_designer",
+        waitingSince: hoursAgo(1),
+      }),
+      item({
+        reference: "COLD",
+        proofStatus: "draft",
+        waitingSince: hoursAgo(30),
+      }),
+    ],
+    DESIGNER,
+    { now: NOW },
+  );
+
+  assert.equal(
+    groups[0].items[0].reference,
+    "COLD",
+    "a day-old item is somebody's bad day whatever kind of work it is",
+  );
+});
+
+test("age alone does not reorder everything, only the overdue", () => {
+  const groups = sortQueue(
+    [
+      item({
+        reference: "BLOCKER",
+        proofStatus: "returned_to_designer",
+        waitingSince: hoursAgo(1),
+      }),
+      item({
+        reference: "OLDER-BUT-NOT-OVERDUE",
+        proofStatus: "draft",
+        waitingSince: hoursAgo(5),
+      }),
+    ],
+    DESIGNER,
+    { now: NOW },
+  );
+
+  assert.equal(
+    groups[0].items[0].reference,
+    "BLOCKER",
+    "five hours is not overdue, so the role ordering still decides",
+  );
+});
+
+test("an order set aside drops out of the queue, and can be asked for back", () => {
+  const rows = [
+    item({
+      reference: "SNOOZED",
+      proofStatus: "returned_to_designer",
+      snoozedUntil: new Date(NOW.getTime() + 3_600_000),
+    }),
+    item({ reference: "AWAKE", proofStatus: "returned_to_designer" }),
+  ];
+
+  const hidden = sortQueue(rows, DESIGNER, { now: NOW })
+    .flatMap((group) => group.items)
+    .map((i) => i.reference);
+  assert.deepEqual(hidden, ["AWAKE"]);
+
+  const shown = sortQueue(rows, DESIGNER, { now: NOW, includeSnoozed: true })
+    .flatMap((group) => group.items)
+    .map((i) => i.reference);
+  assert.equal(shown.length, 2);
+});
+
+test("a snooze that has run out stops hiding anything", () => {
+  const groups = sortQueue(
+    [
+      item({
+        reference: "WOKEN",
+        proofStatus: "returned_to_designer",
+        snoozedUntil: new Date(NOW.getTime() - 60_000),
+      }),
+    ],
+    DESIGNER,
+    { now: NOW },
+  );
+
+  assert.equal(groups[0].items[0].reference, "WOKEN");
+});
+
+test("every row can say why it is in front of you", () => {
+  for (const status of [
+    "changes_requested",
+    "returned_to_designer",
+    "awaiting_proofreading",
+    "awaiting_customer",
+    "draft",
+    "approved",
+    null,
+  ]) {
+    for (const viewer of [DESIGNER, PROOFREADER]) {
+      assert.notEqual(
+        reasonFor(item({ proofStatus: status }), viewer),
+        "",
+        `no reason written for ${status} as ${viewer.role}`,
+      );
+    }
+  }
 });

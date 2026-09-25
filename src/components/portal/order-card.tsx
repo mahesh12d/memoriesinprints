@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { OrderProgress } from "./order-progress";
 import { StatusPill, type PillTone } from "./status-pill";
+import { NewChip } from "./unseen";
 import { formatMoney, QUOTED_INDIVIDUALLY } from "@/lib/pricing/money";
 
 type OrderStatus =
@@ -63,6 +64,7 @@ export function OrderCard({
   orderFormHref,
   formSubmitted = true,
   needsYou,
+  unseen = false,
   statusLabel,
   statusTone,
   paymentLabel,
@@ -84,6 +86,14 @@ export function OrderCard({
   orderFormHref?: string | null;
   formSubmitted?: boolean;
   needsYou: boolean;
+  /**
+   * Something has happened on this order since the customer last opened it.
+   *
+   * Separate from needsYou, which is about whose move it is: a proof can be with
+   * the studio and still have news on it. A customer with several orders open
+   * wants both answers, and they are not the same answer.
+   */
+  unseen?: boolean;
   statusLabel: string;
   statusTone: PillTone;
   paymentLabel: string;
@@ -97,15 +107,19 @@ export function OrderCard({
       }`}
     >
       {/*
-        Open when something is needed, shut otherwise. Six progress steps on
-        every order at once is what made the list unreadable.
+        Open when something is needed or something has changed, shut otherwise.
+        Six progress steps on every order at once is what made the list
+        unreadable — but an order that has just moved is one worth unfolding.
       */}
-      <details open={needsYou} className="group">
+      <details open={needsYou || unseen} className="group">
         <summary className="cursor-pointer px-6 py-4 marker:text-ink-quiet hover:bg-surface-grey">
           <span className="ml-1 inline-flex w-[calc(100%-2rem)] flex-wrap items-center justify-between gap-4 align-middle">
             <span className="flex min-w-0 flex-1 flex-col gap-1">
-              <span className="truncate text-sm font-semibold">
-                {description}
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="truncate text-sm font-semibold">
+                  {description}
+                </span>
+                {unseen && <NewChip />}
               </span>
               <span className="text-xs text-ink-quiet">
                 {reference} · placed {dateFormat.format(placedAt)}

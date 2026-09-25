@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { activityEvents, notifications, orders, payments } from "@/db/schema";
+import { orders, payments } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth/guards";
+import { recordOrderEvent } from "@/lib/notifications/events";
 import { fail, type FormState } from "@/lib/auth/form-state";
 import { formatMoney, majorToMinor } from "@/lib/pricing/money";
 import { ORDER_STATUS } from "@/lib/admin/labels";
@@ -87,29 +88,34 @@ export async function updateOrderAction(
   let archiveWarning = "";
 
   if (before.status !== status) {
-    await db.insert(activityEvents).values({
+    /*
+      Shipped and delivered are the two the customer hears about; the rest are
+      internal bookkeeping, recorded but not announced. Either way the order's
+      clock moves, so anyone watching it sees it is not standing still.
+    */
+    const announce = status === "shipped" || status === "delivered";
+
+    await recordOrderEvent({
       orderId,
       actorId: session.user.id,
       type: "order_status",
       summary: `${before.reference} moved to ${ORDER_STATUS[status]?.label ?? status}`,
+      meta: { from: before.status, to: status },
+      audience: announce ? "customer" : null,
+      notify: announce
+        ? {
+            title:
+              status === "shipped"
+                ? `${before.reference} is on its way`
+                : `${before.reference} has been delivered`,
+            body:
+              status === "shipped"
+                ? "Your order has left the studio."
+                : "Let us know if anything isn't right.",
+            link: "/account/orders",
+          }
+        : undefined,
     });
-
-
-    if (status === "shipped" || status === "delivered") {
-      await db.insert(notifications).values({
-        userId: before.userId,
-        type: "order_status",
-        title:
-          status === "shipped"
-            ? `${before.reference} is on its way`
-            : `${before.reference} has been delivered`,
-        body:
-          status === "shipped"
-            ? "Your order has left the studio."
-            : "Let us know if anything isn't right.",
-        linkUrl: "/account/orders",
-      });
-    }
   }
 
   /**
@@ -208,11 +214,26 @@ export async function recordPaymentAction(
     .set({ paymentStatus: "paid", updatedAt: new Date() })
     .where(eq(orders.id, orderId));
 
-  await db.insert(activityEvents).values({
+  /*
+    The designer's move next, and deliberately not the customer's: they have
+    just paid and know it. What they would want is the money mentioned back to
+    them, which is exactly what staff must not see — so the studio is told the
+    order is clear to print without an amount in it.
+  */
+  await recordOrderEvent({
     orderId,
     actorId: session.user.id,
     type: "payment_recorded",
     summary: `${formatMoney(amountMinor, order.currency)} recorded against ${order.reference}`,
+    meta: { provider },
+    alsoTell: [
+      {
+        audience: "proofreader",
+        title: `${order.reference} is paid up`,
+        body: "It can go to print.",
+        link: `/staff/orders/${orderId}`,
+      },
+    ],
   });
 
   revalidatePath("/admin/orders");

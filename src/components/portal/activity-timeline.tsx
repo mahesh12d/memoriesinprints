@@ -27,8 +27,18 @@ export function ActivityTimeline({
   title = "History",
   scrollable = false,
   collapsible = true,
+  since,
 }: {
   entries: ActivityEntry[];
+  /**
+   * When this viewer last opened the order, if they have before.
+   *
+   * Everything above the line happened since then. Reopening an order you have
+   * seen before is the most confusing moment in the whole loop — the history is
+   * a column of sentences, several of them yours, and working out which ones are
+   * new means reading timestamps. One rule here does away with that.
+   */
+  since?: Date | null;
   title?: string;
   /**
    * Caps the list and scrolls it instead of growing the page.
@@ -82,27 +92,58 @@ export function ActivityTimeline({
             className="absolute bottom-1 left-[3px] top-1.5 w-px bg-line"
           />
 
-          {entries.map((entry, index) => (
-            <li key={entry.id} className="relative flex flex-col gap-0.5">
-              <span
-                aria-hidden="true"
-                className={`absolute -left-5 top-1.5 size-[7px] rounded-full ${
-                  // The newest is what happened last, and is the one being
-                  // looked for when someone opens this.
-                  index === 0 ? "bg-brand" : "bg-line"
-                }`}
-              />
-              <span className="text-[13px] leading-relaxed">
-                {entry.summary}
-              </span>
-              <time
-                dateTime={entry.createdAt.toISOString()}
-                className="text-[11px] text-ink-quiet"
-              >
-                {dateTimeFormat.format(entry.createdAt)}
-              </time>
-            </li>
-          ))}
+          {entries.map((entry, index) => {
+            const isNew =
+              since !== null &&
+              since !== undefined &&
+              entry.createdAt.getTime() > since.getTime();
+
+            /*
+              The divider goes above the first entry that is *not* new, so it
+              sits between the two halves. Nothing is drawn when everything is
+              new — a line under a heading with nothing above it is just a line —
+              nor when nothing is.
+            */
+            const previousWasNew =
+              index > 0 &&
+              since !== null &&
+              since !== undefined &&
+              entries[index - 1].createdAt.getTime() > since.getTime();
+
+            return (
+              <li key={entry.id} className="relative flex flex-col gap-0.5">
+                {!isNew && previousWasNew && (
+                  <span className="mb-3 flex items-center gap-2.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-ink-quiet">
+                    <span aria-hidden="true" className="h-px flex-1 bg-line" />
+                    Before your last visit
+                    <span aria-hidden="true" className="h-px flex-1 bg-line" />
+                  </span>
+                )}
+
+                <span
+                  aria-hidden="true"
+                  className={`absolute -left-5 top-1.5 size-[7px] rounded-full ${
+                    // The newest is what happened last, and is the one being
+                    // looked for when someone opens this.
+                    index === 0 || isNew ? "bg-brand" : "bg-line"
+                  }`}
+                />
+                <span
+                  className={`text-[13px] leading-relaxed ${
+                    isNew ? "font-semibold" : ""
+                  }`}
+                >
+                  {entry.summary}
+                </span>
+                <time
+                  dateTime={entry.createdAt.toISOString()}
+                  className="text-[11px] text-ink-quiet"
+                >
+                  {dateTimeFormat.format(entry.createdAt)}
+                </time>
+              </li>
+            );
+          })}
         </ol>
       </Shell>
     </section>

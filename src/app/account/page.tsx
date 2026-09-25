@@ -4,6 +4,8 @@ import { db } from "@/db";
 import { orderForms, orders, proofVersions, savedItems } from "@/db/schema";
 import { requireUser } from "@/lib/auth/guards";
 import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
+import { AgingBadge, NewChip } from "@/components/portal/unseen";
+import { getUnseenOrderIds } from "@/lib/notifications/watchers";
 
 export default async function AccountDashboardPage({
   searchParams,
@@ -27,12 +29,21 @@ export default async function AccountDashboardPage({
 
   const orderIds = myOrders.map((row) => row.id);
 
-  const [waiting, formsOutstanding, saved] = await Promise.all([
+  const [waiting, formsOutstanding, saved, unseenOrderIds] = await Promise.all([
+    /*
+      Every proof waiting on them, not just the newest.
+
+      This took one row, so a family with three orders in the studio — which is
+      ordinary for a funeral director — was told about one of them and left to
+      discover the other two by going looking. If more than one is waiting, that
+      is precisely the thing they most need to know.
+    */
     orderIds.length
       ? db
           .select({
             orderId: proofVersions.orderId,
             versionNumber: proofVersions.versionNumber,
+            sentAt: proofVersions.sentToCustomerAt,
           })
           .from(proofVersions)
           .where(
@@ -42,7 +53,6 @@ export default async function AccountDashboardPage({
             ),
           )
           .orderBy(desc(proofVersions.sentToCustomerAt))
-          .limit(1)
       : Promise.resolve([]),
     // Orders whose form has not been sent — the only thing here that stops
     // the studio starting work.
@@ -52,15 +62,22 @@ export default async function AccountDashboardPage({
       .leftJoin(orderForms, eq(orderForms.orderId, orders.id))
       .where(and(eq(orders.userId, userId), isNull(orderForms.submittedAt))),
     db.select({ value: count() }).from(savedItems).where(eq(savedItems.userId, userId)),
+    getUnseenOrderIds(userId, orderIds),
   ]);
 
-  const proof = waiting[0]
-    ? {
-        ...waiting[0],
-        reference:
-          myOrders.find((row) => row.id === waiting[0].orderId)?.reference ?? "",
-      }
-    : null;
+  const now = new Date();
+
+  const proofs = waiting.map((row) => ({
+    ...row,
+    reference: myOrders.find((order) => order.id === row.orderId)?.reference ?? "",
+    /*
+      Waiting since it was sent, falling back to now for a proof whose send time
+      predates that column: a missing timestamp must not read as "waiting
+      forever" and paint an ordinary order red.
+    */
+    waitingSince: row.sentAt ?? now,
+    unseen: unseenOrderIds.has(row.orderId),
+  }));
 
   const tiles = [
     { label: "Orders", value: myOrders.length, href: "/account/orders" },
@@ -106,26 +123,67 @@ export default async function AccountDashboardPage({
             </div>
           )}
 
-          {/* The one thing that might actually be waiting on them. */}
-          {proof ? (
-            <div className="rounded-md border border-line bg-card p-8">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-text">
-                Waiting for you
-              </span>
-              <h2 className="mt-1.5 text-lg">
-                Your proof for {proof.reference} is ready to look at
-              </h2>
-              <p className="mt-2 max-w-[62ch] text-sm leading-relaxed text-ink-muted">
-                Check the wording, the dates and the spellings. Nothing is
-                printed until you approve it, and there&rsquo;s no charge for
-                changes.
-              </p>
-              <Link
-                href={`/account/orders/${proof.orderId}/proof`}
-                className="mt-6 inline-flex rounded-[2px] bg-brand px-6 py-3 text-[13px] font-semibold text-on-accent"
-              >
-                Review version {proof.versionNumber}
-              </Link>
+          {/* Everything that is actually waiting on them, one card each. */}
+          {proofs.length > 0 ? (
+            <div className="flex flex-col gap-4">
+              <div className="flex items-baseline justify-between gap-4">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-text">
+                  {proofs.length === 1
+                    ? "Waiting for you"
+                    : `Waiting for you (${proofs.length})`}
+                </span>
+                {proofs.length > 1 && (
+                  <Link
+                    href="/account/orders?group=needs-you"
+                    className="text-[13px] font-semibold text-accent-text"
+                  >
+                    See all of them →
+                  </Link>
+                )}
+              </div>
+
+              {proofs.map((item) => (
+                <div
+                  key={item.orderId}
+                  className={`rounded-md border bg-card p-8 ${
+                    item.unseen ? "border-brand-line" : "border-line"
+                  }`}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <h2 className="text-lg">
+                      Your proof for {item.reference} is ready to look at
+                    </h2>
+                    {/*
+                      A word rather than a dot here: this card is the one thing
+                      on the page, so there is room to say it, and "new" is what
+                      someone with three orders open needs in order to tell which
+                      of the three has moved.
+                    */}
+                    {item.unseen && <NewChip />}
+                  </span>
+
+                  <p className="mt-2 max-w-[62ch] text-sm leading-relaxed text-ink-muted">
+                    Check the wording, the dates and the spellings. Nothing is
+                    printed until you approve it, and there&rsquo;s no charge for
+                    changes.
+                  </p>
+
+                  <div className="mt-6 flex flex-wrap items-center gap-4">
+                    <Link
+                      href={`/account/orders/${item.orderId}/proof`}
+                      className="inline-flex rounded-[2px] bg-brand px-6 py-3 text-[13px] font-semibold text-on-accent"
+                    >
+                      Review version {item.versionNumber}
+                    </Link>
+                    {/*
+                      How long it has been sitting with them. The studio cannot
+                      start printing until they look, so this is the one figure
+                      that is genuinely theirs to act on.
+                    */}
+                    <AgingBadge since={item.waitingSince} now={now} />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
             <div className="rounded-md border border-line bg-card p-8">

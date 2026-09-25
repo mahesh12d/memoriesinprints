@@ -5,9 +5,10 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { activityEvents, notifications, orderItems, orders, users } from "@/db/schema";
+import { orderItems, orders, users } from "@/db/schema";
 import { nextOrderReference } from "@/lib/order-reference";
 import { requireAdmin } from "@/lib/auth/guards";
+import { recordOrderEvent } from "@/lib/notifications/events";
 import { fail, type FormState } from "@/lib/auth/form-state";
 import { majorToMinor } from "@/lib/pricing/money";
 
@@ -102,19 +103,30 @@ export async function createProductionOrderAction(
     lineTotalMinor: totalMinor,
   });
 
-  await db.insert(activityEvents).values({
+  /*
+    The customer's, because the order form is theirs to fill in; the
+    proofreader is told as well, since a new order is work that has to be
+    routed to a designer before anything else can happen to it.
+  */
+  await recordOrderEvent({
     orderId: order.id,
     actorId: session.user.id,
     type: "order_raised",
     summary: `${session.user.name} raised ${reference} for ${customer.name}`,
-  });
-
-  await db.insert(notifications).values({
-    userId: customer.id,
-    type: "order_status",
-    title: `Your order ${reference} is open`,
-    body: "We've set up your order. You'll hear from us when a proof is ready.",
-    linkUrl: "/account/orders",
+    audience: "customer",
+    notify: {
+      title: `Your order ${reference} is open`,
+      body: "We've set up your order. You'll hear from us when a proof is ready.",
+      link: "/account/orders",
+    },
+    alsoTell: [
+      {
+        audience: "proofreader",
+        title: `${reference} was raised`,
+        body: "It needs a designer.",
+        link: `/staff/orders/${order.id}`,
+      },
+    ],
   });
 
   revalidatePath("/staff/orders");

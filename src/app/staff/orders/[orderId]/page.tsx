@@ -19,6 +19,8 @@ import { loadDesigners } from "@/lib/proofs/staff-queries";
 import { formatMoney } from "@/lib/pricing/money";
 import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
 import { ActivityTimeline } from "@/components/portal/activity-timeline";
+import { MarkViewed } from "@/components/portal/mark-viewed";
+import { getLastViewedAt } from "@/lib/notifications/watchers";
 import { StatusPill, type PillTone } from "@/components/portal/status-pill";
 import { StaffProgress } from "@/components/portal/staff-progress";
 import { ProofCompare } from "@/components/proofs/proof-compare";
@@ -93,7 +95,7 @@ export default async function StaffOrderDetailPage({
   const showMoney = canSeeMoney(session.user.role);
   const canUpload = canUploadProofs(session.user.role);
 
-  const [versions, designers, activity] = await Promise.all([
+  const [versions, designers, activity, lastViewedAt] = await Promise.all([
     db
       .select({
         id: proofVersions.id,
@@ -122,6 +124,12 @@ export default async function StaffOrderDetailPage({
       .where(eq(activityEvents.orderId, orderId))
       .orderBy(desc(activityEvents.createdAt))
       .limit(8),
+    /*
+      Read here and written from the browser, which is the whole trick: this has
+      to be the timestamp from *before* this visit for the history's divider to
+      mean anything, and a write during render would have already moved it.
+    */
+    getLastViewedAt(orderId, session.user.id),
   ]);
 
   const current = versions[0] ?? null;
@@ -141,6 +149,9 @@ export default async function StaffOrderDetailPage({
         id: proofComments.id,
         body: proofComments.body,
         pinNumber: proofComments.pinNumber,
+        // Which page it is on: a designer reading "change the middle name" has
+        // to know where to look, and a booklet is up to sixteen pages.
+        sheetIndex: proofComments.sheetIndex,
         authorName: users.name,
       })
       .from(proofComments)
@@ -148,6 +159,10 @@ export default async function StaffOrderDetailPage({
       .where(eq(proofComments.proofVersionId, commentedOn.id))
       .orderBy(asc(proofComments.pinNumber))
     : [];
+
+  const markedPages = [
+    ...new Set(comments.map((comment) => comment.sheetIndex + 1)),
+  ].sort((a, b) => a - b);
 
   const previous = versions[1] ?? null;
 
@@ -174,6 +189,8 @@ export default async function StaffOrderDetailPage({
 
   return (
     <>
+      <MarkViewed orderId={order.id} />
+
       <PortalHeader
         title={order.reference}
         actions={
@@ -295,7 +312,12 @@ export default async function StaffOrderDetailPage({
               </section>
             )}
 
-            <ActivityTimeline entries={activity} scrollable collapsible={false} />
+            <ActivityTimeline
+              entries={activity}
+              since={lastViewedAt}
+              scrollable
+              collapsible={false}
+            />
           </div>
 
           <div className="flex flex-col gap-6">
@@ -417,6 +439,18 @@ export default async function StaffOrderDetailPage({
                     What the customer marked on version{" "}
                     {commentedOn?.versionNumber} ({comments.length})
                   </h2>
+                  {/*
+                    Which pages need work, before any of the comments are read.
+
+                    A designer picking up returned artwork wants the page numbers
+                    first: with sixteen pages and four marks, knowing it is pages
+                    2 and 7 is most of what they need to start.
+                  */}
+                  <p className="mt-1 text-[12px] text-ink-muted">
+                    {markedPages.length === 1
+                      ? `Page ${markedPages[0]} needs work.`
+                      : `Pages ${markedPages.slice(0, -1).join(", ")} and ${markedPages.at(-1)} need work.`}
+                  </p>
                 </div>
                 <ul>
                   {comments.map((comment) => (
@@ -432,6 +466,7 @@ export default async function StaffOrderDetailPage({
                           {comment.body}
                         </p>
                         <span className="text-[12px] text-ink-quiet">
+                          Page {comment.sheetIndex + 1} ·{" "}
                           {comment.authorName ?? "Customer"}
                         </span>
                       </div>

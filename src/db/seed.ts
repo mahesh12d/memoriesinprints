@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { hash } from "@node-rs/argon2";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "./index";
 import {
   activityEvents,
@@ -10,6 +10,7 @@ import {
   notifications,
   orderItems,
   orders,
+  orderWatchers,
   payments,
   portfolioItems,
   customerItemPrices,
@@ -253,18 +254,26 @@ async function seedProofs({
   await db.insert(notifications).values({
     userId: customerId,
     type: "proof_ready",
+    orderId: seeded.awaitingCustomer.id,
     title: `Your proof for ${seeded.awaitingCustomer.reference} is ready`,
     body: "Have a look and let us know if anything needs changing.",
     linkUrl: `/account/orders/${seeded.awaitingCustomer.id}/proof`,
     createdAt: new Date(now.getTime() - 86_400_000),
   });
 
+  /*
+    Seeded events carry an audience, so a fresh database exercises the queues
+    and the bell rather than showing four rows that belong to nobody. The ages
+    are chosen to span the aging thresholds: five hours is amber, a day and
+    over is red.
+  */
   await db.insert(activityEvents).values([
     {
       orderId: seeded.awaitingCustomer.id,
       actorId: proofreaderId,
       type: "proof_sent",
       summary: `Version 2 of ${seeded.awaitingCustomer.reference} sent to the customer`,
+      audience: "customer",
       createdAt: new Date(now.getTime() - 86_400_000),
     },
     {
@@ -272,6 +281,7 @@ async function seedProofs({
       actorId: customerId,
       type: "changes_requested",
       summary: `Changes requested on ${seeded.awaitingCustomer.reference}`,
+      audience: "designer",
       createdAt: new Date(now.getTime() - 5 * 86_400_000),
     },
     {
@@ -279,6 +289,7 @@ async function seedProofs({
       actorId: proofreaderId,
       type: "proof_returned",
       summary: `${seeded.returned.reference} returned to the designer`,
+      audience: "designer",
       createdAt: new Date(now.getTime() - 3 * 3_600_000),
     },
     {
@@ -286,10 +297,28 @@ async function seedProofs({
       actorId: designerId,
       type: "proof_uploaded",
       summary: `A proof for ${seeded.needsProofreading.reference} is waiting to be proofread`,
+      audience: "proofreader",
       createdAt: new Date(now.getTime() - 5 * 3_600_000),
     },
   ]);
 
+  /*
+    Each order's clock set to its newest event.
+
+    The column defaults to now(), which would leave every seeded order looking
+    as though it had just moved — and the whole point of the dev data is to show
+    the difference between one that has and one that has been sitting.
+  */
+  for (const [orderId, at] of [
+    [seeded.awaitingCustomer.id, new Date(now.getTime() - 86_400_000)],
+    [seeded.returned.id, new Date(now.getTime() - 3 * 3_600_000)],
+    [seeded.needsProofreading.id, new Date(now.getTime() - 5 * 3_600_000)],
+  ] as const) {
+    await db
+      .update(orders)
+      .set({ lastActivityAt: at })
+      .where(eq(orders.id, orderId));
+  }
 }
 
 async function reset() {
@@ -299,6 +328,7 @@ async function reset() {
   await db.delete(payments);
   await db.delete(orderItems);
   await db.delete(activityEvents);
+  await db.delete(orderWatchers);
   await db.delete(orders);
   await db.delete(enquiries);
   await db.delete(savedItems);

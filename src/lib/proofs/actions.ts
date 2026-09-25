@@ -4,8 +4,6 @@ import { revalidatePath } from "next/cache";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  activityEvents,
-  notifications,
   orders,
   proofComments,
   proofVersions,
@@ -26,6 +24,7 @@ import {
 } from "@/lib/storage/storage";
 import { checkUpload } from "@/lib/storage/uploads";
 import { fail, type FormState } from "@/lib/auth/form-state";
+import { recordOrderEvent } from "@/lib/notifications/events";
 import { sendMail } from "@/lib/mail/mailer";
 import { paymentRequestMail, proofReadyMail } from "@/lib/mail/templates";
 import { clampPin } from "./pins";
@@ -171,11 +170,17 @@ export async function uploadProofAction(
    * that sets it.
    */
 
-  await db.insert(activityEvents).values({
+  /*
+    No audience: a draft is the designer's own until they send it on, so this
+    is a matter of record rather than a handover. It still bumps the order, so
+    a proofreader watching the job can see it is moving.
+  */
+  await recordOrderEvent({
     orderId,
     actorId: session.user.id,
     type: "proof_uploaded",
     summary: `${session.user.name} uploaded a draft proof for ${order.reference} (${chosen.length} page${chosen.length === 1 ? "" : "s"})`,
+    meta: { pageCount: chosen.length },
   });
 
   revalidatePath(`/staff/orders/${orderId}`);
@@ -234,8 +239,13 @@ async function latestVersion(orderId: string) {
       id: proofVersions.id,
       versionNumber: proofVersions.versionNumber,
       status: proofVersions.status,
+      // The reference travels with it: every caller that acts on a version
+      // then has to say which job it was, and none of them should need a
+      // second query to name it.
+      reference: orders.reference,
     })
     .from(proofVersions)
+    .innerJoin(orders, eq(orders.id, proofVersions.orderId))
     .where(eq(proofVersions.orderId, orderId))
     .orderBy(desc(proofVersions.versionNumber))
     .limit(1);
@@ -292,11 +302,18 @@ export async function submitProofAction(
     .set({ status: "awaiting_proofreading" })
     .where(eq(proofVersions.id, version.id));
 
-  await db.insert(activityEvents).values({
+  await recordOrderEvent({
     orderId,
     actorId: session.user.id,
     type: "proof_submitted",
     summary: `${session.user.name} sent version ${version.versionNumber} of ${order.reference} for proofreading`,
+    meta: { version: version.versionNumber },
+    audience: "proofreader",
+    notify: {
+      title: `${order.reference} needs proofreading`,
+      body: `${session.user.name} sent version ${version.versionNumber} over to be checked.`,
+      link: `/staff/orders/${orderId}`,
+    },
   });
 
   revalidatePath(`/staff/orders/${orderId}`);
@@ -356,14 +373,6 @@ export async function sendProofToCustomerAction(
     })
     .where(eq(proofVersions.id, version.id));
 
-  await db.insert(notifications).values({
-    userId: order.userId,
-    type: "proof_ready",
-    title: `Your proof for ${order.reference} is ready`,
-    body: "Have a look and either approve it or tell us what to change.",
-    linkUrl: `/account/orders/${order.id}/proof`,
-  });
-
   /**
    * And by email, because nobody sits in the portal waiting.
    *
@@ -386,11 +395,24 @@ export async function sendProofToCustomerAction(
     console.error("[proofs] could not email the customer", error);
   }
 
-  await db.insert(activityEvents).values({
+  /*
+    The timeline is written for the studio and the bell row for the customer,
+    which is why the two read differently: the family does not need telling
+    which member of staff pressed the button.
+  */
+  await recordOrderEvent({
     orderId,
     actorId: session.user.id,
     type: "proof_sent",
     summary: `${session.user.name} sent version ${version.versionNumber} of ${order.reference} to the customer`,
+    meta: { version: version.versionNumber },
+    audience: "customer",
+    notify: {
+      title: `Your proof for ${order.reference} is ready`,
+      body: "Have a look and either approve it or tell us what to change.",
+      kind: "proof_ready",
+      link: `/account/orders/${order.id}/proof`,
+    },
   });
 
   revalidatePath(`/staff/orders/${orderId}`);
@@ -427,12 +449,18 @@ export async function returnProofToDesignerAction(
     })
     .where(eq(proofVersions.id, version.id));
 
-  await db.insert(activityEvents).values({
+  await recordOrderEvent({
     orderId,
     actorId: session.user.id,
     type: "proof_returned",
     summary: `${session.user.name} returned version ${version.versionNumber} to the designer`,
-    meta: { notes },
+    meta: { notes, version: version.versionNumber },
+    audience: "designer",
+    notify: {
+      title: `${version.reference} came back with changes`,
+      body: notes,
+      link: `/staff/orders/${orderId}`,
+    },
   });
 
   revalidatePath(`/staff/orders/${orderId}`);
@@ -475,11 +503,23 @@ export async function assignDesignerAction(
       .set({ assignedDesignerId: designer.id, updatedAt: new Date() })
       .where(eq(orders.id, orderId));
 
-    await db.insert(activityEvents).values({
+    /*
+      Recorded after the assignment, not before: the fan-out reads the order's
+      assignedDesignerId to decide who to tell, so the new designer is only
+      reachable once the column holds them.
+    */
+    await recordOrderEvent({
       orderId,
       actorId: session.user.id,
       type: "designer_assigned",
       summary: `${session.user.name} assigned the order to ${designer.name}`,
+      meta: { designerId: designer.id },
+      audience: "designer",
+      notify: {
+        title: "An order has been assigned to you",
+        body: `${session.user.name} put this one with you.`,
+        link: `/staff/orders/${orderId}`,
+      },
     });
   } else {
     await db
@@ -594,6 +634,44 @@ export async function addProofCommentAction(
     pinNumber: count + 1,
   });
 
+  /*
+    A pin used to be silent. Someone could mark a wrong middle name on page
+    three and the only trace was on the proof itself, so the person it was for
+    found it by reopening the artwork — if they thought to.
+
+    Who hears depends on who wrote it: the studio needs to know when a customer
+    marks something, and a customer needs to know when the studio asks them a
+    question back. Neither is a handover, so neither moves the order into a
+    queue: audience is left off and the telling is done by alsoTell.
+  */
+  const fromCustomer = proof.isOwner;
+
+  await recordOrderEvent({
+    orderId: proof.orderId,
+    actorId: proof.session.user.id,
+    type: "comment_added",
+    summary: `${proof.session.user.name} left a comment on page ${sheetIndex + 1} of ${proof.reference}`,
+    meta: { version: proof.versionNumber, sheetIndex, pinNumber: count + 1 },
+    alsoTell: fromCustomer
+      ? [
+          {
+            audience: "designer",
+            title: `New comment on ${proof.reference}`,
+            body: `The customer marked page ${sheetIndex + 1}.`,
+            link: `/staff/orders/${proof.orderId}`,
+          },
+        ]
+      : [
+          {
+            audience: "customer",
+            title: `A note on your proof for ${proof.reference}`,
+            body: `The studio left a comment on page ${sheetIndex + 1}.`,
+            kind: "proof_ready",
+            link: `/account/orders/${proof.orderId}/proof`,
+          },
+        ],
+  });
+
   revalidatePath(`/account/orders/${proof.orderId}/proof`);
   revalidatePath(`/staff/orders/${proof.orderId}`);
 
@@ -672,11 +750,18 @@ export async function decideProofAction(
       })
       .where(eq(orders.id, proof.orderId));
 
-    await db.insert(activityEvents).values({
+    await recordOrderEvent({
       orderId: proof.orderId,
       actorId: session.user.id,
       type: "proof_approved",
       summary: `${session.user.name} approved version ${proof.versionNumber} of ${proof.reference}`,
+      meta: { version: proof.versionNumber },
+      audience: "proofreader",
+      notify: {
+        title: `${proof.reference} was approved`,
+        body: "The customer is happy with it. It can go to print.",
+        link: `/staff/orders/${proof.orderId}`,
+      },
     });
 
     // Approving is what creates the bill, so the request goes out with it.
@@ -726,11 +811,35 @@ export async function decideProofAction(
       .set({ status: "changes_requested", customerDecisionAt: new Date() })
       .where(eq(proofVersions.id, proofVersionId));
 
-    await db.insert(activityEvents).values({
+    /*
+      The designer's move, with the proofreader told as well.
+
+      They route the work and would otherwise find out only by noticing, but
+      the order is not theirs to fix, so it goes to their bell rather than
+      into their queue as work.
+    */
+    const marked = `${count} comment${count === 1 ? "" : "s"} left on the proof`;
+
+    await recordOrderEvent({
       orderId: proof.orderId,
       actorId: session.user.id,
       type: "changes_requested",
       summary: `${session.user.name} requested changes to ${proof.reference} (${count} comment${count === 1 ? "" : "s"})`,
+      meta: { version: proof.versionNumber, commentCount: count },
+      audience: "designer",
+      notify: {
+        title: `${proof.reference} needs changes`,
+        body: `The customer left ${count} comment${count === 1 ? "" : "s"} on the proof.`,
+        link: `/staff/orders/${proof.orderId}`,
+      },
+      alsoTell: [
+        {
+          audience: "proofreader",
+          title: `${proof.reference} came back from the customer`,
+          body: marked,
+          link: `/staff/orders/${proof.orderId}`,
+        },
+      ],
     });
 
     revalidatePath(`/account/orders/${proof.orderId}/proof`);

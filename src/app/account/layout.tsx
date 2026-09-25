@@ -10,9 +10,7 @@ import {
   ShieldIcon,
   UserIcon,
 } from "@/components/portal/icons";
-import { NotificationBell } from "@/components/portal/notification-bell";
-import { loadNotifications } from "@/lib/notifications/queries";
-import { markNotificationsReadAction } from "@/lib/notifications/actions";
+import { Bell } from "@/components/portal/bell";
 
 const NAV = [
   { href: "/account", label: "Dashboard", icon: <GridIcon /> },
@@ -33,7 +31,6 @@ export default async function AccountLayout({
   children: ReactNode;
 }) {
   const session = await requireUser();
-  const { items, unreadCount } = await loadNotifications(session.user.id);
 
   return (
     <PortalShell
@@ -41,13 +38,7 @@ export default async function AccountLayout({
       nav={NAV}
       user={{ name: session.user.name, roleLabel: "Customer" }}
       logout={<LogoutButton action={logoutAction} />}
-      bell={
-        <NotificationBell
-          items={items}
-          unreadCount={unreadCount}
-          markRead={markNotificationsReadAction}
-        />
-      }
+      bell={<Bell userId={session.user.id} />}
     >
       {children}
     </PortalShell>

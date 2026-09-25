@@ -5,8 +5,9 @@ import { randomBytes } from "node:crypto";
 import { and, count, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { activityEvents, users } from "@/db/schema";
+import { users } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth/guards";
+import { recordStudioEvent } from "@/lib/notifications/events";
 import { fail, type FormState } from "@/lib/auth/form-state";
 import { emailField } from "@/lib/validation";
 import { hashPassword } from "@/lib/auth/password";
@@ -70,7 +71,7 @@ export async function setUserRoleAction(
   // their existing sessions are ended rather than left holding the old one.
   await revokeAllSessions(target.id);
 
-  await db.insert(activityEvents).values({
+  await recordStudioEvent({
     actorId: session.user.id,
     type: "role_changed",
     summary: `${target.name} is now ${parsed.data.role}`,
@@ -122,7 +123,7 @@ export async function setUserDisabledAction(
 
   if (disable) await revokeAllSessions(target.id);
 
-  await db.insert(activityEvents).values({
+  await recordStudioEvent({
     actorId: session.user.id,
     type: disable ? "account_suspended" : "account_restored",
     summary: `${target.name}'s account was ${disable ? "suspended" : "restored"}`,
@@ -193,7 +194,7 @@ export async function inviteUserAction(
   const token = await issueToken(created.id, "password_reset");
   await sendMail(resetPasswordMail(email, name, token));
 
-  await db.insert(activityEvents).values({
+  await recordStudioEvent({
     actorId: session.user.id,
     type: "user_invited",
     summary: `${name} was invited as ${role}`,

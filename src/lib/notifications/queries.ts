@@ -2,15 +2,25 @@ import "server-only";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { notifications } from "@/db/schema";
-import type { NotificationRow } from "./types";
+import { bundle } from "./bundle";
+import type { Digest, NotificationGroup, NotificationRow } from "./types";
 
-export type { NotificationRow };
+export type { NotificationRow, NotificationGroup, Digest };
 
-/** The bell shows the ten most recent; the count covers everything unread. */
-const RECENT_LIMIT = 10;
+/**
+ * How many rows the panel reads.
+ *
+ * More than it shows, because bundling collapses them: twenty rows on one busy
+ * order would otherwise fold to a single line and leave the panel looking
+ * empty. The count covers everything unread regardless.
+ */
+const RECENT_LIMIT = 40;
+
+/** After folding, how many lines the panel will show. */
+const PANEL_LINES = 12;
 
 export async function loadNotifications(userId: string): Promise<{
-  items: NotificationRow[];
+  items: NotificationGroup[];
   unreadCount: number;
 }> {
   const [rows, [unread]] = await Promise.all([
@@ -20,6 +30,7 @@ export async function loadNotifications(userId: string): Promise<{
         title: notifications.title,
         body: notifications.body,
         linkUrl: notifications.linkUrl,
+        orderId: notifications.orderId,
         createdAt: notifications.createdAt,
         readAt: notifications.readAt,
       })
@@ -35,15 +46,43 @@ export async function loadNotifications(userId: string): Promise<{
       ),
   ]);
 
+  const items: NotificationRow[] = rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    body: row.body,
+    linkUrl: row.linkUrl,
+    orderId: row.orderId,
+    createdAt: row.createdAt,
+    isUnread: row.readAt === null,
+  }));
+
   return {
-    items: rows.map((row) => ({
-      id: row.id,
-      title: row.title,
-      body: row.body,
-      linkUrl: row.linkUrl,
-      createdAt: row.createdAt,
-      isUnread: row.readAt === null,
-    })),
+    items: bundle(items).slice(0, PANEL_LINES),
     unreadCount: unread?.count ?? 0,
+  };
+}
+
+/**
+ * Has anything happened — answered as cheaply as the question deserves.
+ *
+ * This is what every open page asks on a timer, so it is two aggregates over
+ * one indexed column and no list at all. The caller refreshes only when
+ * latestEventAt moves, which is what keeps a quiet afternoon from re-rendering
+ * the queue four times a minute.
+ */
+export async function digestFor(userId: string): Promise<Digest> {
+  const [row] = await db
+    .select({
+      unreadCount: sql<number>`count(*) filter (where ${notifications.readAt} is null)::int`,
+      latestEventAt: sql<Date | null>`max(${notifications.createdAt})`,
+    })
+    .from(notifications)
+    .where(eq(notifications.userId, userId));
+
+  return {
+    unreadCount: row?.unreadCount ?? 0,
+    latestEventAt: row?.latestEventAt
+      ? new Date(row.latestEventAt).getTime()
+      : null,
   };
 }

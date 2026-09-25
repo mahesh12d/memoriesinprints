@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, desc, eq, isNotNull } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { notifications, orders, proofVersions } from "@/db/schema";
 import { requireUser } from "@/lib/auth/guards";
 import { loadPins, signSheets } from "@/lib/proofs/sheets";
 import { PortalBody, PortalHeader } from "@/components/portal/portal-shell";
 import { ProofReviewer } from "@/components/proofs/proof-reviewer";
+import { MarkViewed } from "@/components/portal/mark-viewed";
 import { isUuid } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -93,19 +94,35 @@ export default async function ProofReviewPage({
 
   const fileUrl = sheets[0]?.url ?? "";
 
-  // Opening the proof clears the notification that brought them here.
+  /*
+    Opening the proof clears the notifications that brought them here.
+
+    Matched on the order rather than on the link text now that a notification
+    carries the order it is about: a comment left on the proof links to this same
+    page, and a rule written against a URL string quietly stops matching the day
+    one of those links gains a query parameter.
+  */
   await db
     .update(notifications)
     .set({ readAt: new Date() })
     .where(
       and(
         eq(notifications.userId, session.user.id),
-        eq(notifications.linkUrl, `/account/orders/${orderId}/proof`),
+        eq(notifications.orderId, orderId),
+        isNull(notifications.readAt),
       ),
     );
 
   return (
     <>
+      {/*
+        Records that they have looked at this order, so the "new" marks on their
+        own orders list and dashboard clear — and so the studio's "with the
+        customer" rows can tell a proof that has been opened from one that has
+        been sitting unread since it was sent.
+      */}
+      <MarkViewed orderId={orderId} />
+
       <PortalHeader
         title={`Proof — ${order.reference}`}
         actions={

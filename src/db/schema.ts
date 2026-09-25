@@ -127,6 +127,21 @@ export const notificationType = pgEnum("notification_type", [
   "system",
 ]);
 
+/**
+ * Who an order event is waiting on, which is what decides whose queue it
+ * surfaces in and who gets told about it.
+ *
+ * Distinct from the actor: a designer uploading a proof is an event *for* the
+ * proofreader. Null means it is a matter of record rather than a handover —
+ * nobody has to do anything about it.
+ */
+export const eventAudience = pgEnum("event_audience", [
+  "designer",
+  "proofreader",
+  "customer",
+  "admin",
+]);
+
 /* -------------------------------------------------------------------------- */
 /* People and auth                                                            */
 /* -------------------------------------------------------------------------- */
@@ -570,12 +585,27 @@ export const orders = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+
+    /**
+     * When something last happened on this order, bumped by every recorded
+     * event.
+     *
+     * Deliberately not updatedAt: that moves when a member of staff edits a
+     * production note, which is not something anyone needs telling about.
+     * This is the one column "is there anything new since I last looked"
+     * compares against, so the queue can answer it per row without joining
+     * the event table.
+     */
+    lastActivityAt: timestamp("last_activity_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (t) => [
     uniqueIndex("orders_reference_unique").on(t.reference),
     index("orders_user_idx").on(t.userId),
     index("orders_status_idx").on(t.status),
     index("orders_designer_idx").on(t.assignedDesignerId),
+    index("orders_activity_idx").on(t.lastActivityAt),
   ],
 );
 
@@ -738,6 +768,13 @@ export const payments = pgTable(
   (t) => [index("payments_order_idx").on(t.orderId)],
 );
 
+/**
+ * The per-user bell feed, fanned out when an event is recorded rather than
+ * worked out when the bell is opened.
+ *
+ * A read of the panel is then one indexed select on user_id, which matters
+ * because the bell is in every layout and so runs on every page.
+ */
 export const notifications = pgTable(
   "notifications",
   {
@@ -749,15 +786,40 @@ export const notifications = pgTable(
     title: text("title").notNull(),
     body: text("body"),
     linkUrl: text("link_url"),
+
+    /**
+     * The order this is about, and the event that produced it.
+     *
+     * The order is what the panel groups on, so ten pages uploaded to one job
+     * read as one line instead of ten. Both are optional: a quote update and a
+     * verification notice belong to nobody's order.
+     */
+    orderId: uuid("order_id").references(() => orders.id, {
+      onDelete: "cascade",
+    }),
+    eventId: uuid("event_id").references(() => activityEvents.id, {
+      onDelete: "set null",
+    }),
+
     readAt: timestamp("read_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("notifications_user_idx").on(t.userId, t.readAt)],
+  (t) => [
+    index("notifications_user_idx").on(t.userId, t.readAt),
+    // Newest-first for one person, which is the only way the panel reads it.
+    index("notifications_user_created_idx").on(t.userId, t.createdAt),
+  ],
 );
 
-/** Feeds the staff activity panel and doubles as a light audit trail. */
+/**
+ * Everything that has happened to an order: the studio's activity panel, a
+ * light audit trail, and the source the bell feed is fanned out from.
+ *
+ * Append-only. Rows are never edited, so a summary read on a screen today is
+ * the sentence that was written when it happened.
+ */
 export const activityEvents = pgTable(
   "activity_events",
   {
@@ -771,11 +833,65 @@ export const activityEvents = pgTable(
     type: text("type").notNull(),
     summary: text("summary").notNull(),
     meta: jsonb("meta"),
+
+    /**
+     * Whose move it is next, if it is anyone's.
+     *
+     * Null for a matter of record — a payment landing, a file archived —
+     * which nobody has to act on. Where it is set, it is what puts the order
+     * in that role's queue and what decides who the bell tells.
+     */
+    audience: eventAudience("audience"),
+
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("activity_events_created_idx").on(t.createdAt)],
+  (t) => [
+    index("activity_events_created_idx").on(t.createdAt),
+    // The order timeline, newest first — how every detail page reads it.
+    index("activity_events_order_idx").on(t.orderId, t.createdAt),
+  ],
+);
+
+/**
+ * When each person last looked at each order, which is the whole of "what is
+ * new since I last looked".
+ *
+ * A row per viewer per order, written on the way into the order rather than
+ * on any explicit "mark as read" click: the question this answers is whether
+ * they have *seen* it, and opening it is the only honest evidence of that. No
+ * row at all means never opened, so everything on it is new.
+ */
+export const orderWatchers = pgTable(
+  "order_watchers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    lastViewedAt: timestamp("last_viewed_at", { withTimezone: true }),
+
+    /**
+     * Set aside until this time.
+     *
+     * Seen but not ready to act on, which is neither unread nor handled. New
+     * activity supersedes it rather than waiting the snooze out: a customer
+     * coming back with changes is not something to keep sitting on.
+     */
+    snoozedUntil: timestamp("snoozed_until", { withTimezone: true }),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("order_watchers_order_user_unique").on(t.orderId, t.userId),
+    index("order_watchers_user_idx").on(t.userId),
+  ],
 );
 
 /* -------------------------------------------------------------------------- */
@@ -996,6 +1112,45 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
   items: many(orderItems),
   proofs: many(proofVersions),
   payments: many(payments),
+  events: many(activityEvents),
+  watchers: many(orderWatchers),
+}));
+
+export const activityEventsRelations = relations(activityEvents, ({ one }) => ({
+  order: one(orders, {
+    fields: [activityEvents.orderId],
+    references: [orders.id],
+  }),
+  actor: one(users, {
+    fields: [activityEvents.actorId],
+    references: [users.id],
+  }),
+}));
+
+export const orderWatchersRelations = relations(orderWatchers, ({ one }) => ({
+  order: one(orders, {
+    fields: [orderWatchers.orderId],
+    references: [orders.id],
+  }),
+  user: one(users, {
+    fields: [orderWatchers.userId],
+    references: [users.id],
+  }),
+}));
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, {
+    fields: [notifications.userId],
+    references: [users.id],
+  }),
+  order: one(orders, {
+    fields: [notifications.orderId],
+    references: [orders.id],
+  }),
+  event: one(activityEvents, {
+    fields: [notifications.eventId],
+    references: [activityEvents.id],
+  }),
 }));
 
 export const orderItemsRelations = relations(orderItems, ({ one }) => ({
@@ -1053,9 +1208,12 @@ export type Enquiry = typeof enquiries.$inferSelect;
 export type ProofVersion = typeof proofVersions.$inferSelect;
 export type ProofComment = typeof proofComments.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
+export type ActivityEvent = typeof activityEvents.$inferSelect;
+export type OrderWatcher = typeof orderWatchers.$inferSelect;
 export type Cart = typeof carts.$inferSelect;
 export type CartItem = typeof cartItems.$inferSelect;
 export type ProductPrice = typeof productPrices.$inferSelect;
 export type UserRole = (typeof userRole.enumValues)[number];
 export type OrderStatus = (typeof orderStatus.enumValues)[number];
 export type ProofStatus = (typeof proofStatus.enumValues)[number];
+export type EventAudience = (typeof eventAudience.enumValues)[number];

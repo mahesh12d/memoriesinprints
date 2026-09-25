@@ -11,6 +11,7 @@ import {
   TagIcon,
   UsersIcon,
 } from "@/components/portal/icons";
+import { Bell } from "@/components/portal/bell";
 
 /**
  * This layout wraps every admin page except /admin/login, which sits outside
@@ -39,6 +40,7 @@ export default async function AdminPortalLayout({
       nav={NAV}
       user={{ name: session.user.name, roleLabel: "Administrator" }}
       logout={<LogoutButton action={adminLogoutAction} />}
+      bell={<Bell userId={session.user.id} />}
     >
       {children}
     </PortalShell>

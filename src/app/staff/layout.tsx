@@ -3,6 +3,7 @@ import { requireStaff } from "@/lib/auth/guards";
 import { logoutAction } from "@/lib/auth/actions";
 import { LogoutButton, PortalShell } from "@/components/portal/portal-shell";
 import { FileIcon, GridIcon, ListIcon } from "@/components/portal/icons";
+import { Bell } from "@/components/portal/bell";
 
 const NAV = [
   { href: "/staff", label: "Dashboard", icon: <GridIcon /> },
@@ -32,6 +33,7 @@ export default async function StaffLayout({
           ROLE_LABEL[session.user.role as keyof typeof ROLE_LABEL] ?? "Staff",
       }}
       logout={<LogoutButton action={logoutAction} />}
+      bell={<Bell userId={session.user.id} />}
     >
       {children}
     </PortalShell>
