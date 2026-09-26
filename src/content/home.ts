@@ -59,18 +59,35 @@ export const TRUSTED_BY = [
   "[Wedding Venue]",
 ];
 
+/**
+ * What clients said, in the shape `TestimonialCarousel` takes.
+ *
+ * The name and the role used to be one `attribution` string, which was all the
+ * old marquee card needed. Split in two, the person sits on their own line
+ * above the home or venue they said it from, instead of being a comma in the
+ * middle of a sentence.
+ *
+ * Square brackets are placeholders, as everywhere else in this file: real names
+ * go in once the studio has asked.
+ */
 export const TESTIMONIALS = [
   {
-    text: "Memories in Prints turned around our order of service booklets in under 48 hours, exactly as promised, when we needed it most.",
-    attribution: "[Funeral Director], [Funeral Home Name]",
+    name: "[Funeral Director Name]",
+    role: "Funeral Director, [Funeral Home Name]",
+    review:
+      "Memories in Prints turned around our order of service booklets in under 48 hours, exactly as promised, when we needed it most.",
   },
   {
-    text: "Every proof felt like it had been designed just for us. Our invitations were exactly what we'd hoped for.",
-    attribution: "[Couple's Name], Wedding client",
+    name: "[Couple's Name]",
+    role: "Wedding client",
+    review:
+      "Every proof felt like it had been designed just for us. Our invitations were exactly what we'd hoped for.",
   },
   {
-    text: "Clear communication from start to finish, and the finished pieces were beautifully made.",
-    attribution: "[Funeral Director], [Funeral Home Name]",
+    name: "[Funeral Director Name]",
+    role: "Funeral Director, [Funeral Home Name]",
+    review:
+      "Clear communication from start to finish, and the finished pieces were beautifully made.",
   },
 ];
 

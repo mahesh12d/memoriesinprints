@@ -8,7 +8,7 @@ import {
 import { CtaBand, Section, SectionHeading } from "@/components/site/section";
 import { ImagePlaceholder } from "@/components/site/image-placeholder";
 import { ImageAutoSlider } from "@/components/ui/image-auto-slider";
-import { TestimonialSlider } from "@/components/ui/testimonial-slider";
+import { TestimonialCarousel } from "@/components/ui/testimonial-carousel";
 import { and, asc, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
 import { portfolioItems } from "@/db/schema";
@@ -278,7 +278,9 @@ export default async function HomePage() {
 
       {/* TESTIMONIALS */}
       <Section>
-        <TestimonialSlider quotes={TESTIMONIALS} />
+        {/* `py-0`: the section already supplies the vertical rhythm, so the
+            carousel's own default padding would double it. */}
+        <TestimonialCarousel testimonials={TESTIMONIALS} className="py-0" />
       </Section>
 
       {/* INTERNATIONAL */}
