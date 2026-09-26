@@ -492,9 +492,27 @@ Not security findings, but they get in the way of testing the security ones.
    which cannot work against the current route.
 
 Items 1 and 4 to 6 mean `npm run test:e2e` does not currently pass on `dev`, independently
-of anything in this review. A full-suite run from this container confirms it: the security
-spec's own tests behave exactly as they do when run alone, while the specs that rely on
-those `signIn` helpers fail in bulk.
+of anything in this review. A full-suite run from this container measures it —
+**46 passed, 78 failed** in 8 minutes:
+
+| Spec | Passed | Failed |
+| --- | --- | --- |
+| `security.spec.ts` | 30 | 7 |
+| `admin.spec.ts` | 1 | 22 |
+| `auth.spec.ts` | 1 | 14 |
+| `site.spec.ts` | 9 | 13 |
+| `proofs.spec.ts` | 0 | 10 |
+| `shop.spec.ts` | 5 | 8 |
+| `order-form.spec.ts` | 0 | 4 |
+
+**60 of the 71 failures outside the security spec are the single locator in item 1** — one
+`strict mode violation: getByLabel('Password') resolved to 2 elements`, repeated once per
+test that needs a session. The rest are items 4 to 6. Fixing item 1 alone should recover
+most of the suite.
+
+The security spec scored 30 / 7 here, exactly as it does when run on its own, which is the
+point of it building and removing its own fixtures: its result does not depend on what
+else ran first.
 
 ## Suggested order of work
 
